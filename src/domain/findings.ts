@@ -20,6 +20,23 @@ export type Severity =
   /** The criterion is mostly met and this is a gap – e.g. one image among many missing alt text. */
   | 'partial';
 
+/**
+ * What a reviewer did about a finding. `apply` carries a value the fix
+ * needs (alternative text, link wording) and is written into the document;
+ * `decorative` marks an image as carrying no information; `dismiss` records
+ * that a person looked and judged it not a failure, with the reason. A
+ * dismissed finding does not count against the criterion, and the report
+ * says who dismissed it and why. There is no "fixed by hand": the document
+ * never leaves the service, so every change to it goes through here.
+ */
+export interface Decision {
+  action: 'apply' | 'decorative' | 'dismiss';
+  value?: string;
+  note?: string;
+  by: string;
+  at: string;
+}
+
 export interface Finding {
   /** What kind of problem this is, in the customer's words. See `kinds.ts`. */
   kind: Kind;
@@ -32,6 +49,27 @@ export interface Finding {
   severity: Severity;
   /** True once the fix has been made in the delivered document. */
   remediated: boolean;
+  /**
+   * Where in the XML the finding is, for a reviewer-supplied fix to find it
+   * again: "docPr:12" for an image, "hyperlink:3" for the fourth link in
+   * document order. Absent for findings nothing can apply a fix to.
+   */
+  anchor?: string;
+  decision?: Decision;
+}
+
+export function isDismissed(f: Finding): boolean {
+  return f.decision?.action === 'dismiss';
+}
+
+/** Open: not fixed in the document and not judged a non-failure by a person. */
+export function isOpen(f: Finding): boolean {
+  return !f.remediated && !isDismissed(f);
+}
+
+/** The key a decision is filed under. Location is part of it because a document can have the same kind of problem in ten places. */
+export function findingKey(f: Finding): string {
+  return `${f.kind}|${f.location}`;
 }
 
 /**
@@ -48,10 +86,12 @@ export interface Assessment {
   status: Status;
   /** Open findings that produced the status. Empty when it Supports or is Not Applicable. */
   open: Finding[];
+  /** Findings a reviewer judged not failures. They show in the remarks. */
+  dismissed: Finding[];
 }
 
 export function openFindings(findings: readonly Finding[]): Finding[] {
-  return findings.filter((f) => !f.remediated);
+  return findings.filter(isOpen);
 }
 
 /**
@@ -69,19 +109,20 @@ export function assess(
   kind: ContentKind,
   confirmed: ReadonlySet<string> = NONE,
 ): Assessment {
+  const dismissed = findings.filter((f) => f.criterion === criterionId && isDismissed(f));
   if (!appliesTo(criterionId, kind)) {
-    return { criterion: criterionId, status: 'Not Applicable', open: [] };
+    return { criterion: criterionId, status: 'Not Applicable', open: [], dismissed };
   }
   const open = openFindings(findings).filter((f) => f.criterion === criterionId);
   if (open.length > 0) {
     const status: Status = open.some((f) => f.severity === 'blocking') ? 'Does Not Support' : 'Partially Supports';
-    return { criterion: criterionId, status, open };
+    return { criterion: criterionId, status, open, dismissed };
   }
   const basis = coverageOf(criterionId)?.coverage;
   if (basis === 'reviewer' && !confirmed.has(criterionId)) {
-    return { criterion: criterionId, status: 'Needs Review', open };
+    return { criterion: criterionId, status: 'Needs Review', open, dismissed };
   }
-  return { criterion: criterionId, status: 'Supports', open };
+  return { criterion: criterionId, status: 'Supports', open, dismissed };
 }
 
 /** One assessment per criterion in the catalogue, in catalogue order. */
@@ -174,9 +215,12 @@ export function describeSummary(s: Summary): { headline: string; detail: string 
 
 /** The Remarks column of the report, without the criterion's name. One place. */
 export function describeRemarks(a: Assessment): string {
+  const reviewed = a.dismissed.length
+    ? ` ${a.dismissed.length} ${a.dismissed.length === 1 ? 'finding was' : 'findings were'} reviewed and judged not ${a.dismissed.length === 1 ? 'a failure' : 'failures'}${dismissedBy(a.dismissed)}.`
+    : '';
   switch (a.status) {
     case 'Supports':
-      return coverageOf(a.criterion)?.remark ?? 'No open issues.';
+      return `${coverageOf(a.criterion)?.remark ?? 'No open issues.'}${reviewed}`;
     case 'Needs Review':
       return `Waiting on a reviewer. ${coverageOf(a.criterion)?.remark ?? ''}`.trim();
     case 'Not Applicable':
@@ -185,9 +229,14 @@ export function describeRemarks(a: Assessment): string {
     case 'Does Not Support': {
       const n = a.open.length;
       const where = a.open.map((f) => f.location).join(', ');
-      return `${n} open ${n === 1 ? 'issue' : 'issues'} (${where}).`;
+      return `${n} open ${n === 1 ? 'issue' : 'issues'} (${where}).${reviewed}`;
     }
   }
+}
+
+function dismissedBy(dismissed: readonly Finding[]): string {
+  const names = [...new Set(dismissed.map((f) => f.decision?.by).filter((n): n is string => !!n))];
+  return names.length ? ` by ${names.join(', ')}` : '';
 }
 
 /** The one-line form: criterion, then its remarks. */
@@ -196,8 +245,14 @@ export function describeAssessment(a: Assessment): string {
   return `${labelFor(a.criterion)}: ${remarks.charAt(0).toLowerCase()}${remarks.slice(1)}`;
 }
 
+/** The word for a finding's state, everywhere it is shown. */
+export function stateOf(f: Finding): 'Fixed' | 'Dismissed' | 'Blocking' | 'Open' {
+  if (f.remediated) return 'Fixed';
+  if (isDismissed(f)) return 'Dismissed';
+  return f.severity === 'blocking' ? 'Blocking' : 'Open';
+}
+
 /** The sentence that names a finding to a person: what, where, and whether it is done. */
 export function describeFinding(f: Finding): string {
-  const state = f.remediated ? 'Fixed' : f.severity === 'blocking' ? 'Blocking' : 'Open';
-  return `${state} – ${labelFor(f.criterion)}, ${f.location}: ${f.description}`;
+  return `${stateOf(f)} – ${labelFor(f.criterion)}, ${f.location}: ${f.description}`;
 }

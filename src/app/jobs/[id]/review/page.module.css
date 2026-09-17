@@ -1,0 +1,199 @@
+.kicker {
+  margin: 0 0 1rem;
+}
+
+.title {
+  font-size: clamp(1.5rem, 3vw, 2.25rem);
+  margin: 0 0 0.5rem;
+  overflow-wrap: anywhere;
+}
+
+.status {
+  color: var(--muted);
+  margin: 0 0 1.5rem;
+}
+
+.problem {
+  border-left: 4px solid var(--accent);
+  padding: 0.75rem 1rem;
+  margin: 0 0 1.5rem;
+  max-width: 60ch;
+}
+
+.note {
+  color: var(--muted);
+  max-width: 70ch;
+  margin: 0 0 1rem;
+}
+
+.h2 {
+  font-size: 1.35rem;
+  margin: 2rem 0 0.75rem;
+}
+
+.who {
+  max-width: 70ch;
+}
+
+.reviewerLine {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.item {
+  border-top: 1px solid var(--rule);
+  padding: 1.25rem 0 1.5rem;
+  max-width: 80ch;
+}
+
+.itemTitle {
+  font-size: 1.15rem;
+  margin: 0 0 0.5rem;
+}
+
+.place {
+  margin: 0 0 0.5rem;
+}
+
+.why {
+  color: var(--muted);
+  margin: 0 0 1rem;
+}
+
+.forms {
+  display: grid;
+  gap: 1rem;
+}
+
+.form {
+  display: grid;
+  gap: 0.5rem;
+  justify-items: start;
+  margin-bottom: 1rem;
+}
+
+.field {
+  display: grid;
+  gap: 0.25rem;
+  width: 100%;
+}
+
+.field span,
+.nameField span {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.input,
+.textarea {
+  font: inherit;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--background);
+  color: var(--foreground);
+  min-height: 44px;
+  width: 100%;
+  max-width: 60ch;
+}
+
+.textarea {
+  resize: vertical;
+}
+
+.nameField {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.button,
+.secondary,
+.linkButton {
+  font: inherit;
+  font-weight: 600;
+  min-height: 44px;
+  padding: 0.5rem 1.1rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.button {
+  color: var(--background);
+  background: var(--accent);
+  border: 2px solid var(--accent);
+}
+
+.button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.secondary {
+  color: var(--accent);
+  background: var(--background);
+  border: 2px solid var(--accent);
+}
+
+.linkButton {
+  color: var(--accent);
+  background: none;
+  border: none;
+  text-decoration: underline;
+  padding-inline: 0.25rem;
+}
+
+.criteria,
+.decided {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-width: 80ch;
+}
+
+.criterion,
+.decidedItem {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.75rem 1.5rem;
+  align-items: start;
+  padding: 0.85rem 0;
+  border-top: 1px solid var(--rule);
+}
+
+.remark {
+  display: block;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.confirmed {
+  font-weight: 600;
+}
+
+.done {
+  margin-top: 2.5rem;
+  padding: 1rem 1.25rem;
+  border-left: 5px solid var(--accent);
+  max-width: 70ch;
+}
+
+@media (max-width: 40rem) {
+  .criterion,
+  .decidedItem {
+    grid-template-columns: 1fr;
+  }
+}

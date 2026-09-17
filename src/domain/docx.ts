@@ -45,8 +45,10 @@ const MIN_PARAGRAPHS_FOR_HEADINGS = 20;
 const GENERIC_LINK_TEXT = /^(click here|here|click|read more|more|link|this link|this|learn more|download|see more)[.!]?$/i;
 const BARE_URL = /^(https?:\/\/|www\.)\S+$/i;
 
-function finding(kind: Kind, location: string, description: string, severity: Severity): Finding {
-  return { kind, criterion: KINDS[kind].criterion, location, description, severity, remediated: false };
+function finding(kind: Kind, location: string, description: string, severity: Severity, anchor?: string): Finding {
+  const f: Finding = { kind, criterion: KINDS[kind].criterion, location, description, severity, remediated: false };
+  if (anchor) f.anchor = anchor;
+  return f;
 }
 
 function snippet(text: string): string {
@@ -243,12 +245,14 @@ export function detectDocx(parts: DocxParts): Finding[] {
     if (descr || decorative) continue;
     const p = enclosing(drawing);
     const name = docPr ? attr(docPr, 'name') : undefined;
+    const id = docPr ? attr(docPr, 'id') : undefined;
     out.push(
       finding(
         'image-alt',
         `image ${imageNumber}${name ? ` (${name})` : ''}${p ? `, ${where(p)}` : ''}`,
         'The image has no alternative text and is not marked decorative.',
         'partial',
+        id ? `docPr:${id}` : undefined,
       ),
     );
   }
@@ -304,12 +308,13 @@ export function detectDocx(parts: DocxParts): Finding[] {
   }
 
   // 2.4.4 Link Purpose (In Context) – link text should say where it goes.
-  for (const link of visible(findAll(body, 'hyperlink'))) {
+  visible(findAll(body, 'hyperlink')).forEach((link, index) => {
     const text = runText(link).trim();
     const p = enclosing(link);
     const at = p ? where(p) : 'document body';
+    const anchor = `hyperlink:${index}`;
     if (text === '') {
-      out.push(finding('link-text', at, 'A link has no text at all, so it is announced as just “link”.', 'partial'));
+      out.push(finding('link-text', at, 'A link has no text at all, so it is announced as just “link”.', 'partial', anchor));
     } else if (GENERIC_LINK_TEXT.test(text)) {
       out.push(
         finding(
@@ -317,6 +322,7 @@ export function detectDocx(parts: DocxParts): Finding[] {
           at,
           `The link text is “${text}”, which does not say where the link goes when read on its own.`,
           'partial',
+          anchor,
         ),
       );
     } else if (BARE_URL.test(text)) {
@@ -326,10 +332,11 @@ export function detectDocx(parts: DocxParts): Finding[] {
           at,
           `The link text is the bare address “${snippet(text)}”, which a screen reader spells out character by character.`,
           'partial',
+          anchor,
         ),
       );
     }
-  }
+  });
 
   // 1.4.3 Contrast (Minimum) – coloured runs against their background.
   const reported = new Set<string>();

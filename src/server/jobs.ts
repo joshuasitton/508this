@@ -21,9 +21,9 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 
 import { detectDocx } from '@/domain/docx';
-import type { Finding } from '@/domain/findings';
+import { findingKey, isOpen, summarise, type Decision, type Finding } from '@/domain/findings';
 import type { Format, Job } from '@/domain/job';
-import { remediateDocx } from '@/domain/remediate';
+import { applyDecisions, remediateDocx } from '@/domain/remediate';
 import { readDocxParts, writeDocx } from './docx';
 
 const ROOT = process.env.DOCUMENTS_DIR ?? path.join(process.cwd(), 'documents');
@@ -116,32 +116,98 @@ export function deliveredName(filename: string, which: JobFile): string {
  * re-detection – not when a fix claims to have handled it – so the record
  * describes the delivered document and nothing else. Findings the output
  * still has stay open; anything new the output has (there should be
- * nothing) is added, so a fix that broke something cannot hide it.
+ * nothing) is added, so a fix that broke something cannot hide.
  */
 export async function remediateJob(id: string): Promise<Job | null> {
   const job = await getJob(id);
   if (!job) return null;
-  const original = new Uint8Array(await readFile(path.join(dirFor(id), `original.${job.format}`)));
+  return rebuild(job);
+}
+
+/**
+ * The delivered document is a pure function of the original and the
+ * record: automatic remediation, then the reviewer's applied decisions, then
+ * re-detection to say what is really fixed. Every change to the record
+ * comes back through here, so there is one path and it always starts from
+ * the original.
+ */
+async function rebuild(job: Job): Promise<Job> {
+  const original = new Uint8Array(await readFile(path.join(dirFor(job.id), `original.${job.format}`)));
   const parts = readDocxParts(original);
-  const { parts: fixedParts, applied } = remediateDocx(parts, { fallbackTitle: stem(job.filename) });
-  const remediated = writeDocx(original, fixedParts);
+  const auto = remediateDocx(parts, { fallbackTitle: stem(job.filename) });
+  const reviewed = applyDecisions(auto.parts, job.findings);
+  const remediated = writeDocx(original, reviewed.parts);
   const after = detectDocx(readDocxParts(remediated));
 
   const still = new Set(after.map(key));
-  const findings: Finding[] = job.findings.map((f) => (f.remediated || still.has(key(f)) ? f : { ...f, remediated: true }));
+  const findings: Finding[] = job.findings.map((f) => ({ ...f, remediated: !still.has(key(f)) }));
   const known = new Set(findings.map(key));
   for (const f of after) if (!known.has(key(f))) findings.push(f);
 
   const updated: Job = {
     ...job,
     findings,
-    applied,
+    applied: [...auto.applied, ...reviewed.applied],
     remediatedAt: new Date().toISOString(),
-    status: findings.some((f) => !f.remediated) ? 'remediated' : 'in-review',
   };
-  await writeFile(path.join(dirFor(id), `remediated.${job.format}`), remediated);
-  await writeFile(path.join(dirFor(id), 'job.json'), JSON.stringify(updated, null, 2));
+  updated.status = statusOf(updated);
+  await writeFile(path.join(dirFor(job.id), `remediated.${job.format}`), remediated);
+  await writeFile(path.join(dirFor(job.id), 'job.json'), JSON.stringify(updated, null, 2));
   return updated;
+}
+
+/**
+ * Delivered when nothing is open and nothing waits on a reviewer; in review
+ * once a person has decided or confirmed anything; remediated after the
+ * button and before a person; detected before that.
+ */
+function statusOf(job: Job): Job['status'] {
+  const confirmed = new Set(Object.keys(job.confirmations ?? {}));
+  if (summarise(job.findings, 'document', confirmed).conforms) return 'delivered';
+  const touched = job.findings.some((f) => f.decision) || confirmed.size > 0;
+  if (touched) return 'in-review';
+  return job.remediatedAt ? 'remediated' : 'detected';
+}
+
+/** A reviewer's decision on one finding, then a rebuild. Returns null for an unknown job or finding. */
+export async function decide(id: string, findingKeyValue: string, decision: Decision): Promise<Job | null> {
+  const job = await getJob(id);
+  if (!job) return null;
+  const target = job.findings.find((f) => findingKey(f) === findingKeyValue);
+  if (!target || !isOpen(target)) return null;
+  target.decision = decision;
+  job.reviewer = decision.by;
+  return rebuild(job);
+}
+
+export async function undecide(id: string, findingKeyValue: string): Promise<Job | null> {
+  const job = await getJob(id);
+  if (!job) return null;
+  const target = job.findings.find((f) => findingKey(f) === findingKeyValue);
+  if (!target?.decision) return null;
+  delete target.decision;
+  return rebuild(job);
+}
+
+export async function confirm(id: string, criterion: string, by: string): Promise<Job | null> {
+  const job = await getJob(id);
+  if (!job) return null;
+  job.confirmations = { ...(job.confirmations ?? {}), [criterion]: { by, at: new Date().toISOString() } };
+  job.reviewer = by;
+  job.status = statusOf(job);
+  await writeFile(path.join(dirFor(id), 'job.json'), JSON.stringify(job, null, 2));
+  return job;
+}
+
+export async function unconfirm(id: string, criterion: string): Promise<Job | null> {
+  const job = await getJob(id);
+  if (!job?.confirmations?.[criterion]) return null;
+  const { [criterion]: _gone, ...rest } = job.confirmations;
+  void _gone;
+  job.confirmations = rest;
+  job.status = statusOf(job);
+  await writeFile(path.join(dirFor(id), 'job.json'), JSON.stringify(job, null, 2));
+  return job;
 }
 
 function key(f: Finding): string {

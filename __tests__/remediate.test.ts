@@ -166,3 +166,61 @@ test('FIXABLE_KINDS is exactly the set remediation applies', () => {
   const r = remediateDocx({ document: doc(body), styles: STYLES, core: CORE_EMPTY }, OPTS);
   assert.deepEqual([...new Set(r.applied.map((a) => a.kind))].sort(), [...FIXABLE_KINDS].sort());
 });
+
+import { applyDecisions } from '../src/domain/remediate';
+
+const decision = (action: 'apply' | 'decorative' | 'dismiss', value?: string) => ({
+  action,
+  value,
+  by: 'Josh',
+  at: '2026-09-18T10:00:00.000Z',
+});
+
+test('a reviewer’s alternative text, decorative mark and link wording are written into the document by anchor', () => {
+  const drawing = (id: string) =>
+    `<w:p><w:r><w:drawing><wp:inline xmlns:wp="p"><wp:docPr id="${id}" name="Pic ${id}"/></wp:inline></w:drawing></w:r></w:p>`;
+  const link = (t: string) =>
+    `<w:p><w:hyperlink r:id="rId1" xmlns:r="r"><w:r><w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr><w:t>${t}</w:t></w:r><w:r><w:t xml:space="preserve"> </w:t></w:r></w:hyperlink></w:p>`;
+  const parts: DocxParts = { document: doc(heading(1, 'T') + drawing('7') + drawing('8') + link('here') + link('click')), styles: STYLES };
+  const found = detectDocx(parts);
+  const alt = found.find((f) => f.anchor === 'docPr:7')!;
+  const deco = found.find((f) => f.anchor === 'docPr:8')!;
+  const link1 = found.find((f) => f.anchor === 'hyperlink:0')!;
+  const link2 = found.find((f) => f.anchor === 'hyperlink:1')!;
+  alt.decision = decision('apply', '  Bar chart of spend by quarter  ');
+  deco.decision = decision('decorative');
+  link1.decision = decision('apply', 'the GSA Section 508 page');
+  link2.decision = decision('dismiss');
+
+  const r = applyDecisions(parts, found);
+  assert.deepEqual(
+    r.applied.map((a) => a.kind),
+    ['image-alt', 'image-alt', 'link-text'],
+  );
+  const after = parseXml(r.parts.document);
+  const docPrs = findAll(after, 'docPr');
+  assert.equal(attr(docPrs[0]!, 'descr'), 'Bar chart of spend by quarter');
+  assert.equal(attr(find(docPrs[1]!, 'decorative')!, 'val'), '1');
+  const links = findAll(after, 'hyperlink');
+  assert.equal(findAll(links[0]!, 'r').length, 1, 'two runs became one');
+  assert.equal(textOf(links[0]!), 'the GSA Section 508 page');
+  assert.ok(find(links[0]!, 'rStyle'), 'the first run’s formatting is kept');
+  assert.equal(textOf(links[1]!), 'click ', 'a dismissed finding changes nothing');
+
+  // Re-detection: the two images and the first link are clean; the
+  // dismissed link is still found, as it should be – dismissal is a
+  // judgement in the record, not a change to the document.
+  const again = detectDocx(r.parts);
+  assert.deepEqual(again.filter((f) => f.anchor).map((f) => f.anchor), ['hyperlink:1']);
+});
+
+test('decisions are idempotent and survive automatic remediation running first', () => {
+  const drawing = `<w:p><w:r><w:drawing><wp:inline xmlns:wp="p"><wp:docPr id="7" name="Pic"/></wp:inline></w:drawing></w:r></w:p>`;
+  const parts: DocxParts = { document: doc(heading(1, 'T') + heading(3, 'skip') + drawing), styles: STYLES, core: CORE_EMPTY };
+  const found = detectDocx(parts);
+  found.find((f) => f.kind === 'image-alt')!.decision = decision('apply', 'A picture');
+  const once = applyDecisions(remediateDocx(parts, OPTS).parts, found);
+  const twice = applyDecisions(once.parts, found);
+  assert.equal(twice.parts.document, once.parts.document);
+  assert.equal(attr(find(parseXml(twice.parts.document), 'docPr')!, 'descr'), 'A picture');
+});

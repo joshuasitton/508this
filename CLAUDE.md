@@ -30,7 +30,7 @@ npm run build         # what Vercel runs
 
 | Path | What lives there |
 |---|---|
-| `src/app/` | App Router pages and layouts, one folder per route |
+| `src/app/` | App Router pages and layouts, one folder per route; `jobs/[id]/review` is the queue |
 | `src/domain/` | pure functions: the criteria catalogue and coverage, findings, the Word detector and remediator, the job model |
 | `src/server/` | Node-only code: the zip reader and writer, the .docx part reader, the job store |
 | `__tests__/` | tests, against the domain layer and the server layer's pure parts |
@@ -56,8 +56,13 @@ npm run build         # what Vercel runs
   check", is where a document lands after remediation. Collapsing it into
   "Conforms" is a false statement to a federal buyer.
 - **A finding is remediated only when re-detection no longer finds it.**
-  `remediateJob` in `src/server/jobs.ts` re-runs detection on the output and
-  marks findings from that, never from what a fix claims. Keep it that way.
+  `rebuild` in `src/server/jobs.ts` is the one path: original, automatic
+  remediation, the reviewer's applied decisions, re-detection. It marks
+  findings from re-detection, never from what a fix or a button claims.
+  Every change to a job's record goes back through it. Keep it that way.
+- **A dismissal is a judgement, not a change.** A reviewer can dismiss a
+  finding with a reason; that removes it from the count and puts the name
+  and reason in the report. It never touches the document.
 - **The catalogue is WCAG 2.0, not the newest WCAG.** The regulation
   incorporates 2.0 by reference. Adding a 2.1 or 2.2 criterion makes the report
   claim a legal requirement that does not exist. If a customer wants 2.2, that

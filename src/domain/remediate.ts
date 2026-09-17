@@ -15,6 +15,7 @@
 
 import { adjustForContrast, isLargeText, minimumRatio, parseHex, toHex, type Rgb } from './contrast';
 import type { DocxParts } from './docx';
+import type { Finding } from './findings';
 import type { Applied } from './job';
 import type { Kind } from './kinds';
 import { detectLanguage, primarySubtag } from './language';
@@ -405,4 +406,102 @@ function setTitle(parts: DocxParts, title: string): boolean {
     }
   }
   return true;
+}
+
+const DECORATIVE_URI = '{C183D7F6-B498-43B3-948B-1728B52AA6E4}';
+const DECORATIVE_NS = 'http://schemas.microsoft.com/office/drawing/2017/decorative';
+
+/**
+ * Fixes a reviewer supplied, written into the document. Alternative text
+ * goes on the image's `docPr` as `descr`; "decorative" sets the flag Word
+ * itself sets, which tells a screen reader to skip the image; new link
+ * wording replaces the link's runs with one run in the first run's
+ * formatting. Each finding is found again by its anchor, never by its
+ * paragraph number, because automatic remediation may have run first and
+ * the anchor is the one thing it does not move.
+ *
+ * Applied after `remediateDocx` on every rebuild, from the original, so the
+ * result is a pure function of the original and the decisions.
+ */
+export function applyDecisions(parts: DocxParts, findings: readonly Finding[]): Remediation {
+  const applied: Applied[] = [];
+  const document = parseXml(parts.document);
+  const body = find(document, 'body') ?? document;
+  const wPrefix = prefixOf(document, 'body') ?? 'w';
+  const w = (local: string) => `${wPrefix}:${local}`;
+  let changed = false;
+
+  const invisible = new Set<XmlElement>();
+  for (const root of findAll(body, 'Fallback')) for (const d of allDescendants(root)) invisible.add(d);
+  const links = findAll(body, 'hyperlink').filter((h) => !invisible.has(h));
+  const docPrs = findAll(body, 'docPr').filter((d) => !invisible.has(d));
+
+  for (const f of findings) {
+    const d = f.decision;
+    if (!d || d.action === 'dismiss' || !f.anchor) continue;
+
+    if (f.kind === 'image-alt') {
+      const id = f.anchor.replace(/^docPr:/, '');
+      const docPr = docPrs.find((x) => attr(x, 'id') === id);
+      if (!docPr) continue;
+      if (d.action === 'decorative') {
+        const aPrefix = prefixOf(docPr, 'extLst') ?? 'a';
+        let extLst = child(docPr, 'extLst');
+        if (!extLst) {
+          extLst = el(`${aPrefix}:extLst`);
+          docPr.children.push(extLst);
+        }
+        if (!find(extLst, 'decorative')) {
+          extLst.children.push(
+            el(`${aPrefix}:ext`, { uri: DECORATIVE_URI }, [el('adec:decorative', { 'xmlns:adec': DECORATIVE_NS, val: '1' })]),
+          );
+        }
+        docPr.attrs['descr'] = '';
+        applied.push({ kind: f.kind, location: f.location, description: `Marked the image decorative, on ${d.by}\u2019s decision.` });
+        changed = true;
+      } else if (d.action === 'apply' && d.value?.trim()) {
+        docPr.attrs['descr'] = d.value.trim();
+        applied.push({
+          kind: f.kind,
+          location: f.location,
+          description: `Set the alternative text to \u201c${d.value.trim()}\u201d, as written by ${d.by}.`,
+        });
+        changed = true;
+      }
+    } else if (f.kind === 'link-text' && d.action === 'apply' && d.value?.trim()) {
+      const index = Number(f.anchor.replace(/^hyperlink:/, ''));
+      const link = links[index];
+      if (!link) continue;
+      const runs = findAll(link, 'r');
+      const first = runs[0];
+      const rPr = first ? child(first, 'rPr') : undefined;
+      const run = el(w('r'), {}, [
+        ...(rPr ? [rPr] : []),
+        el(w('t'), { 'xml:space': 'preserve' }, [text(d.value.trim())]),
+      ]);
+      link.children = link.children.filter((c) => c.type !== 'element' || c.local !== 'r');
+      link.children.push(run);
+      applied.push({
+        kind: f.kind,
+        location: f.location,
+        description: `Changed the link text to \u201c${d.value.trim()}\u201d, as written by ${d.by}.`,
+      });
+      changed = true;
+    }
+  }
+
+  return { parts: changed ? { ...parts, document: serializeXml(document) } : parts, applied };
+}
+
+function allDescendants(root: XmlElement): XmlElement[] {
+  const out: XmlElement[] = [];
+  const walk = (node: XmlElement) => {
+    for (const c of node.children) {
+      if (c.type !== 'element') continue;
+      out.push(c);
+      walk(c);
+    }
+  };
+  walk(root);
+  return out;
 }

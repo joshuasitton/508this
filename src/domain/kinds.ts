@@ -17,7 +17,7 @@
  * two different ways.
  */
 
-import type { Finding } from './findings';
+import { isOpen, type Finding } from './findings';
 
 export type Kind =
   | 'no-title'
@@ -155,6 +155,36 @@ export const KINDS: Record<Kind, KindInfo> = {
 
 export const ALL_KINDS = Object.keys(KINDS) as Kind[];
 
+/**
+ * What the review queue offers for a kind. `alt` takes text and writes it
+ * as the image's alternative text, or marks the image decorative. `text`
+ * takes new wording and writes it into the link. `judge` offers only a
+ * dismissal with a reason, because the fix is a change to the prose or the
+ * layout that a person makes in Word – the queue records the judgement,
+ * and the document goes back to them with the finding open if it is real.
+ */
+export type ReviewInput = 'alt' | 'text' | 'judge';
+
+export const REVIEW_INPUT: Record<Kind, ReviewInput> = {
+  'no-title': 'judge',
+  'no-language': 'judge',
+  'image-alt': 'alt',
+  'table-header': 'judge',
+  'heading-skip': 'judge',
+  'no-headings': 'judge',
+  'link-text': 'text',
+  contrast: 'judge',
+  media: 'judge',
+  forms: 'judge',
+  'reading-order': 'judge',
+  'layout-table': 'judge',
+  'language-parts': 'judge',
+  sensory: 'judge',
+  'colour-words': 'judge',
+  'colour-only': 'judge',
+  chart: 'judge',
+};
+
 export interface KindGroup {
   kind: Kind;
   info: KindInfo;
@@ -181,8 +211,8 @@ export function groupByKind(findings: readonly Finding[]): KindGroup[] {
       kind,
       info: KINDS[kind],
       findings: list,
-      open: list.filter((f) => !f.remediated).length,
-      blocking: list.some((f) => !f.remediated && f.severity === 'blocking'),
+      open: list.filter(isOpen).length,
+      blocking: list.some((f) => isOpen(f) && f.severity === 'blocking'),
     }))
     .sort(
       (a, b) =>
