@@ -8,6 +8,42 @@ for. Where an entry has since been overtaken, `docs/build-state.md` says so.
 
 ---
 
+## 2026-09-18 — The review queue
+
+### Done
+
+The screen that stands between a remediated document and one that can be
+reported as conformant. A person decides each open finding – alternative
+text or a decorative mark for an image, new wording for a link, both
+written into the document; a dismissal with a reason for everything else –
+and confirms the four criteria only a person can judge. Their name is asked
+once and goes on the statement. Every decision rebuilds the delivered
+document from the original and re-detects it, so the record never says more
+than the document shows. When nothing is open and nothing waits, the job is
+delivered and the statement says "Conforms to Section 508", under the
+reviewer's name. That sentence was unreachable before today.
+
+### Decided by the engineering lead, for the Chairman to overturn
+
+- **The reviewer is a typed name, not an account.** Right for a service one
+  person runs; wrong the day there are two. Accounts are the change when a
+  second reviewer exists.
+- **Judgement findings take a dismissal only.** The fix for "click the
+  button on the left" is a change to the prose, which a person makes in
+  Word. The queue records the judgement and does not pretend to edit prose.
+
+### Decisions needed from the Chairman
+
+1. **Retention and third-party calls** – now on the critical path. The next
+   step drafts alt text with a vision model, which sends an image out. The
+   recommended posture is unchanged: only the fragment a fix needs, never a
+   whole document, nothing retained by the provider.
+2. **The first customer document.** The pipeline is complete end to end for
+   Word. Sprint item 9 – ask one team for one document – is now the highest
+   leverage thing anyone can do.
+
+---
+
 ## 2026-09-18 — The judgement criteria, screened
 
 ### Done

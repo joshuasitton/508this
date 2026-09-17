@@ -4,6 +4,20 @@ The running project-level record. Sections are dated and kept in order rather
 than rewritten, so the reasoning stays readable. Decisions live in
 `docs/leadership-standup.md`; this file says where the code stands.
 
+## 2026-09-18 — The review queue
+
+`/jobs/[id]/review` with its actions; `Decision`, `isOpen`, `findingKey`,
+`stateOf` and dismissal-aware assessments in `findings.ts`; `applyDecisions`
+in `remediate.ts`; `decide` / `undecide` / `confirm` / `unconfirm` and the
+single `rebuild` path in the job store; anchors on image and link findings;
+`REVIEW_INPUT` in `kinds.ts`. The job page links to the queue and shows
+dismissals; the statement names the reviewer. Stacked on the sensory PR.
+
+**Verified end to end** in Chromium: upload, fix, decide alt text and a link
+rewrite (both land in the downloaded file), dismiss a sentence with a
+reason, confirm four criteria, and the verdict reads "Conforms to Section
+508" with the reviewer's name on the statement.
+
 ## 2026-09-18 — Sensory and colour screens
 
 `src/domain/phrases.ts` (the patterns and sentence splitter), four kinds

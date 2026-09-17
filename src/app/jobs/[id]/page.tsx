@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { DOCUMENT_EXEMPT, labelFor } from '@/domain/criteria';
-import { assessAll, describeRemarks, describeSummary, summarise, type Finding } from '@/domain/findings';
+import { assessAll, describeRemarks, describeSummary, isOpen, stateOf, summarise } from '@/domain/findings';
 import { describeStatus } from '@/domain/job';
 import { groupByKind } from '@/domain/kinds';
 import { FIXABLE_KINDS } from '@/domain/remediate';
@@ -34,7 +34,7 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
   const job = await getJob(id);
   if (!job) notFound();
 
-  const confirmed = new Set(job.confirmed ?? []);
+  const confirmed = new Set(Object.keys(job.confirmations ?? {}));
   const summary = summarise(job.findings, 'document', confirmed);
   const verdict = describeSummary(summary);
   const groups = groupByKind(job.findings);
@@ -83,6 +83,15 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
               </a>
             </li>
             <li>
+              <Link href={`/jobs/${job.id}/review`} className={styles.button}>
+                {summary.conforms ? 'Review record' : 'Review what is left'}
+              </Link>
+              <span className={styles.muted}>
+                {' '}
+                – {summary.short + summary.review === 0 ? 'complete' : 'decide the open findings and confirm the reviewer criteria'}
+              </span>
+            </li>
+            <li>
               <Link href={`/jobs/${job.id}/report`}>Conformance statement</Link>
               <span className={styles.muted}> – printable, in the layout a buyer expects</span>
             </li>
@@ -116,18 +125,23 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
                 {g.info.title}
               </h3>
               <p className={styles.count}>
-                {g.open === 0
-                  ? 'All fixed'
-                  : `${g.open} ${g.open === 1 ? 'place' : 'places'} to fix${g.blocking ? ', blocking' : ''}`}
+                {g.findings.filter(isOpen).length === 0
+                  ? 'All fixed or reviewed'
+                  : `${g.findings.filter(isOpen).length} ${g.findings.filter(isOpen).length === 1 ? 'place' : 'places'} to fix${g.blocking ? ', blocking' : ''}`}
               </p>
               <p className={styles.why}>{g.info.why}</p>
               <ul className={styles.places}>
                 {g.findings.map((f, i) => (
-                  <li key={i} className={f.remediated ? styles.placeFixed : styles.place}>
+                  <li key={i} className={f.remediated || f.decision?.action === 'dismiss' ? styles.placeFixed : styles.place}>
                     <span className={styles.state}>{stateOf(f)}</span>
                     <span className={styles.placeBody}>
                       <strong>{capitalise(f.location)}</strong>
                       <span className={styles.description}>{f.description}</span>
+                      {f.decision?.action === 'dismiss' && (
+                        <span className={styles.description}>
+                          Reviewed by {f.decision.by}: {f.decision.note}
+                        </span>
+                      )}
                     </span>
                   </li>
                 ))}
@@ -206,7 +220,10 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
         <h2 id="next-title">What happens next</h2>
         <ol className={styles.next}>
           {!job.remediatedAt && <li>Press the button above. The issues with one right answer are fixed in the document.</li>}
-          <li>What is left goes to a reviewer, who confirms each remaining fix and the criteria only a person can judge.</li>
+          <li>
+            What is left goes to <Link href={`/jobs/${job.id}/review`}>the review queue</Link>, where a person decides each
+            remaining finding and confirms the criteria only a person can judge.
+          </li>
           <li>
             When nothing is open and nothing waits on a reviewer, the conformance statement says “Conforms to Section
             508”, and not before.
@@ -215,11 +232,6 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
       </section>
     </>
   );
-}
-
-function stateOf(f: Finding): string {
-  if (f.remediated) return 'Fixed';
-  return f.severity === 'blocking' ? 'Blocking' : 'Open';
 }
 
 function capitalise(s: string): string {

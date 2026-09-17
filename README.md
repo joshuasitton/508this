@@ -359,6 +359,60 @@ reviewer it says "Conforms to Section 508", and not before.
 
 ---
 
+## The review queue
+
+`/jobs/[id]/review` is where a person finishes what the machine started, and
+it is the reason the statement can ever say "Conforms". Three things live
+there.
+
+**Findings to decide.** Everything still open after automatic remediation,
+one item at a time, with the place, the quotation and the plain-language
+reason beside it. What the reviewer can do depends on the kind, and
+`REVIEW_INPUT` in `kinds.ts` says which. An image takes alternative text, or
+a decorative mark; a link takes new wording. Both are written into the
+document. Everything else – a sentence that relies on position, colour as
+the signal, a text box, a chart – takes only a dismissal with a reason,
+because the fix is a change to the prose or the layout that a person makes
+in Word, and the queue records the judgement rather than pretending to make
+the change. A dismissed finding does not count against the criterion, and
+the report says who dismissed it and why.
+
+**Criteria to confirm.** The four criteria only a person can vouch for, each
+with its remark, and a Confirm button that is disabled while any finding on
+it is still open. Confirming moves the row from "Needs Review" to "Supports"
+under the reviewer's name.
+
+**A name.** Asked once, carried in every form, printed on the statement. A
+statement with nobody's name on it is not an assurance, and an Accessibility
+Conformance Report is a representation to the government.
+
+Every decision goes through one path in `src/server/jobs.ts`: the delivered
+document is rebuilt from the original – automatic remediation, then the
+reviewer's applied decisions, then re-detection – so it is a pure function
+of the original and the record, and undoing a decision is rebuilding without
+it. Applied fixes find their target by an *anchor* the detector left on the
+finding (`docPr:12`, `hyperlink:3`), never by paragraph number, because
+automatic remediation may have run first and the anchor is the one thing it
+does not move. What the reviewer sees afterwards is what re-detection says,
+not what the button claimed; an applied decision that re-detection still
+finds is shown as "not applied", which is a bug report against the fix.
+
+There is no client JavaScript on the page. Every button is a form, the name
+field is an ordinary input, and a missing name or reason comes back as a
+sentence in a live region.
+
+### What is deliberately not here yet
+
+Model-drafted proposals. The queue works today with the reviewer writing the
+alt text and the link wording; the next step drafts them with a vision model
+and a language model so the reviewer edits instead of writes. That is the
+first part of the product that sends anything out, and it waits on the
+retention decision. Accounts are also not here: the reviewer is a name
+typed on the first decision, which is right for a service run by one person
+and wrong the day there are two.
+
+---
+
 ## Reading the result
 
 The job page is the report, and it is written in the order a customer asks
@@ -454,8 +508,8 @@ file cannot be merged.
 - The Next.js scaffold, ESLint, TypeScript in strict mode with
   `noUncheckedIndexedAccess`.
 - The criteria catalogue and the findings model, tested.
-- Intake, Word detection, remediation, the job page and the conformance
-  statement, above. Run end to end in a browser against the production build
+- Intake, Word detection, remediation, the review queue, the job page and
+  the conformance statement, above. Run end to end in a browser against the production build
   before merging, and the downloaded file checked with an independent reader;
   `docs/build-state.md` says what was checked.
 - A landing page that renders the catalogue from the domain – partly so the

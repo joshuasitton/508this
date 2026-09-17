@@ -22,8 +22,10 @@ export interface Job {
   /** What automatic remediation changed, in order. Absent until it has run. */
   applied?: Applied[];
   remediatedAt?: string;
-  /** Criteria a reviewer has confirmed. Absent until the review queue exists. */
-  confirmed?: string[];
+  /** Criteria a reviewer has confirmed, by whom and when. */
+  confirmations?: Record<string, { by: string; at: string }>;
+  /** The reviewer named on the statement. Set the first time a person decides anything. */
+  reviewer?: string;
 }
 
 /** One change remediation made, in the customer's words. */
@@ -102,7 +104,7 @@ export function describeStatus(status: JobStatus): string {
     case 'remediated':
       return 'Fixed automatically where that is safe. What is left needs a person.';
     case 'in-review':
-      return 'In review. A person is confirming each fix.';
+      return 'In review. A person is deciding what is left and confirming what only a person can.';
     case 'delivered':
       return 'Delivered. The remediated document and its conformance report are ready.';
   }

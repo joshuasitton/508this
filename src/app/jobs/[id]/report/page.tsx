@@ -26,7 +26,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
   const job = await getJob(id);
   if (!job) notFound();
 
-  const confirmed = new Set(job.confirmed ?? []);
+  const confirmed = new Set(Object.keys(job.confirmations ?? {}));
   const summary = summarise(job.findings, 'document', confirmed);
   const verdict = describeSummary(summary);
   const byId = new Map(assessAll(job.findings, 'document', confirmed).map((a) => [a.criterion, a]));
@@ -48,11 +48,17 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
           <dd>Non-web document (Word)</dd>
           <dt>Evaluated</dt>
           <dd>{date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</dd>
+          {job.reviewer && (
+            <>
+              <dt>Reviewer</dt>
+              <dd>{job.reviewer}</dd>
+            </>
+          )}
           <dt>Method</dt>
           <dd>
             508This automated checks on the document as delivered
             {job.remediatedAt ? `, after remediation of ${fixed} ${fixed === 1 ? 'issue' : 'issues'}` : ''}
-            {summary.review > 0 ? '; reviewer confirmation outstanding where stated' : '; reviewer-confirmed where stated'}
+            {summary.review > 0 ? '; reviewer confirmation outstanding where stated' : `; confirmed by ${job.reviewer ?? 'the reviewer'} where stated`}
           </dd>
         </dl>
       </header>
