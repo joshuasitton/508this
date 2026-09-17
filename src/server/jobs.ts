@@ -53,11 +53,34 @@ export async function createJob(filename: string, format: Format, bytes: Uint8Ar
 
 export async function getJob(id: string): Promise<Job | null> {
   if (!ID.test(id)) return null;
+  let job: Job;
   try {
     const raw = await readFile(path.join(dirFor(id), 'job.json'), 'utf8');
-    return JSON.parse(raw) as Job;
+    job = JSON.parse(raw) as Job;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
     throw error;
   }
+  return isCurrent(job) ? job : redetect(job);
+}
+
+/**
+ * A record written by an earlier build may lack fields the page now needs –
+ * the first time was `kind`, added after the first jobs had already been
+ * stored. Detection is deterministic and the original document is kept
+ * beside the record, so the honest repair is to run detection again and
+ * rewrite the record, not to guess at the missing fields. The one thing this
+ * cannot preserve is review state on findings, which no build has written
+ * yet; when one does, this check grows to carry it across.
+ */
+function isCurrent(job: Job): boolean {
+  return job.findings.every((f) => typeof f.kind === 'string');
+}
+
+async function redetect(job: Job): Promise<Job> {
+  const bytes = await readFile(path.join(dirFor(job.id), `original.${job.format}`));
+  const findings = detectDocx(readDocxParts(new Uint8Array(bytes)));
+  const repaired: Job = { ...job, findings };
+  await writeFile(path.join(dirFor(job.id), 'job.json'), JSON.stringify(repaired, null, 2));
+  return repaired;
 }
