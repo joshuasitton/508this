@@ -31,15 +31,17 @@ npm run build         # what Vercel runs
 | Path | What lives there |
 |---|---|
 | `src/app/` | App Router pages and layouts, one folder per route |
-| `src/domain/` | pure functions: the criteria catalogue, findings, conformance |
-| `__tests__/` | tests, all against the domain layer |
+| `src/domain/` | pure functions: the criteria catalogue, findings, the Word detector, the job model |
+| `src/server/` | Node-only code: the zip reader, the .docx part reader, the job store |
+| `__tests__/` | tests, against the domain layer and the server layer's pure parts |
 | `scripts/ts-resolve.mjs` | lets Node run the TypeScript domain with no bundler |
 | `docs/` | project-level state and the leadership standup log |
 
 ## Invariants — do not break these silently
 
 - **`npm test` runs with zero dependencies installed.** Nothing under
-  `src/domain/` may import React or Next. This is what makes the build
+  `src/domain/` may import React, Next or a Node API; `src/server/` may use
+  Node's own modules and nothing from npm. This is what makes the build
   verifiable from a sandbox with no npm access, and it is worth keeping.
 - **One source of truth per concept, pinned by a test.** `domain/criteria.ts`
   is the list of what "508 conformant" means – WCAG 2.0 A and AA, 38 criteria,
@@ -59,7 +61,9 @@ npm run build         # what Vercel runs
   document's contents goes into a log, an analytics event or an error report.
   Where they are stored, for how long, and whether any of it leaves the
   service is a decision that waits on the Chairman (see the standup log) – do
-  not make it in code by accident.
+  not make it in code by accident. `src/server/jobs.ts` is the local-disk
+  store for development and hand-run jobs; it is the one file to replace,
+  and nothing that stores a document in production merges before the decision.
 - **Never put a secret in a `NEXT_PUBLIC_` variable** — they are bundled into
   the browser in plaintext.
 
