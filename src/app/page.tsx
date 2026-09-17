@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 import { CRITERIA, DOCUMENT_EXEMPT, type Principle } from '@/domain/criteria';
 import styles from './page.module.css';
 
@@ -18,6 +20,9 @@ export default function Home() {
           508This remediates PDF, Word and PowerPoint documents to the Revised Section 508 Standards and returns
           them with an Accessibility Conformance Report you can hand to a federal buyer.
         </p>
+        <Link href="/start" className={styles.cta}>
+          Start a remediation
+        </Link>
       </section>
 
       <section className={styles.catalogue} aria-labelledby="catalogue-title">

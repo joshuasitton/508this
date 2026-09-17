@@ -9,7 +9,20 @@
   font-size: 1.125rem;
   color: var(--muted);
   max-width: 60ch;
-  margin: 0 0 3rem;
+  margin: 0 0 1.5rem;
+}
+
+.cta {
+  display: inline-block;
+  min-height: 44px;
+  padding: 0.6rem 1.25rem;
+  margin-bottom: 3rem;
+  font-weight: 600;
+  color: var(--background);
+  background: var(--accent);
+  border: 2px solid var(--accent);
+  border-radius: 4px;
+  text-decoration: none;
 }
 
 .catalogue h2 {

@@ -4,6 +4,63 @@ The running project-level record. Sections are dated and kept in order rather
 than rewritten, so the reasoning stays readable. Decisions live in
 `docs/leadership-standup.md`; this file says where the code stands.
 
+## 2026-09-17, evening — Remediation and the conformance statement
+
+On the same branch. `src/domain/remediate.ts`, `src/server/zip.ts`,
+`remediateJob` in the job store, the button and downloads on the job page,
+and `/jobs/[id]/report`. `DOCUMENT_COVERAGE` in `criteria.ts` and the
+"Needs Review" status in `findings.ts` are the honesty line; the standup log
+records why.
+
+**Verified end to end** on the production build in Chromium: upload a
+python-docx document with six issues, press the button, four are fixed and
+two (alt text, link text) correctly remain; the verdict moves from "does not
+conform" to "does not conform" with two open and six waiting on a reviewer;
+the download is named "(remediated)"; the statement lists 38 rows with six
+Needs Review. The downloaded file: `zipfile.testzip()` clean, python-docx
+opens it, title / header row / Heading 2 / #767676 / language all present,
+16 of 18 parts byte-identical to the input.
+
+**Next:** the review queue, which is now the critical path to a document
+that can be reported as conformant. Then the ACR as a Word file and the
+tagged PDF export.
+
+## 2026-09-17, later — Intake and Word detection
+
+On the `intake/word-detection` branch, stacked on the founding PR.
+
+**What exists now, beyond the founding scaffold:**
+
+- `src/domain/xml.ts`: a reader for Office Open XML, matching by local name.
+  Own code rather than a dependency, so the detector still runs bare.
+- `src/domain/contrast.ts`: WCAG 2.0 contrast. Used by the detector and by a
+  test that recomputes the site's own token ratios.
+- `src/domain/docx.ts`: the Word detector. Parts in, findings out.
+- `src/domain/job.ts`: the job record, accepted formats, the upload checks
+  and their sentences.
+- `src/server/unzip.ts` and `src/server/docx.ts`: bytes to parts, on
+  `node:zlib`, refusing what Word never writes.
+- `src/server/jobs.ts`: the local-disk job store under `documents/` or
+  `DOCUMENTS_DIR`. One file to replace when storage is decided. `next build`
+  warns that its dynamic path causes whole-project tracing; that is the cost
+  of a filesystem store and goes away with it.
+- `/start` and `/jobs/[id]`. No client JavaScript on either.
+
+**Verified end to end** on the production build with Playwright: a renamed
+legacy .doc is refused with the right sentence; a sample report with seven
+planted issues produces exactly those seven findings at the right paragraphs;
+the report table shows 34 owed criteria; the first Tab lands on the skip
+link; unknown and traversal-shaped job ids return 404.
+
+**The report page, second pass.** After the first run on Josh's Mac, the
+result was restructured for reading: verdict first, findings grouped by kind
+with plain-language "why" and "what we do" sentences owned by
+`src/domain/kinds.ts`, the shortfall table before a disclosure of the criteria
+met, and a "what happens next". Checked in light and dark schemes and at phone
+width, with a clean heading outline and no horizontal scroll.
+
+**Next, in order:** see `docs/sprint-2026-09-17.md`.
+
 ## 2026-09-17 — Founded
 
 **Where the code lives:** <https://github.com/joshuasitton/508this>, `main`.

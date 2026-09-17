@@ -8,6 +8,87 @@ for. Where an entry has since been overtaken, `docs/build-state.md` says so.
 
 ---
 
+## 2026-09-17, evening — Remediation, and what the report is allowed to claim
+
+### Done today
+
+- **Remediation** of what has one right answer: title, language, table
+  header rows, skipped heading levels, contrast. One button on the job page;
+  the output is re-detected and a finding counts as fixed only if
+  re-detection no longer finds it. On a real Word file the run changes two of
+  eighteen parts and the rest are byte-identical. The downloaded file passes
+  an independent CRC check and opens in python-docx with the title, header
+  row, heading level and colour as claimed.
+- **The conformance statement** at `/jobs/[id]/report`: every criterion,
+  level, conformance and remark in the layout of an ACR, printable.
+
+### Decided by the engineering and security leads, for the Chairman to overturn if he disagrees
+
+**The report never says "Supports" on nothing.** The first version marked
+every criterion without a finding as Supports, including the twenty-eight no
+check had looked at. That is a false statement to a federal buyer. Every
+criterion now has a basis – checked, static, or reviewer – and the six
+reviewer-class criteria read "Needs Review" until a person confirms them. The
+verdict has three states, and a document lands on the middle one after
+remediation: "passes every automated check; six criteria wait on a
+reviewer". It cannot reach "Conforms to Section 508" until the review queue
+exists and someone has used it. This is slower to a headline the customer
+wants and it is the only headline the company can stand behind.
+
+### Decisions needed from the Chairman
+
+1. **Retention** – still open, still the gate on production storage.
+2. **The default document language is en-US** when none is set. Right for
+   federal documents; wrong for a Spanish-language notice. The intake form
+   could ask. Recommended: ask only when the reviewer flags it.
+3. **The review queue is now the critical path.** Nothing can be reported as
+   conformant without it. Recommended as the next build, ahead of PDF export.
+
+---
+
+## 2026-09-17 — The plan to a first delivered document
+
+### Decided by the Chairman
+
+The Chairman took the plan for delivering on the product's purpose quickly,
+in full: Word first, a person reviewing every fix, and the ACR as the
+deliverable that makes a buyer accept the document. It is written up as
+`docs/sprint-2026-09-17.md`, with a definition of done and the work in order.
+
+The plan included a recommended retention posture – encrypted at rest,
+deleted 30 days after delivery, never a whole document to a third-party
+model, only the fragment a fix needs. **Recorded here as the working
+assumption, not as decided.** The Chairman's "yes" was to the plan; the
+retention decision was queued to him separately at founding and stays queued
+until he confirms it in so many words. Nothing that stores a document in
+production is merged before then; the local-disk store on the intake branch
+is for development and hand-run jobs.
+
+### Done today
+
+- Intake: `/start` takes one .docx, checks name, size and signature in the
+  order a person can act on, and creates a job. Every problem is one sentence.
+- Word detection: seven deterministic checks, each producing findings with a
+  paragraph number and a quotation so a reviewer can find the place by eye.
+  Title (2.4.2), language (3.1.1), alternative text (1.1.1), table header rows
+  and heading levels (1.3.1), link text (2.4.4), contrast of coloured runs
+  (1.4.3). All from XML strings, all tested with nothing installed.
+- The job page: findings and the conformance table for the 34 criteria a
+  document owes, rendered by the functions the ACR will use.
+- The site's own contrast claims are now tested. The test found that the
+  ratios written beside the tokens at founding were estimates and two were
+  wrong; they are now computed values.
+
+### Decisions needed from the Chairman
+
+1. **Retention**, as above. This is the one that gates production.
+2. **PDF export path for v1:** LibreOffice headless on the server, or Word on
+   a Mac operated by hand for the first customers. The first is automatable
+   and produces adequate tags; the second produces better ones and does not
+   scale. Recommended: LibreOffice for the sprint, and judge the output.
+
+---
+
 ## 2026-09-17 — Founding: what 508This is, and what it is built on
 
 ### Decided by the Chairman
