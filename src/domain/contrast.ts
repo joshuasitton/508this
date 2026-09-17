@@ -49,3 +49,40 @@ export function minimumRatio(large: boolean): number {
 export function formatRatio(ratio: number): string {
   return `${(Math.floor(ratio * 100) / 100).toFixed(2).replace(/\.?0+$/, '')}:1`;
 }
+
+/**
+ * The nearest colour to `fg` that meets the minimum against `bg`, found by
+ * mixing `fg` toward black on a light background or toward white on a dark
+ * one until the ratio is reached. A bisection, because the ratio is
+ * monotonic along that line, and the smallest change that passes is the one
+ * that best keeps the design. Returns `fg` unchanged if it already passes.
+ */
+export function adjustForContrast(fg: Rgb, bg: Rgb, minimum: number): Rgb {
+  if (contrastRatio(fg, bg) >= minimum) return fg;
+  const target: Rgb = relativeLuminance(bg) > 0.5 ? [0, 0, 0] : [255, 255, 255];
+  const mix = (t: number): Rgb => [
+    Math.round(fg[0] + (target[0] - fg[0]) * t),
+    Math.round(fg[1] + (target[1] - fg[1]) * t),
+    Math.round(fg[2] + (target[2] - fg[2]) * t),
+  ];
+  let lo = 0;
+  let hi = 1;
+  for (let i = 0; i < 24; i++) {
+    const mid = (lo + hi) / 2;
+    if (contrastRatio(mix(mid), bg) >= minimum) hi = mid;
+    else lo = mid;
+  }
+  const result = mix(hi);
+  // Rounding can land a hair under; nudge along the line until it passes.
+  let t = hi;
+  let out = result;
+  while (contrastRatio(out, bg) < minimum && t < 1) {
+    t = Math.min(1, t + 1 / 255);
+    out = mix(t);
+  }
+  return out;
+}
+
+export function toHex([r, g, b]: Rgb): string {
+  return [r, g, b].map((c) => c.toString(16).padStart(2, '0')).join('').toUpperCase();
+}

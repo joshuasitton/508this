@@ -8,6 +8,44 @@ for. Where an entry has since been overtaken, `docs/build-state.md` says so.
 
 ---
 
+## 2026-09-17, evening — Remediation, and what the report is allowed to claim
+
+### Done today
+
+- **Remediation** of what has one right answer: title, language, table
+  header rows, skipped heading levels, contrast. One button on the job page;
+  the output is re-detected and a finding counts as fixed only if
+  re-detection no longer finds it. On a real Word file the run changes two of
+  eighteen parts and the rest are byte-identical. The downloaded file passes
+  an independent CRC check and opens in python-docx with the title, header
+  row, heading level and colour as claimed.
+- **The conformance statement** at `/jobs/[id]/report`: every criterion,
+  level, conformance and remark in the layout of an ACR, printable.
+
+### Decided by the engineering and security leads, for the Chairman to overturn if he disagrees
+
+**The report never says "Supports" on nothing.** The first version marked
+every criterion without a finding as Supports, including the twenty-eight no
+check had looked at. That is a false statement to a federal buyer. Every
+criterion now has a basis – checked, static, or reviewer – and the six
+reviewer-class criteria read "Needs Review" until a person confirms them. The
+verdict has three states, and a document lands on the middle one after
+remediation: "passes every automated check; six criteria wait on a
+reviewer". It cannot reach "Conforms to Section 508" until the review queue
+exists and someone has used it. This is slower to a headline the customer
+wants and it is the only headline the company can stand behind.
+
+### Decisions needed from the Chairman
+
+1. **Retention** – still open, still the gate on production storage.
+2. **The default document language is en-US** when none is set. Right for
+   federal documents; wrong for a Spanish-language notice. The intake form
+   could ask. Recommended: ask only when the reviewer flags it.
+3. **The review queue is now the critical path.** Nothing can be reported as
+   conformant without it. Recommended as the next build, ahead of PDF export.
+
+---
+
 ## 2026-09-17 — The plan to a first delivered document
 
 ### Decided by the Chairman

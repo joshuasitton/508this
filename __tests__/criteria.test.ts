@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { CRITERIA, DOCUMENT_EXEMPT, appliesTo, criteriaFor, criterion, labelFor } from '../src/domain/criteria';
+import { CRITERIA, DOCUMENT_COVERAGE, DOCUMENT_EXEMPT, appliesTo, criteriaFor, criterion, labelFor } from '../src/domain/criteria';
+import { KINDS } from '../src/domain/kinds';
 
 test('the catalogue is exactly WCAG 2.0 Level A and AA', () => {
   // Deliberate: the Revised 508 Standards incorporate WCAG 2.0 A and AA, which is
@@ -56,4 +57,24 @@ test('an id outside the catalogue applies to nothing', () => {
 test('a criterion is named to a person as number and name', () => {
   assert.equal(labelFor('1.1.1'), '1.1.1 Non-text Content');
   assert.equal(labelFor('9.9.9'), '9.9.9');
+});
+
+test('every criterion has a coverage class and a remark, and the checked ones are the ones with a detector kind', () => {
+  // The report's honesty line. A criterion with no coverage entry would
+  // default to Supports on nothing; a "checked" criterion with no kind
+  // behind it would claim a check that does not exist.
+  const detected = new Set(Object.values(KINDS).map((k) => k.criterion));
+  for (const c of CRITERIA) {
+    const info = DOCUMENT_COVERAGE[c.id];
+    assert.ok(info, `${c.id} has no coverage`);
+    assert.ok(info.remark.length > 10, `${c.id} has no remark`);
+    if (info.coverage === 'checked' && c.id !== '4.1.1') {
+      assert.ok(detected.has(c.id), `${c.id} is "checked" but no kind produces it`);
+    }
+  }
+  assert.equal(Object.keys(DOCUMENT_COVERAGE).length, 38);
+  assert.deepEqual(
+    Object.entries(DOCUMENT_COVERAGE).filter(([, v]) => v.coverage === 'reviewer').map(([k]) => k),
+    ['1.3.2', '1.3.3', '1.4.1', '1.4.5', '2.4.6', '3.1.2'],
+  );
 });

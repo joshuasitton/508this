@@ -5,8 +5,9 @@
  */
 
 import type { Finding } from './findings';
+import type { Kind } from './kinds';
 
-export type JobStatus = 'received' | 'detected' | 'in-review' | 'delivered';
+export type JobStatus = 'received' | 'detected' | 'remediated' | 'in-review' | 'delivered';
 
 export type Format = 'docx';
 
@@ -18,6 +19,18 @@ export interface Job {
   format: Format;
   status: JobStatus;
   findings: Finding[];
+  /** What automatic remediation changed, in order. Absent until it has run. */
+  applied?: Applied[];
+  remediatedAt?: string;
+  /** Criteria a reviewer has confirmed. Absent until the review queue exists. */
+  confirmed?: string[];
+}
+
+/** One change remediation made, in the customer's words. */
+export interface Applied {
+  kind: Kind;
+  location: string;
+  description: string;
 }
 
 export const ACCEPTED: Record<Format, { extension: string; mime: string; label: string }> = {
@@ -85,7 +98,9 @@ export function describeStatus(status: JobStatus): string {
     case 'received':
       return 'Received. Checking the document.';
     case 'detected':
-      return 'Checked. Every issue below has been found and is waiting for a reviewer.';
+      return 'Checked. Every issue below has been found; nothing has been changed yet.';
+    case 'remediated':
+      return 'Fixed automatically where that is safe. What is left needs a person.';
     case 'in-review':
       return 'In review. A person is confirming each fix.';
     case 'delivered':

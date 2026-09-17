@@ -5,6 +5,7 @@
 
 import type { DocxParts } from '@/domain/docx';
 import { unzip, ZipError } from './unzip';
+import { zip } from './zip';
 
 export class NotADocxError extends Error {}
 
@@ -13,16 +14,32 @@ const OPTIONAL: Array<[keyof Omit<DocxParts, 'document'>, string]> = [
   ['styles', 'word/styles.xml'],
   ['settings', 'word/settings.xml'],
   ['core', 'docProps/core.xml'],
+  ['contentTypes', '[Content_Types].xml'],
+  ['rels', '_rels/.rels'],
 ];
+const PATHS: Record<keyof DocxParts, string> = {
+  document: DOCUMENT,
+  styles: 'word/styles.xml',
+  settings: 'word/settings.xml',
+  core: 'docProps/core.xml',
+  contentTypes: '[Content_Types].xml',
+  rels: '_rels/.rels',
+};
 
 export function readDocxParts(bytes: Uint8Array): DocxParts {
-  let entries: Map<string, Uint8Array>;
+  return partsOf(readEntries(bytes));
+}
+
+function readEntries(bytes: Uint8Array): Map<string, Uint8Array> {
   try {
-    entries = unzip(bytes);
+    return unzip(bytes);
   } catch (error) {
     if (error instanceof ZipError) throw new NotADocxError(error.message);
     throw error;
   }
+}
+
+function partsOf(entries: Map<string, Uint8Array>): DocxParts {
   const document = entries.get(DOCUMENT);
   if (!document) throw new NotADocxError(`No ${DOCUMENT} part; this is a zip but not a Word document`);
   const decoder = new TextDecoder('utf-8', { fatal: true });
@@ -32,4 +49,20 @@ export function readDocxParts(bytes: Uint8Array): DocxParts {
     if (bytes) parts[key] = decoder.decode(bytes);
   }
   return parts;
+}
+
+/**
+ * The original archive with the changed parts written over it. Everything
+ * remediation did not touch – images, fonts, numbering, comments – is
+ * carried across byte for byte, so the output is the customer's document
+ * and not a reconstruction of it.
+ */
+export function writeDocx(original: Uint8Array, parts: DocxParts): Uint8Array {
+  const entries = readEntries(original);
+  const enc = new TextEncoder();
+  for (const [key, path] of Object.entries(PATHS) as [keyof DocxParts, string][]) {
+    const value = parts[key];
+    if (value !== undefined) entries.set(path, enc.encode(value));
+  }
+  return zip(entries);
 }

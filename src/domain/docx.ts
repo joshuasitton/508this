@@ -16,7 +16,7 @@
  * report; it must never go anywhere else (see the invariant in CLAUDE.md).
  */
 
-import { contrastRatio, formatRatio, isLargeText, minimumRatio, parseHex, type Rgb } from './contrast';
+import { contrastRatio, formatRatio, isLargeText, minimumRatio, parseHex, toHex, type Rgb } from './contrast';
 import type { Finding, Severity } from './findings';
 import { KINDS, type Kind } from './kinds';
 import { attr, child, children, find, findAll, parseXml, textOf, type XmlElement } from './xml';
@@ -30,6 +30,10 @@ export interface DocxParts {
   settings?: string;
   /** docProps/core.xml */
   core?: string;
+  /** [Content_Types].xml – only remediation needs it, to register a new part. */
+  contentTypes?: string;
+  /** _rels/.rels – likewise. */
+  rels?: string;
 }
 
 const WHITE: Rgb = [255, 255, 255];
@@ -301,18 +305,55 @@ export function detectDocx(parts: DocxParts): Finding[] {
       const ratio = contrastRatio(fg, bg);
       const minimum = minimumRatio(isLargeText(points, bold));
       if (ratio >= minimum) continue;
-      const key = `${p.number}:${hex(fg)}:${hex(bg)}`;
+      const key = `${p.number}:${toHex(fg)}:${toHex(bg)}`;
       if (reported.has(key)) continue;
       reported.add(key);
       out.push(
         finding(
           'contrast',
           where(p),
-          `Text “${snippet(text)}” is #${hex(fg)} on #${hex(bg)}, a contrast of ${formatRatio(ratio)}; it needs ${minimum}:1.`,
+          `Text “${snippet(text)}” is #${toHex(fg)} on #${toHex(bg)}, a contrast of ${formatRatio(ratio)}; it needs ${minimum}:1.`,
           'partial',
         ),
       );
     }
+  }
+
+  // 1.2.x – embedded recordings, and 3.3.x – form fields, take the document
+  // out of the "static" class for those criteria. Each is a finding for a
+  // reviewer; nothing here can fix them.
+  const MEDIA = ['videoFile', 'audioFile', 'audioCd', 'wavAudioFile', 'quickTimeFile'];
+  let mediaNumber = 0;
+  for (const local of MEDIA) {
+    for (const m of findAll(body, local)) {
+      mediaNumber += 1;
+      const p = enclosing(m);
+      out.push(
+        finding(
+          'media',
+          `recording ${mediaNumber}${p ? `, ${where(p)}` : ''}`,
+          'The document embeds a recording. A reviewer confirms it has captions and an audio description.',
+          'partial',
+        ),
+      );
+    }
+  }
+  let fieldNumber = 0;
+  const fieldAt = (el: XmlElement, what: string) => {
+    fieldNumber += 1;
+    const p = enclosing(el);
+    out.push(
+      finding(
+        'forms',
+        `field ${fieldNumber}${p ? `, ${where(p)}` : ''}`,
+        `The document contains a ${what}. A reviewer confirms it has a label and instructions.`,
+        'partial',
+      ),
+    );
+  };
+  for (const sdt of findAll(body, 'sdt')) fieldAt(sdt, 'content control');
+  for (const instr of findAll(body, 'instrText')) {
+    if (/^\s*FORM(TEXT|CHECKBOX|DROPDOWN)\b/.test(textOf(instr))) fieldAt(instr, 'legacy form field');
   }
 
   return out;
@@ -339,6 +380,3 @@ function fillOf(shd: XmlElement | undefined): Rgb | undefined {
   return parseHex(fill) ?? undefined;
 }
 
-function hex([r, g, b]: Rgb): string {
-  return [r, g, b].map((c) => c.toString(16).padStart(2, '0')).join('').toUpperCase();
-}

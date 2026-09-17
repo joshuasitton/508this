@@ -123,6 +123,79 @@ export function criteriaFor(kind: ContentKind): Criterion[] {
   return CRITERIA.filter((c) => appliesTo(c.id, kind));
 }
 
+/**
+ * How 508This knows a document meets a criterion. This is the honesty line
+ * in the report. A criterion with no findings is not thereby met; it is met
+ * if a check looked and found nothing, or if a static document has nothing
+ * the criterion governs, or if a person looked. Anything else is "Needs
+ * Review" in the report, never "Supports", because a buyer reads Supports
+ * as a claim and the claim has to have a basis.
+ *
+ * - checked: an automated check in `docx.ts` covers it.
+ * - static: a Word document with no interactive or time-based content has
+ *   nothing this criterion governs. The detector emits a finding if it sees
+ *   media or form fields, which moves the criterion out of this class for
+ *   that document.
+ * - reviewer: only a person can tell. Reading order, colour as the only
+ *   signal, images of text, whether headings describe their sections.
+ */
+export type Coverage = 'checked' | 'static' | 'reviewer';
+
+export interface CoverageInfo {
+  coverage: Coverage;
+  /** The remark the report carries when the criterion is met on this basis. */
+  remark: string;
+}
+
+const STATIC_INTERACTIVE = 'A static document has no interactive content this criterion governs.';
+const STATIC_MEDIA = 'The document contains no audio or video.';
+const STATIC_FORMS = 'The document contains no form fields.';
+
+export const DOCUMENT_COVERAGE: Record<string, CoverageInfo> = {
+  '1.1.1': { coverage: 'checked', remark: 'Every image has alternative text or is marked decorative.' },
+  '1.2.1': { coverage: 'static', remark: STATIC_MEDIA },
+  '1.2.2': { coverage: 'static', remark: STATIC_MEDIA },
+  '1.2.3': { coverage: 'static', remark: STATIC_MEDIA },
+  '1.2.4': { coverage: 'static', remark: STATIC_MEDIA },
+  '1.2.5': { coverage: 'static', remark: STATIC_MEDIA },
+  '1.3.1': { coverage: 'checked', remark: 'Headings run in order and every table has a header row.' },
+  '1.3.2': { coverage: 'reviewer', remark: 'A reviewer confirms the reading order matches the visual order.' },
+  '1.3.3': { coverage: 'reviewer', remark: 'A reviewer confirms no instruction relies on shape, size or position alone.' },
+  '1.4.1': { coverage: 'reviewer', remark: 'A reviewer confirms colour is never the only way information is conveyed.' },
+  '1.4.2': { coverage: 'static', remark: STATIC_MEDIA },
+  '1.4.3': { coverage: 'checked', remark: 'Every coloured run meets the minimum contrast against its background.' },
+  '1.4.4': { coverage: 'static', remark: 'Word documents scale text without loss of content.' },
+  '1.4.5': { coverage: 'reviewer', remark: 'A reviewer confirms no image is used in place of text.' },
+  '2.1.1': { coverage: 'static', remark: STATIC_INTERACTIVE },
+  '2.1.2': { coverage: 'static', remark: STATIC_INTERACTIVE },
+  '2.2.1': { coverage: 'static', remark: STATIC_INTERACTIVE },
+  '2.2.2': { coverage: 'static', remark: 'The document contains no moving or auto-updating content.' },
+  '2.3.1': { coverage: 'static', remark: 'The document contains no flashing content.' },
+  '2.4.1': { coverage: 'static', remark: 'Not required for documents.' },
+  '2.4.2': { coverage: 'checked', remark: 'The document has a title.' },
+  '2.4.3': { coverage: 'static', remark: STATIC_INTERACTIVE },
+  '2.4.4': { coverage: 'checked', remark: 'Every link’s text says where it goes.' },
+  '2.4.5': { coverage: 'static', remark: 'Not required for documents.' },
+  '2.4.6': { coverage: 'reviewer', remark: 'A reviewer confirms headings describe their sections.' },
+  '2.4.7': { coverage: 'static', remark: STATIC_INTERACTIVE },
+  '3.1.1': { coverage: 'checked', remark: 'The document declares its language.' },
+  '3.1.2': { coverage: 'reviewer', remark: 'A reviewer confirms passages in another language are marked.' },
+  '3.2.1': { coverage: 'static', remark: STATIC_INTERACTIVE },
+  '3.2.2': { coverage: 'static', remark: STATIC_FORMS },
+  '3.2.3': { coverage: 'static', remark: 'Not required for documents.' },
+  '3.2.4': { coverage: 'static', remark: 'Not required for documents.' },
+  '3.3.1': { coverage: 'static', remark: STATIC_FORMS },
+  '3.3.2': { coverage: 'static', remark: STATIC_FORMS },
+  '3.3.3': { coverage: 'static', remark: STATIC_FORMS },
+  '3.3.4': { coverage: 'static', remark: STATIC_FORMS },
+  '4.1.1': { coverage: 'checked', remark: 'The document’s XML parsed without error.' },
+  '4.1.2': { coverage: 'static', remark: STATIC_FORMS },
+};
+
+export function coverageOf(id: string): CoverageInfo | undefined {
+  return DOCUMENT_COVERAGE[id];
+}
+
 /** Short form used everywhere a criterion is named to a person: "1.1.1 Non-text Content". */
 export function labelFor(id: string): string {
   const c = BY_ID.get(id);

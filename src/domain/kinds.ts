@@ -27,7 +27,9 @@ export type Kind =
   | 'heading-skip'
   | 'no-headings'
   | 'link-text'
-  | 'contrast';
+  | 'contrast'
+  | 'media'
+  | 'forms';
 
 export interface KindInfo {
   criterion: string;
@@ -87,6 +89,18 @@ export const KINDS: Record<Kind, KindInfo> = {
     title: 'Text that is hard to read against its background',
     why: 'Light grey on white, or white on yellow, disappears for people with low vision, on a poor screen, or in daylight. The standard sets a minimum contrast of 4.5:1 for body text.',
     fix: 'We darken the text colour just enough to meet the minimum and keep the design.',
+  },
+  media: {
+    criterion: '1.2.1',
+    title: 'Embedded audio or video',
+    why: 'A recording carries information a person who cannot hear it, or cannot see it, has no other way to get. Captions and an audio description are what make it available to them.',
+    fix: 'We flag each recording for a reviewer, who confirms captions and a description are present or arranges them.',
+  },
+  forms: {
+    criterion: '3.3.2',
+    title: 'Form fields',
+    why: 'A field with no label is announced as "edit text" and nothing more. A person filling it in by ear does not know what goes in it, or what went wrong when it is rejected.',
+    fix: 'We flag each field for a reviewer, who confirms it has a label and clear instructions.',
   },
 };
 

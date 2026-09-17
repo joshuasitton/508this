@@ -11,7 +11,7 @@
  * drifts. When the wording changes, the test here changes with it.
  */
 
-import { appliesTo, labelFor, type ContentKind, criteriaFor } from './criteria';
+import { appliesTo, coverageOf, labelFor, type ContentKind, criteriaFor } from './criteria';
 import type { Kind } from './kinds';
 
 export type Severity =
@@ -34,7 +34,14 @@ export interface Finding {
   remediated: boolean;
 }
 
-export type Status = 'Supports' | 'Partially Supports' | 'Does Not Support' | 'Not Applicable';
+/**
+ * The four VPAT terms, plus one of our own. "Needs Review" is a criterion
+ * with no findings that only a person can vouch for, before a person has.
+ * It is never in a delivered report; delivery waits until every one is
+ * confirmed or has a finding. It is on the job page so the customer sees
+ * what is still owed and by whom.
+ */
+export type Status = 'Supports' | 'Partially Supports' | 'Does Not Support' | 'Not Applicable' | 'Needs Review';
 
 export interface Assessment {
   criterion: string;
@@ -54,24 +61,41 @@ export function openFindings(findings: readonly Finding[]): Finding[] {
  * regardless of findings, so a mis-filed finding cannot fail a document on a
  * criterion it does not owe.
  */
-export function assess(criterionId: string, findings: readonly Finding[], kind: ContentKind): Assessment {
+const NONE: ReadonlySet<string> = new Set();
+
+export function assess(
+  criterionId: string,
+  findings: readonly Finding[],
+  kind: ContentKind,
+  confirmed: ReadonlySet<string> = NONE,
+): Assessment {
   if (!appliesTo(criterionId, kind)) {
     return { criterion: criterionId, status: 'Not Applicable', open: [] };
   }
   const open = openFindings(findings).filter((f) => f.criterion === criterionId);
-  if (open.length === 0) return { criterion: criterionId, status: 'Supports', open };
-  const status: Status = open.some((f) => f.severity === 'blocking') ? 'Does Not Support' : 'Partially Supports';
-  return { criterion: criterionId, status, open };
+  if (open.length > 0) {
+    const status: Status = open.some((f) => f.severity === 'blocking') ? 'Does Not Support' : 'Partially Supports';
+    return { criterion: criterionId, status, open };
+  }
+  const basis = coverageOf(criterionId)?.coverage;
+  if (basis === 'reviewer' && !confirmed.has(criterionId)) {
+    return { criterion: criterionId, status: 'Needs Review', open };
+  }
+  return { criterion: criterionId, status: 'Supports', open };
 }
 
 /** One assessment per criterion in the catalogue, in catalogue order. */
-export function assessAll(findings: readonly Finding[], kind: ContentKind): Assessment[] {
-  return criteriaFor('web').map((c) => assess(c.id, findings, kind));
+export function assessAll(
+  findings: readonly Finding[],
+  kind: ContentKind,
+  confirmed: ReadonlySet<string> = NONE,
+): Assessment[] {
+  return criteriaFor('web').map((c) => assess(c.id, findings, kind, confirmed));
 }
 
-/** A document conforms when nothing it owes is open. */
-export function conforms(findings: readonly Finding[], kind: ContentKind): boolean {
-  return assessAll(findings, kind).every((a) => a.status === 'Supports' || a.status === 'Not Applicable');
+/** A document conforms when nothing it owes is open and nothing waits on a reviewer. */
+export function conforms(findings: readonly Finding[], kind: ContentKind, confirmed: ReadonlySet<string> = NONE): boolean {
+  return assessAll(findings, kind, confirmed).every((a) => a.status === 'Supports' || a.status === 'Not Applicable');
 }
 
 export interface Progress {
@@ -95,34 +119,56 @@ export interface Summary {
   owed: number;
   /** Owed criteria with at least one open finding. */
   short: number;
+  /** Owed criteria with no findings that still wait on a reviewer. */
+  review: number;
   blocking: number;
   other: number;
 }
 
-export function summarise(findings: readonly Finding[], kind: ContentKind): Summary {
-  const assessments = assessAll(findings, kind);
+export function summarise(findings: readonly Finding[], kind: ContentKind, confirmed: ReadonlySet<string> = NONE): Summary {
+  const assessments = assessAll(findings, kind, confirmed);
   const owed = assessments.filter((a) => a.status !== 'Not Applicable');
-  const short = owed.filter((a) => a.status !== 'Supports');
+  const short = owed.filter((a) => a.status === 'Partially Supports' || a.status === 'Does Not Support');
+  const review = owed.filter((a) => a.status === 'Needs Review').length;
   const open = short.flatMap((a) => a.open);
   const blocking = open.filter((f) => f.severity === 'blocking').length;
-  return { conforms: short.length === 0, owed: owed.length, short: short.length, blocking, other: open.length - blocking };
+  return {
+    conforms: short.length === 0 && review === 0,
+    owed: owed.length,
+    short: short.length,
+    review,
+    blocking,
+    other: open.length - blocking,
+  };
 }
 
-/** The headline of the report, and the sentence under it. */
+/**
+ * The headline of the report, and the sentence under it. Three states, and
+ * the middle one is the honest one: every automated check passes, and the
+ * criteria only a person can vouch for are named as still owed rather than
+ * quietly counted as met.
+ */
 export function describeSummary(s: Summary): { headline: string; detail: string } {
   if (s.conforms) {
     return {
       headline: 'Conforms to Section 508',
-      detail: `No open issues on any of the ${s.owed} criteria this document owes.`,
+      detail: `No open issues on any of the ${s.owed} criteria this document owes, and every criterion that needs a person has been confirmed.`,
+    };
+  }
+  if (s.short === 0) {
+    return {
+      headline: 'Passes every automated check',
+      detail: `No open issues. ${s.review} of the ${s.owed} criteria this document owes can only be confirmed by a reviewer, and ${s.review === 1 ? 'that one is' : 'those are'} still waiting. It is not reported as conformant until they are.`,
     };
   }
   const issues = s.blocking + s.other;
   const parts: string[] = [];
   if (s.blocking > 0) parts.push(`${s.blocking} ${s.blocking === 1 ? 'is' : 'are'} blocking`);
   if (s.other > 0) parts.push(`${s.other} ${s.other === 1 ? 'is' : 'are'} partial`);
+  const tail = s.review > 0 ? ` ${s.review} more ${s.review === 1 ? 'waits' : 'wait'} on a reviewer.` : '';
   return {
     headline: 'Does not conform to Section 508 yet',
-    detail: `${s.short} of the ${s.owed} criteria this document owes ${s.short === 1 ? 'has' : 'have'} open issues: ${issues} in all, of which ${parts.join(' and ')}. Fix them and the document conforms.`,
+    detail: `${s.short} of the ${s.owed} criteria this document owes ${s.short === 1 ? 'has' : 'have'} open issues: ${issues} in all, of which ${parts.join(' and ')}.${tail}`,
   };
 }
 
@@ -130,7 +176,9 @@ export function describeSummary(s: Summary): { headline: string; detail: string 
 export function describeRemarks(a: Assessment): string {
   switch (a.status) {
     case 'Supports':
-      return 'No open issues.';
+      return coverageOf(a.criterion)?.remark ?? 'No open issues.';
+    case 'Needs Review':
+      return `Waiting on a reviewer. ${coverageOf(a.criterion)?.remark ?? ''}`.trim();
     case 'Not Applicable':
       return 'Not required for this content under E205.4.';
     case 'Partially Supports':

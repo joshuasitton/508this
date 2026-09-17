@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { attr, child, children, decodeEntities, find, findAll, parseXml, textOf } from '../src/domain/xml';
+import { attr, child, children, decodeEntities, el, find, findAll, parseXml, serializeXml, text, textOf } from '../src/domain/xml';
 
 test('parses what Word writes: declaration, prefixes, self-closing tags, both quote styles', () => {
   const root = parseXml(
@@ -68,4 +68,19 @@ test('malformed input throws rather than guessing', () => {
   assert.throws(() => parseXml('<a><b></a>'), /Mismatched/);
   assert.throws(() => parseXml('<a>'), /Unclosed/);
   assert.throws(() => parseXml('<a b=c/>'), /not quoted/);
+});
+
+test('serialize is a fixed point of parse, and escapes what must be escaped', () => {
+  // Remediation writes the whole part back. If the round trip changed
+  // anything Word cares about, every remediated document would differ from
+  // the original in ways nobody asked for.
+  const source = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="w" mc:Ignorable="w14"><w:body><w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t xml:space="preserve">Fish &amp; chips &lt;3 "quoted"</w:t></w:r></w:p><w:sectPr/></w:body></w:document>`;
+  const once = serializeXml(parseXml(source));
+  assert.equal(serializeXml(parseXml(once)), once);
+  assert.match(once, /Fish &amp; chips &lt;3 "quoted"/);
+  assert.match(once, /<w:sectPr\/>/);
+  assert.match(once, /^<\?xml version="1.0" encoding="UTF-8" standalone="yes"\?>\n<w:document /);
+  const built = el('a:x', { v: 'say "hi" & <bye>' }, [text('1 < 2')]);
+  assert.equal(serializeXml(built).split('\n')[1], '<a:x v="say &quot;hi&quot; &amp; &lt;bye&gt;">1 &lt; 2</a:x>');
 });

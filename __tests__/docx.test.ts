@@ -142,3 +142,20 @@ test('every finding starts unremediated with a criterion from the catalogue', ()
     assert.match(f.criterion, /^\d\.\d\.\d$/);
   }
 });
+
+test('an embedded recording and a form field are findings for a reviewer', () => {
+  const video = `<w:p><w:r><w:drawing><wp:inline xmlns:wp="p"><wp:docPr id="1" name="Clip" descr="A clip"/><a:videoFile xmlns:a="a" r:link="rId9"/></wp:inline></w:drawing></w:r></w:p>`;
+  const control = `<w:p><w:sdt><w:sdtContent><w:r><w:t>Name:</w:t></w:r></w:sdtContent></w:sdt></w:p>`;
+  const legacy = `<w:p><w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText xml:space="preserve"> FORMTEXT </w:instrText></w:r></w:p>`;
+  const findings = detectDocx(clean(heading(1, 'x') + video + control + legacy));
+  assert.deepEqual(
+    findings.map((f) => [f.kind, f.criterion]),
+    [
+      ['media', '1.2.1'],
+      ['forms', '3.3.2'],
+      ['forms', '3.3.2'],
+    ],
+  );
+  assert.equal(findings[0]?.location, 'recording 1, paragraph 2');
+  assert.equal(findings[2]?.location, 'field 2, paragraph 4');
+});

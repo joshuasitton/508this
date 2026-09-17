@@ -31,8 +31,8 @@ npm run build         # what Vercel runs
 | Path | What lives there |
 |---|---|
 | `src/app/` | App Router pages and layouts, one folder per route |
-| `src/domain/` | pure functions: the criteria catalogue, findings, the Word detector, the job model |
-| `src/server/` | Node-only code: the zip reader, the .docx part reader, the job store |
+| `src/domain/` | pure functions: the criteria catalogue and coverage, findings, the Word detector and remediator, the job model |
+| `src/server/` | Node-only code: the zip reader and writer, the .docx part reader, the job store |
 | `__tests__/` | tests, against the domain layer and the server layer's pure parts |
 | `scripts/ts-resolve.mjs` | lets Node run the TypeScript domain with no bundler |
 | `docs/` | project-level state and the leadership standup log |
@@ -48,6 +48,16 @@ npm run build         # what Vercel runs
   plus the E205.4 exception for non-web documents. `domain/findings.ts` owns
   both a criterion's status *and* the sentence that states it in the report.
   A value defined in two places drifts; it drifted repeatedly in Loadsy.
+- **"Supports" is never said on nothing.** `DOCUMENT_COVERAGE` in
+  `domain/criteria.ts` gives every criterion a basis – an automated check, a
+  static document having nothing the criterion governs, or a reviewer – and a
+  reviewer-class criterion nobody has confirmed reads "Needs Review". The
+  verdict has three states and the middle one, "passes every automated
+  check", is where a document lands after remediation. Collapsing it into
+  "Conforms" is a false statement to a federal buyer.
+- **A finding is remediated only when re-detection no longer finds it.**
+  `remediateJob` in `src/server/jobs.ts` re-runs detection on the output and
+  marks findings from that, never from what a fix claims. Keep it that way.
 - **The catalogue is WCAG 2.0, not the newest WCAG.** The regulation
   incorporates 2.0 by reference. Adding a 2.1 or 2.2 criterion makes the report
   claim a legal requirement that does not exist. If a customer wants 2.2, that

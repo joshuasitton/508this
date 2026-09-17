@@ -1,0 +1,132 @@
+.report {
+  max-width: 80ch;
+}
+
+.tools {
+  margin: 0 0 1.5rem;
+}
+
+.head {
+  margin-bottom: 2rem;
+}
+
+.kicker {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.title {
+  font-size: clamp(1.5rem, 3vw, 2.25rem);
+  margin: 0 0 1rem;
+  overflow-wrap: anywhere;
+}
+
+.meta {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.35rem 1.25rem;
+  margin: 0;
+}
+
+.meta dt {
+  color: var(--muted);
+}
+
+.meta dd {
+  margin: 0;
+}
+
+.verdict {
+  border-left: 5px solid var(--foreground);
+  padding: 1rem 1.25rem;
+  margin: 0 0 2.5rem;
+}
+
+.verdict h2 {
+  font-size: 1.4rem;
+  margin: 0 0 0.5rem;
+}
+
+.verdict p {
+  margin: 0;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 2.5rem;
+  font-size: 0.95rem;
+}
+
+.table caption {
+  text-align: left;
+  font-weight: 700;
+  font-size: 1.1rem;
+  padding-bottom: 0.5rem;
+}
+
+.table th,
+.table td {
+  text-align: left;
+  padding: 0.5rem 0.75rem 0.5rem 0;
+  border-bottom: 1px solid var(--rule);
+  vertical-align: top;
+}
+
+.table thead th {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.table tbody th {
+  font-weight: 500;
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+.review th,
+.review td {
+  font-style: italic;
+}
+
+.footnote {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+@media (max-width: 40rem) {
+  .meta {
+    grid-template-columns: 1fr;
+    gap: 0.1rem;
+  }
+
+  .meta dd {
+    margin-bottom: 0.6rem;
+  }
+
+  .nowrap {
+    white-space: normal;
+  }
+}
+
+@media print {
+  .tools {
+    display: none;
+  }
+
+  .verdict {
+    border-left-color: #000;
+  }
+
+  .table {
+    page-break-inside: auto;
+  }
+
+  .table tr {
+    page-break-inside: avoid;
+  }
+}

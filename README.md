@@ -191,6 +191,94 @@ still fails.
 
 ---
 
+## What "Supports" is allowed to mean
+
+The report's honesty line is `DOCUMENT_COVERAGE` in `src/domain/criteria.ts`.
+A criterion with no findings is not thereby met. It is met on one of three
+bases, and each criterion is assigned one:
+
+- **checked** – an automated check in `docx.ts` looked and found nothing.
+  Six criteria, plus 4.1.1 Parsing, which the reader itself vouches for.
+- **static** – a Word document with no interactive or time-based content has
+  nothing the criterion governs: keyboard traps, timing, flashing, focus,
+  forms, captions. Twenty-two criteria. The detector emits a `media` or
+  `forms` finding if it sees a recording or a form field, which moves the
+  criterion out of this class for that document.
+- **reviewer** – only a person can tell: reading order, colour as the only
+  signal, images of text, whether headings describe their sections, passages
+  in another language. Six criteria.
+
+A reviewer-class criterion nobody has confirmed is **Needs Review** in the
+report, never Supports. That is not a VPAT term and the statement says so in
+its footnote. The alternative – counting "nobody looked" as "Supports" – is a
+false statement to a federal buyer, and the verdict therefore has three states,
+not two: does not conform yet; passes every automated check but N criteria
+wait on a reviewer; conforms. The middle one is the honest one, and it is the
+one a document lands on after automatic remediation. A test pins that with
+nothing confirmed, an empty findings list is *not* conformance.
+
+---
+
+## Remediation
+
+`src/domain/remediate.ts` fixes what has one right answer and leaves the rest.
+Marking a table's first row as its header, setting the document language,
+closing a skipped heading level, darkening a grey until it meets 4.5:1: each
+is a change detection can verify afterwards. Alternative text, link wording
+and which bold paragraphs are really headings have no single right answer,
+and a confident wrong one is worse than a finding, so those go to a reviewer.
+
+The contract with the job store is the honest part. After remediation the
+output is re-detected, and a finding is marked remediated **only if
+re-detection no longer finds it** – not because a fix claims to have handled
+it. What re-detection still finds stays open; anything new it finds is added.
+A fix that broke something cannot hide.
+
+Some particulars, each the answer to a way the first version was wrong:
+
+- The output is the original archive with the changed parts written over
+  it, not a reconstruction. Images, fonts, numbering and comments are carried
+  across byte for byte; a run on a real document changes two parts of
+  eighteen.
+- `src/server/zip.ts` writes the real CRC for every entry, from `node:zlib`.
+  Word opens an archive with a wrong CRC as "corrupt", which is the one thing
+  a remediation service cannot hand back. A test reads the CRCs out of both
+  headers and checks them.
+- The heading fix pulls a level *up* to the previous plus one, in document
+  order, so H1 → H3 → H3 → H5 becomes H1 → H2 → H3 → H4 without flattening
+  the outline. If the style it needs does not exist, one is added in the shape
+  Word's built-in headings take.
+- The contrast fix bisects along the line from the colour to black (or white
+  on a dark fill) for the smallest change that passes, and drops any theme
+  colour on the run, which would otherwise override the literal. #999999 on
+  white lands on #767676, the well-known just-passing grey.
+- A document with no `docProps/core.xml` gets one, registered in the content
+  types and the package relationships, because a title nothing can find is
+  not a title.
+
+The XML goes through `parseXml` and back through `serializeXml`; a test pins
+that the round trip is a fixed point, so a remediated document differs from
+the original only where a fix touched it.
+
+### Kicking it off, and what comes back
+
+One button on the job page, disabled when nothing on the page can be fixed
+without a person. It runs the fixes, stores `remediated.docx` beside the
+original, re-detects, and sends the customer back to the same page, which now
+offers the remediated document, the original, a list of what was changed, and
+the conformance statement. The download names the file "report (remediated)
+.docx" so it never overwrites the original on the customer's disk, and the
+customer's filename goes through a quoted, escaped header and nowhere near a
+path.
+
+`/jobs/[id]/report` is the conformance statement: every criterion, its level,
+its conformance and its remark, in the layout of an Accessibility Conformance
+Report, printable, with the three-state verdict on top. It is rendered by the
+same functions as the job page. When nothing is open and nothing waits on a
+reviewer it says "Conforms to Section 508", and not before.
+
+---
+
 ## Reading the result
 
 The job page is the report, and it is written in the order a customer asks
@@ -286,9 +374,10 @@ file cannot be merged.
 - The Next.js scaffold, ESLint, TypeScript in strict mode with
   `noUncheckedIndexedAccess`.
 - The criteria catalogue and the findings model, tested.
-- Intake, Word detection and the job page, above. Run end to end in a browser
-  against the production build before merging; `docs/build-state.md` says what
-  was checked.
+- Intake, Word detection, remediation, the job page and the conformance
+  statement, above. Run end to end in a browser against the production build
+  before merging, and the downloaded file checked with an independent reader;
+  `docs/build-state.md` says what was checked.
 - A landing page that renders the catalogue from the domain – partly so the
   list a customer reads is the list the report is built from, and partly to
   prove on the first page that `src/domain/` has no idea React exists.

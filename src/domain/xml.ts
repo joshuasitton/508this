@@ -220,3 +220,43 @@ export function textOf(el: XmlElement): string {
   }
   return s;
 }
+
+const ESCAPE_TEXT: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;' };
+const ESCAPE_ATTR: Record<string, string> = { ...ESCAPE_TEXT, '"': '&quot;' };
+
+export function escapeText(s: string): string {
+  return s.replace(/[&<>]/g, (c) => ESCAPE_TEXT[c] ?? c);
+}
+
+export function escapeAttr(s: string): string {
+  return s.replace(/[&<>"]/g, (c) => ESCAPE_ATTR[c] ?? c);
+}
+
+/**
+ * Back to text, with the declaration Word writes. Attributes and text are
+ * escaped; an element with no children self-closes. The reader dropped
+ * whitespace between elements and comments, and neither carries meaning in
+ * OOXML, so a part that goes through parse and serialize is the same part
+ * to Word. A test pins that the round trip is a fixed point.
+ */
+export function serializeXml(root: XmlElement): string {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n${serializeElement(root)}`;
+}
+
+function serializeElement(el: XmlElement): string {
+  let s = `<${el.name}`;
+  for (const [k, v] of Object.entries(el.attrs)) s += ` ${k}="${escapeAttr(v)}"`;
+  if (el.children.length === 0) return `${s}/>`;
+  s += '>';
+  for (const c of el.children) s += c.type === 'text' ? escapeText(c.text) : serializeElement(c);
+  return `${s}</${el.name}>`;
+}
+
+/** A new element, for building fixes. */
+export function el(name: string, attrs: Record<string, string> = {}, children: XmlNode[] = []): XmlElement {
+  return { type: 'element', name, local: name.includes(':') ? name.slice(name.indexOf(':') + 1) : name, attrs, children };
+}
+
+export function text(s: string): XmlText {
+  return { type: 'text', text: s };
+}

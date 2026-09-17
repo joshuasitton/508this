@@ -10,7 +10,8 @@ import { zip } from './helpers/zip';
 // module is loaded and the module is loaded dynamically.
 const root = mkdtempSync(path.join(tmpdir(), '508this-jobs-'));
 process.env.DOCUMENTS_DIR = root;
-const { createJob, getJob } = await import('../src/server/jobs');
+const { createJob, getJob, getJobFile, remediateJob } = await import('../src/server/jobs');
+const { unzip } = await import('../src/server/unzip');
 
 const W = 'xmlns:w="w"';
 const docx = zip({
@@ -59,4 +60,37 @@ test('a record written by an earlier build, without kinds, is repaired from the 
 test('an unknown or malformed id is null, never a path', async () => {
   assert.equal(await getJob('00000000-0000-4000-8000-0000000000ff'), null);
   assert.equal(await getJob('../etc'), null);
+});
+
+test('remediation stores a fixed document, marks only what re-detection no longer finds, and names the file', async () => {
+  const W2 = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"';
+  const withIssues = zip({
+    '[Content_Types].xml': '<Types xmlns="ct"/>',
+    '_rels/.rels': '<Relationships xmlns="r"/>',
+    'word/document.xml': `<w:document ${W2}><w:body><w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>Title</w:t></w:r></w:p><w:tbl><w:tr><w:tc><w:p><w:r><w:t>h</w:t></w:r></w:p></w:tc></w:tr></w:tbl><w:p><w:hyperlink r:id="x" xmlns:r="r"><w:r><w:t>here</w:t></w:r></w:hyperlink></w:p></w:body></w:document>`,
+    'word/styles.xml': `<w:styles ${W2}><w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/><w:pPr><w:outlineLvl w:val="0"/></w:pPr></w:style></w:styles>`,
+    'word/media/image1.png': new Uint8Array([137, 80, 78, 71]),
+  });
+  const job = await createJob('grant narrative.docx', 'docx', withIssues);
+  assert.deepEqual([...new Set(job.findings.map((f) => f.kind))].sort(), ['link-text', 'no-language', 'no-title', 'table-header']);
+  assert.equal(await getJobFile(job.id, 'remediated'), null, 'nothing to download before remediation');
+
+  const done = (await remediateJob(job.id))!;
+  assert.equal(done.status, 'remediated', 'the link still needs a person');
+  assert.deepEqual(done.applied!.map((a) => a.kind), ['no-title', 'no-language', 'table-header']);
+  assert.deepEqual(
+    done.findings.map((f) => [f.kind, f.remediated]),
+    [
+      ['no-title', true],
+      ['no-language', true],
+      ['table-header', true],
+      ['link-text', false],
+    ],
+  );
+  const file = (await getJobFile(job.id, 'remediated'))!;
+  assert.equal(file.filename, 'grant narrative (remediated).docx');
+  const entries = unzip(file.bytes);
+  assert.ok(entries.has('docProps/core.xml'), 'the core part was created');
+  assert.deepEqual([...entries.get('word/media/image1.png')!], [137, 80, 78, 71], 'untouched parts carried across byte for byte');
+  assert.deepEqual(await getJob(job.id), done, 'the record was written');
 });

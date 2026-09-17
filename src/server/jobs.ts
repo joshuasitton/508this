@@ -21,8 +21,10 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 
 import { detectDocx } from '@/domain/docx';
+import type { Finding } from '@/domain/findings';
 import type { Format, Job } from '@/domain/job';
-import { readDocxParts } from './docx';
+import { remediateDocx } from '@/domain/remediate';
+import { readDocxParts, writeDocx } from './docx';
 
 const ROOT = process.env.DOCUMENTS_DIR ?? path.join(process.cwd(), 'documents');
 const ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -83,4 +85,70 @@ async function redetect(job: Job): Promise<Job> {
   const repaired: Job = { ...job, findings };
   await writeFile(path.join(dirFor(job.id), 'job.json'), JSON.stringify(repaired, null, 2));
   return repaired;
+}
+
+export type JobFile = 'original' | 'remediated';
+
+/** The bytes of a job's document, or null if the job or the file does not exist. */
+export async function getJobFile(id: string, which: JobFile): Promise<{ bytes: Uint8Array; filename: string } | null> {
+  const job = await getJob(id);
+  if (!job) return null;
+  if (which === 'remediated' && !job.remediatedAt) return null;
+  try {
+    const bytes = await readFile(path.join(dirFor(id), `${which}.${job.format}`));
+    return { bytes: new Uint8Array(bytes), filename: deliveredName(job.filename, which) };
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw error;
+  }
+}
+
+/** "report.docx" comes back as "report (remediated).docx", so the two never overwrite each other on the customer's disk. */
+export function deliveredName(filename: string, which: JobFile): string {
+  if (which === 'original') return filename;
+  const dot = filename.lastIndexOf('.');
+  return dot > 0 ? `${filename.slice(0, dot)} (remediated)${filename.slice(dot)}` : `${filename} (remediated)`;
+}
+
+/**
+ * Runs automatic remediation on the original, stores the result, and
+ * re-detects it. A finding is marked remediated when it is absent from the
+ * re-detection – not when a fix claims to have handled it – so the record
+ * describes the delivered document and nothing else. Findings the output
+ * still has stay open; anything new the output has (there should be
+ * nothing) is added, so a fix that broke something cannot hide it.
+ */
+export async function remediateJob(id: string): Promise<Job | null> {
+  const job = await getJob(id);
+  if (!job) return null;
+  const original = new Uint8Array(await readFile(path.join(dirFor(id), `original.${job.format}`)));
+  const parts = readDocxParts(original);
+  const { parts: fixedParts, applied } = remediateDocx(parts, { fallbackTitle: stem(job.filename) });
+  const remediated = writeDocx(original, fixedParts);
+  const after = detectDocx(readDocxParts(remediated));
+
+  const still = new Set(after.map(key));
+  const findings: Finding[] = job.findings.map((f) => (f.remediated || still.has(key(f)) ? f : { ...f, remediated: true }));
+  const known = new Set(findings.map(key));
+  for (const f of after) if (!known.has(key(f))) findings.push(f);
+
+  const updated: Job = {
+    ...job,
+    findings,
+    applied,
+    remediatedAt: new Date().toISOString(),
+    status: findings.some((f) => !f.remediated) ? 'remediated' : 'in-review',
+  };
+  await writeFile(path.join(dirFor(id), `remediated.${job.format}`), remediated);
+  await writeFile(path.join(dirFor(id), 'job.json'), JSON.stringify(updated, null, 2));
+  return updated;
+}
+
+function key(f: Finding): string {
+  return `${f.kind}|${f.location}`;
+}
+
+function stem(filename: string): string {
+  const dot = filename.lastIndexOf('.');
+  return dot > 0 ? filename.slice(0, dot) : filename;
 }

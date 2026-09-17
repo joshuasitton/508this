@@ -4,6 +4,27 @@ The running project-level record. Sections are dated and kept in order rather
 than rewritten, so the reasoning stays readable. Decisions live in
 `docs/leadership-standup.md`; this file says where the code stands.
 
+## 2026-09-17, evening — Remediation and the conformance statement
+
+On the same branch. `src/domain/remediate.ts`, `src/server/zip.ts`,
+`remediateJob` in the job store, the button and downloads on the job page,
+and `/jobs/[id]/report`. `DOCUMENT_COVERAGE` in `criteria.ts` and the
+"Needs Review" status in `findings.ts` are the honesty line; the standup log
+records why.
+
+**Verified end to end** on the production build in Chromium: upload a
+python-docx document with six issues, press the button, four are fixed and
+two (alt text, link text) correctly remain; the verdict moves from "does not
+conform" to "does not conform" with two open and six waiting on a reviewer;
+the download is named "(remediated)"; the statement lists 38 rows with six
+Needs Review. The downloaded file: `zipfile.testzip()` clean, python-docx
+opens it, title / header row / Heading 2 / #767676 / language all present,
+16 of 18 parts byte-identical to the input.
+
+**Next:** the review queue, which is now the critical path to a document
+that can be reported as conformant. Then the ACR as a Word file and the
+tagged PDF export.
+
 ## 2026-09-17, later — Intake and Word detection
 
 On the `intake/word-detection` branch, stacked on the founding PR.
