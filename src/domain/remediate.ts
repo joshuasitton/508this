@@ -1,0 +1,354 @@
+/**
+ * Remediation for Word documents: the parts in, the parts out, changed.
+ *
+ * Only what can be fixed *correctly* without a person is fixed here, and
+ * "correctly" is the whole test. Marking a table's first row as a header
+ * row, setting a language, closing a skipped heading level, darkening a
+ * grey until it meets 4.5:1: each is a change with one right answer that
+ * detection can verify afterwards. Alternative text, link wording and which
+ * bold paragraphs are really headings have no single right answer, and a
+ * confident wrong one is worse than a finding, so those go to a reviewer.
+ *
+ * The output is re-detected by the caller. A fix that does not make its
+ * finding disappear is a bug here, and the re-detection is what catches it.
+ */
+
+import { adjustForContrast, isLargeText, minimumRatio, parseHex, toHex, type Rgb } from './contrast';
+import type { DocxParts } from './docx';
+import type { Applied } from './job';
+import { attr, child, children, el, find, findAll, parseXml, serializeXml, text, textOf, type XmlElement } from './xml';
+
+export interface RemediationOptions {
+  /** Used for the title when the document has no heading to take one from. */
+  fallbackTitle: string;
+  /** BCP 47, e.g. "en-US". */
+  language?: string;
+}
+
+export interface Remediation {
+  parts: DocxParts;
+  applied: Applied[];
+}
+
+const CORE_NS = {
+  'xmlns:cp': 'http://schemas.openxmlformats.org/package/2006/metadata/core-properties',
+  'xmlns:dc': 'http://purl.org/dc/elements/1.1/',
+  'xmlns:dcterms': 'http://purl.org/dc/terms/',
+  'xmlns:dcmitype': 'http://purl.org/dc/dcmitype/',
+  'xmlns:xsi': 'http://www.w3.org/2001/XMLSchema-instance',
+};
+const CORE_CONTENT_TYPE = 'application/vnd.openxmlformats-package.core-properties+xml';
+const CORE_REL_TYPE = 'http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties';
+
+export function remediateDocx(parts: DocxParts, options: RemediationOptions): Remediation {
+  const applied: Applied[] = [];
+  const out: DocxParts = { ...parts };
+  const document = parseXml(parts.document);
+  const body = find(document, 'body') ?? document;
+  const wPrefix = prefixOf(document, 'body') ?? 'w';
+  const w = (local: string) => `${wPrefix}:${local}`;
+
+  // Styles are read for heading levels and written for language and any
+  // heading style a level change needs.
+  const styles = parts.styles ? parseXml(parts.styles) : undefined;
+  let stylesChanged = false;
+
+  // 2.4.2 – title.
+  const firstHeading = headingsOf(body, styles, w).find((h) => h.text.trim() !== '');
+  const title = (firstHeading?.text ?? options.fallbackTitle).replace(/\s+/g, ' ').trim();
+  const titled = setTitle(out, title);
+  if (titled) {
+    applied.push({
+      kind: 'no-title',
+      location: 'document properties',
+      description: `Set the title to “${title}”${firstHeading ? ', from the first heading' : ', from the filename'}.`,
+    });
+  }
+
+  // 3.1.1 – language.
+  if (styles && !hasLanguage(styles, parts.settings)) {
+    const lang = options.language ?? 'en-US';
+    const defaults = ensureChild(styles, w('docDefaults'), 0);
+    const rPrDefault = ensureChild(defaults, w('rPrDefault'), 0);
+    const rPr = ensureChild(rPrDefault, w('rPr'), 0);
+    const existing = child(rPr, 'lang');
+    if (existing) existing.attrs[w('val')] = lang;
+    else rPr.children.push(el(w('lang'), { [w('val')]: lang }));
+    stylesChanged = true;
+    applied.push({ kind: 'no-language', location: 'document defaults', description: `Set the document language to ${lang}.` });
+  }
+
+  // 1.3.1 – table header rows.
+  let tableNumber = 0;
+  for (const tbl of findAll(body, 'tbl')) {
+    tableNumber += 1;
+    const firstRow = children(tbl, 'tr')[0];
+    if (!firstRow) continue;
+    const existing = child(firstRow, 'trPr');
+    if (existing && child(existing, 'tblHeader')) continue;
+    if (existing) {
+      existing.children.unshift(el(w('tblHeader')));
+    } else {
+      // Schema order inside w:tr: tblPrEx?, trPr?, then cells.
+      const at = children(firstRow, 'tblPrEx').length;
+      firstRow.children.splice(indexOfNthElement(firstRow, at), 0, el(w('trPr'), {}, [el(w('tblHeader'))]));
+    }
+    applied.push({
+      kind: 'table-header',
+      location: `table ${tableNumber}`,
+      description: 'Marked the first row as the header row.',
+    });
+  }
+
+  // 1.3.1 – heading levels. Walk in order; a level deeper than the previous
+  // plus one is pulled up to previous plus one, which closes every skip
+  // without flattening the outline.
+  let previous = 0;
+  for (const h of headingsOf(body, styles, w)) {
+    let level = h.level;
+    if (previous > 0 && level > previous + 1) {
+      level = previous + 1;
+      const styleId = `Heading${level}`;
+      if (styles) stylesChanged = ensureHeadingStyle(styles, styleId, level, w) || stylesChanged;
+      setStyle(h.p, styleId, w);
+      applied.push({
+        kind: 'heading-skip',
+        location: `paragraph ${h.number} (“${snippet(h.text)}”)`,
+        description: `Changed heading level ${h.level} to level ${level}, so the outline runs in order.`,
+      });
+    }
+    previous = level;
+  }
+
+  // 1.4.3 – contrast. Darken (or lighten) each failing run's colour to the
+  // nearest passing one.
+  const defaultPoints = styles ? defaultPointsOf(styles) : 11;
+  const paragraphs = findAll(body, 'p');
+  paragraphs.forEach((p, i) => {
+    const pPr = child(p, 'pPr');
+    const paragraphFill = pPr ? fillOf(child(pPr, 'shd')) : undefined;
+    const done = new Set<string>();
+    for (const r of findAll(p, 'r')) {
+      const rPr = child(r, 'rPr');
+      const colorEl = rPr ? child(rPr, 'color') : undefined;
+      const val = colorEl ? attr(colorEl, 'val') : undefined;
+      if (!colorEl || !val || val.toLowerCase() === 'auto') continue;
+      const fg = parseHex(val);
+      if (!fg) continue;
+      const runText = findAll(r, 't').map(textOf).join('').trim();
+      if (!runText) continue;
+      const bg = fillOf(child(rPr!, 'shd')) ?? paragraphFill ?? ([255, 255, 255] as Rgb);
+      const sz = child(rPr!, 'sz');
+      const half = sz ? Number(attr(sz, 'val')) : NaN;
+      const points = Number.isFinite(half) && half > 0 ? half / 2 : defaultPoints;
+      const bold = isOn(child(rPr!, 'b'));
+      const minimum = minimumRatio(isLargeText(points, bold));
+      const fixed = adjustForContrast(fg, bg, minimum);
+      if (toHex(fixed) === toHex(fg)) continue;
+      const key = Object.keys(colorEl.attrs).find((k) => k.endsWith('val')) ?? w('val');
+      colorEl.attrs[key] = toHex(fixed);
+      // Word's theme colour, if set, would override the literal; drop it.
+      for (const k of Object.keys(colorEl.attrs)) if (/theme/i.test(k)) delete colorEl.attrs[k];
+      const dedupe = `${toHex(fg)}:${toHex(bg)}`;
+      if (done.has(dedupe)) continue;
+      done.add(dedupe);
+      applied.push({
+        kind: 'contrast',
+        location: `paragraph ${i + 1} (“${snippet(textOf(p))}”)`,
+        description: `Changed the text colour from #${toHex(fg)} to #${toHex(fixed)} on #${toHex(bg)}, which meets ${minimum}:1.`,
+      });
+    }
+  });
+
+  out.document = serializeXml(document);
+  if (styles && stylesChanged) out.styles = serializeXml(styles);
+  return { parts: out, applied };
+}
+
+// --- helpers ---------------------------------------------------------------
+
+function prefixOf(root: XmlElement, local: string): string | undefined {
+  const found = find(root, local);
+  const name = found?.name ?? root.name;
+  return name.includes(':') ? name.slice(0, name.indexOf(':')) : undefined;
+}
+
+function isOn(e: XmlElement | undefined): boolean {
+  if (!e) return false;
+  const v = attr(e, 'val');
+  return v === undefined || v === '1' || v === 'true' || v === 'on';
+}
+
+function snippet(s: string): string {
+  const t = s.replace(/\s+/g, ' ').trim();
+  return t.length > 48 ? `${t.slice(0, 47)}…` : t;
+}
+
+function fillOf(shd: XmlElement | undefined): Rgb | undefined {
+  if (!shd) return undefined;
+  const fill = attr(shd, 'fill');
+  if (!fill || fill.toLowerCase() === 'auto') return undefined;
+  return parseHex(fill) ?? undefined;
+}
+
+function defaultPointsOf(styles: XmlElement): number {
+  const defaults = child(styles, 'docDefaults');
+  const rPr = defaults ? find(defaults, 'rPr') : undefined;
+  const sz = rPr ? child(rPr, 'sz') : undefined;
+  const half = sz ? Number(attr(sz, 'val')) : NaN;
+  return Number.isFinite(half) && half > 0 ? half / 2 : 11;
+}
+
+function hasLanguage(styles: XmlElement, settings: string | undefined): boolean {
+  const defaults = child(styles, 'docDefaults');
+  const rPr = defaults ? find(defaults, 'rPr') : undefined;
+  const lang = rPr ? child(rPr, 'lang') : undefined;
+  if (lang && (attr(lang, 'val') || attr(lang, 'eastAsia') || attr(lang, 'bidi'))) return true;
+  if (settings) {
+    const theme = child(parseXml(settings), 'themeFontLang');
+    if (theme && (attr(theme, 'val') || attr(theme, 'eastAsia') || attr(theme, 'bidi'))) return true;
+  }
+  return false;
+}
+
+/** First direct child with this name, or a new one inserted at `index`. */
+function ensureChild(parent: XmlElement, name: string, index: number): XmlElement {
+  const local = name.slice(name.indexOf(':') + 1);
+  const existing = child(parent, local);
+  if (existing) return existing;
+  const made = el(name);
+  parent.children.splice(Math.min(index, parent.children.length), 0, made);
+  return made;
+}
+
+/** The child-array index of the n-th element child. */
+function indexOfNthElement(parent: XmlElement, n: number): number {
+  let seen = 0;
+  for (let i = 0; i < parent.children.length; i++) {
+    if (parent.children[i]!.type !== 'element') continue;
+    if (seen === n) return i;
+    seen += 1;
+  }
+  return parent.children.length;
+}
+
+interface Heading {
+  p: XmlElement;
+  number: number;
+  level: number;
+  text: string;
+}
+
+function headingLevels(styles: XmlElement | undefined): Map<string, number> {
+  const map = new Map<string, number>();
+  if (!styles) return map;
+  for (const style of children(styles, 'style')) {
+    if (attr(style, 'type') !== 'paragraph') continue;
+    const id = attr(style, 'styleId');
+    if (!id) continue;
+    const outline = find(style, 'outlineLvl');
+    const lvl = outline ? Number(attr(outline, 'val')) : NaN;
+    if (Number.isInteger(lvl) && lvl >= 0 && lvl <= 8) {
+      map.set(id, lvl + 1);
+      continue;
+    }
+    const name = attr(child(style, 'name') ?? style, 'val') ?? '';
+    const m = /^heading (\d)$/i.exec(name) ?? /^Heading(\d)$/.exec(id);
+    if (m) map.set(id, Number(m[1]));
+  }
+  return map;
+}
+
+function headingsOf(body: XmlElement, styles: XmlElement | undefined, w: (l: string) => string): Heading[] {
+  void w;
+  const levels = headingLevels(styles);
+  const out: Heading[] = [];
+  findAll(body, 'p').forEach((p, i) => {
+    const pPr = child(p, 'pPr');
+    if (!pPr) return;
+    const styleId = attr(child(pPr, 'pStyle') ?? pPr, 'val');
+    let level: number | undefined;
+    if (styleId) level = levels.get(styleId) ?? (/^Heading(\d)$/.exec(styleId) ? Number(styleId.slice(7)) : undefined);
+    if (level === undefined) {
+      const outline = child(pPr, 'outlineLvl');
+      const lvl = outline ? Number(attr(outline, 'val')) : NaN;
+      if (Number.isInteger(lvl) && lvl >= 0 && lvl <= 8) level = lvl + 1;
+    }
+    if (level === undefined) return;
+    out.push({ p, number: i + 1, level, text: findAll(p, 't').map(textOf).join('') });
+  });
+  return out;
+}
+
+function setStyle(p: XmlElement, styleId: string, w: (l: string) => string) {
+  const pPr = ensureChild(p, w('pPr'), 0);
+  const pStyle = child(pPr, 'pStyle');
+  if (pStyle) {
+    const key = Object.keys(pStyle.attrs).find((k) => k.endsWith('val')) ?? w('val');
+    pStyle.attrs[key] = styleId;
+  } else {
+    pPr.children.unshift(el(w('pStyle'), { [w('val')]: styleId }));
+  }
+  // A direct outline level would fight the style; remove it.
+  pPr.children = pPr.children.filter((c) => c.type !== 'element' || c.local !== 'outlineLvl');
+}
+
+/** Adds a built-in-shaped heading style if the document lacks it. Returns whether it did. */
+function ensureHeadingStyle(styles: XmlElement, styleId: string, level: number, w: (l: string) => string): boolean {
+  if (children(styles, 'style').some((s) => attr(s, 'styleId') === styleId)) return false;
+  const sizes = [32, 26, 24, 22, 22, 22, 22, 22, 22];
+  styles.children.push(
+    el(w('style'), { [w('type')]: 'paragraph', [w('styleId')]: styleId }, [
+      el(w('name'), { [w('val')]: `heading ${level}` }),
+      el(w('basedOn'), { [w('val')]: 'Normal' }),
+      el(w('next'), { [w('val')]: 'Normal' }),
+      el(w('uiPriority'), { [w('val')]: '9' }),
+      el(w('qFormat')),
+      el(w('pPr'), {}, [el(w('keepNext')), el(w('keepLines')), el(w('outlineLvl'), { [w('val')]: String(level - 1) })]),
+      el(w('rPr'), {}, [el(w('b')), el(w('sz'), { [w('val')]: String(sizes[level - 1] ?? 22) })]),
+    ]),
+  );
+  return true;
+}
+
+/**
+ * Sets dc:title in docProps/core.xml, creating the part – and its content
+ * type and package relationship – when the document has none. Returns
+ * whether anything changed.
+ */
+function setTitle(parts: DocxParts, title: string): boolean {
+  if (parts.core) {
+    const core = parseXml(parts.core);
+    const existing = find(core, 'title');
+    if (existing && textOf(existing).trim() !== '') return false;
+    if (existing) {
+      existing.children = [text(title)];
+    } else {
+      const dcPrefix = Object.entries(core.attrs).find(([, v]) => v === CORE_NS['xmlns:dc'])?.[0]?.replace('xmlns:', '') ?? 'dc';
+      if (!(`xmlns:${dcPrefix}` in core.attrs)) core.attrs[`xmlns:${dcPrefix}`] = CORE_NS['xmlns:dc'];
+      core.children.unshift(el(`${dcPrefix}:title`, {}, [text(title)]));
+    }
+    parts.core = serializeXml(core);
+    return true;
+  }
+  // No core part at all. Make one, and register it.
+  parts.core = serializeXml(el('cp:coreProperties', CORE_NS, [el('dc:title', {}, [text(title)])]));
+  if (parts.contentTypes) {
+    const types = parseXml(parts.contentTypes);
+    if (!children(types, 'Override').some((o) => attr(o, 'PartName') === '/docProps/core.xml')) {
+      types.children.push(el('Override', { PartName: '/docProps/core.xml', ContentType: CORE_CONTENT_TYPE }));
+      parts.contentTypes = serializeXml(types);
+    }
+  }
+  if (parts.rels) {
+    const rels = parseXml(parts.rels);
+    if (!children(rels, 'Relationship').some((r) => attr(r, 'Type') === CORE_REL_TYPE)) {
+      const ids = new Set(children(rels, 'Relationship').map((r) => attr(r, 'Id')));
+      let n = 1;
+      while (ids.has(`rId${n}`)) n += 1;
+      rels.children.push(el('Relationship', { Id: `rId${n}`, Type: CORE_REL_TYPE, Target: 'docProps/core.xml' }));
+      parts.rels = serializeXml(rels);
+    }
+  }
+  return true;
+}

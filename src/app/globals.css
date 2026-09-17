@@ -1,0 +1,108 @@
+/*
+ * Design tokens. Every colour pair used for text on a background is chosen to
+ * meet WCAG 2.0 1.4.3 at 4.5:1 or better in both schemes; the ratio is noted
+ * next to each so the next change can be checked without a tool.
+ */
+:root {
+  --background: #ffffff;
+  --foreground: #1a1a1a; /* 17.4:1 on background */
+  --muted: #4d4d4d; /* 8.5:1 on background */
+  --accent: #0b5cad; /* 6.7:1 on background */
+  --rule: #d9d9d9;
+  --focus: #0b5cad;
+  --measure: 68rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #101214;
+    --foreground: #ececec; /* 15.9:1 on background */
+    --muted: #b8b8b8; /* 9.5:1 on background */
+    --accent: #7db6ff; /* 8.9:1 on background */
+    --rule: #333739;
+    --focus: #7db6ff;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: light dark;
+}
+
+body {
+  margin: 0;
+  color: var(--foreground);
+  background: var(--background);
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+  line-height: 1.5;
+}
+
+/* 2.4.7 Focus Visible: one ring, everywhere, never removed. */
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+a {
+  color: var(--accent);
+}
+
+.skip-link {
+  position: absolute;
+  left: 1rem;
+  top: -100%;
+  padding: 0.5rem 1rem;
+  background: var(--background);
+  color: var(--accent);
+  border: 2px solid var(--accent);
+  z-index: 1;
+}
+
+.skip-link:focus {
+  top: 1rem;
+}
+
+.site-header,
+.site-footer,
+main {
+  max-width: var(--measure);
+  margin-inline: auto;
+  padding-inline: 1rem;
+}
+
+.site-header {
+  padding-block: 1rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.wordmark {
+  font-weight: 700;
+  font-size: 1.25rem;
+  text-decoration: none;
+  color: var(--foreground);
+}
+
+main {
+  padding-block: 2rem 4rem;
+}
+
+/* main is focusable only as the skip link's target; it should not show a ring
+   when a mouse user clicks into the page. */
+main:focus {
+  outline: none;
+}
+
+.site-footer {
+  padding-block: 1.5rem;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-size: 0.9rem;
+}
