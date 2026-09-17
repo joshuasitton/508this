@@ -181,10 +181,56 @@ name. A document round-tripped through another editor can write the main
 namespace under a different prefix, and a detector that looked for the
 literal string `w:tblHeader` would miss a header row that is there.
 
+### Reading order and language, without a person
+
+Two criteria that looked like judgement calls turned out to have
+deterministic rules in Word, and moved from "reviewer" to "checked".
+
+**1.3.2 Meaningful Sequence.** A screen reader reads a Word document in body
+order. That order is wrong only when text lives somewhere else: a floating
+text box, a positioned frame, or a table being used to put prose side by
+side. Each of those is findable. Text boxes are `w:txbxContent`; frames are
+`w:framePr`; a layout table is borderless, has more than one column, and has
+a cell with more than one paragraph of text – conservative on purpose,
+because a data table with borders switched off is rare and a false flag
+costs a reviewer's time on every document. A document with none of these
+reads in order by construction, and the report says so.
+
+Word writes every text box twice, once in `mc:Choice` for modern readers and
+once in `mc:Fallback` for old ones, with the same content. Everything under
+a Fallback is invisible to every check, or each box, link, image and run in
+one would be found twice. Paragraphs inside a box are not body paragraphs
+either; they are located by their box, and the box's text is not part of the
+paragraph it floats in. The first version got both wrong and the test for
+this is the one that caught it.
+
+**3.1.2 Language of Parts.** A passage in a language other than the
+document's has to be marked, so the screen reader switches voice.
+`src/domain/language.ts` finds those passages with no dependency: script
+first (Han, Hangul, Cyrillic, Arabic, Thai, Devanagari decide the language
+outright), then function words – the, of, and, to; el, la, de, que; le, les,
+des – counted against short lists for the languages that turn up in US
+federal documents. Function words are the right signal because they are
+frequent, closed-class and nearly disjoint between languages once a passage
+has twenty of them.
+
+The thresholds are conservative. The criterion itself exempts proper names
+and borrowed phrases, so "prepared by José García de la Cruz" must not flag
+and neither must "de facto" or "ad hoc"; a passage has to be twenty words,
+score clearly, and beat the document's own language by a margin. The tests
+hold both those sentences quiet and a Spanish paragraph loud. Detection is
+symmetric: in a Spanish document, the English paragraph is the one flagged.
+
+The fix is deterministic: every run with text in the flagged paragraph gets
+`w:lang` with the tag Word writes for that language (es-US, fr-FR, zh-CN in
+the East Asian slot, ar-SA in the bidi slot), existing run properties kept.
+Re-detection then finds nothing, which is the contract.
+
 ### What detection cannot see
 
-Images of text (1.4.5), meaningful reading order across text boxes (1.3.2),
-and whether alt text is *good* are judgement calls. They are the reviewer's,
+Images of text (1.4.5), colour as the only signal (1.4.1), instructions that
+rely on shape or position (1.3.3), and whether alt text is *good* are
+judgement calls. They are the reviewer's,
 and later a model's to propose. A check that guessed at them would produce
 findings nobody can act on and, worse, a clean report on a document that
 still fails.
@@ -198,15 +244,15 @@ A criterion with no findings is not thereby met. It is met on one of three
 bases, and each criterion is assigned one:
 
 - **checked** – an automated check in `docx.ts` looked and found nothing.
-  Six criteria, plus 4.1.1 Parsing, which the reader itself vouches for.
+  Eight criteria, plus 4.1.1 Parsing, which the reader itself vouches for.
 - **static** – a Word document with no interactive or time-based content has
   nothing the criterion governs: keyboard traps, timing, flashing, focus,
   forms, captions. Twenty-two criteria. The detector emits a `media` or
   `forms` finding if it sees a recording or a form field, which moves the
   criterion out of this class for that document.
-- **reviewer** – only a person can tell: reading order, colour as the only
-  signal, images of text, whether headings describe their sections, passages
-  in another language. Six criteria.
+- **reviewer** – only a person can tell: colour as the only signal,
+  instructions that rely on shape or position, images of text, whether
+  headings describe their sections. Four criteria.
 
 A reviewer-class criterion nobody has confirmed is **Needs Review** in the
 report, never Supports. That is not a VPAT term and the statement says so in

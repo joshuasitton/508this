@@ -61,11 +61,11 @@ test('an exempt criterion is Not Applicable to a document even with a finding fi
   assert.equal(assess('2.4.1', [stray], 'web').status, 'Partially Supports');
 });
 
-const ALL_REVIEWER = new Set(['1.3.2', '1.3.3', '1.4.1', '1.4.5', '2.4.6', '3.1.2']);
+const ALL_REVIEWER = new Set(['1.3.3', '1.4.1', '1.4.5', '2.4.6']);
 
 test('a document conforms when nothing it owes is open and every reviewer criterion is confirmed', () => {
   // Deliberate: with nothing confirmed, an empty findings list is NOT
-  // conformance. Six criteria can only be vouched for by a person, and
+  // conformance. Four criteria can only be vouched for by a person, and
   // "nobody looked" must never read as "Supports" to a federal buyer.
   assert.equal(conforms([], 'document'), false);
   assert.equal(conforms([], 'document', ALL_REVIEWER), true);
@@ -77,11 +77,11 @@ test('a document conforms when nothing it owes is open and every reviewer criter
 });
 
 test('a criterion only a person can vouch for is Needs Review until confirmed, never Supports by default', () => {
-  assert.equal(assess('1.3.2', [], 'document').status, 'Needs Review');
-  assert.equal(assess('1.3.2', [], 'document', new Set(['1.3.2'])).status, 'Supports');
+  assert.equal(assess('1.4.1', [], 'document').status, 'Needs Review');
+  assert.equal(assess('1.4.1', [], 'document', new Set(['1.4.1'])).status, 'Supports');
   assert.equal(assess('2.1.1', [], 'document').status, 'Supports', 'static: a document has nothing this governs');
   assert.equal(assess('1.1.1', [], 'document').status, 'Supports', 'checked: the detector looked');
-  assert.match(describeRemarks(assess('1.3.2', [], 'document')), /^Waiting on a reviewer\./);
+  assert.match(describeRemarks(assess('1.4.1', [], 'document')), /^Waiting on a reviewer\./);
   assert.match(describeRemarks(assess('2.1.1', [], 'document')), /static document/);
   assert.match(describeRemarks(assess('1.1.1', [], 'document')), /alternative text/);
 });
@@ -92,8 +92,8 @@ test('assessAll covers every criterion once, in catalogue order', () => {
   assert.equal(all[0]!.criterion, '1.1.1');
   assert.equal(all[37]!.criterion, '4.1.2');
   assert.equal(all.filter((a) => a.status === 'Not Applicable').length, 4);
-  assert.equal(all.filter((a) => a.status === 'Needs Review').length, 6);
-  assert.equal(all.filter((a) => a.status === 'Supports').length, 28);
+  assert.equal(all.filter((a) => a.status === 'Needs Review').length, 4);
+  assert.equal(all.filter((a) => a.status === 'Supports').length, 30);
 });
 
 test('progress is a fraction of findings remediated, and an empty job is complete', () => {
@@ -143,16 +143,16 @@ test('the summary counts what the document owes and what is open, and its headli
   // 0 blocking, 1 other. The stray 2.4.1 finding is exempt and counts nowhere.
   const stray: Finding = { ...missingAlt, criterion: '2.4.1' };
   const s = summarise([missingAlt, scanned, stray], 'document');
-  assert.deepEqual(s, { conforms: false, owed: 34, short: 1, review: 6, blocking: 1, other: 1 });
+  assert.deepEqual(s, { conforms: false, owed: 34, short: 1, review: 4, blocking: 1, other: 1 });
   assert.equal(describeSummary(s).headline, 'Does not conform to Section 508 yet');
   assert.equal(
     describeSummary(s).detail,
-    '1 of the 34 criteria this document owes has open issues: 2 in all, of which 1 is blocking and 1 is partial. 6 more wait on a reviewer.',
+    '1 of the 34 criteria this document owes has open issues: 2 in all, of which 1 is blocking and 1 is partial. 4 more wait on a reviewer.',
   );
   // The middle state: nothing open, but nobody has confirmed the reviewer
   // criteria. This must not read as conformance.
   const checked = summarise([fixed(missingAlt)], 'document');
-  assert.deepEqual(checked, { conforms: false, owed: 34, short: 0, review: 6, blocking: 0, other: 0 });
+  assert.deepEqual(checked, { conforms: false, owed: 34, short: 0, review: 4, blocking: 0, other: 0 });
   assert.equal(describeSummary(checked).headline, 'Passes every automated check');
   assert.match(describeSummary(checked).detail, /not reported as conformant until/);
   const clean = summarise([fixed(missingAlt)], 'document', ALL_REVIEWER);

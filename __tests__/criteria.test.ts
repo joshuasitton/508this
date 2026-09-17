@@ -75,6 +75,6 @@ test('every criterion has a coverage class and a remark, and the checked ones ar
   assert.equal(Object.keys(DOCUMENT_COVERAGE).length, 38);
   assert.deepEqual(
     Object.entries(DOCUMENT_COVERAGE).filter(([, v]) => v.coverage === 'reviewer').map(([k]) => k),
-    ['1.3.2', '1.3.3', '1.4.1', '1.4.5', '2.4.6', '3.1.2'],
+    ['1.3.3', '1.4.1', '1.4.5', '2.4.6'],
   );
 });

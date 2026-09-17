@@ -159,3 +159,55 @@ test('an embedded recording and a form field are findings for a reviewer', () =>
   assert.equal(findings[0]?.location, 'recording 1, paragraph 2');
   assert.equal(findings[2]?.location, 'field 2, paragraph 4');
 });
+
+const SPANISH =
+  'Esta guía explica los beneficios disponibles para los veteranos y sus familias. Para solicitar los servicios, complete el formulario en línea o visite una oficina regional. Si tiene preguntas sobre su elegibilidad, comuníquese con nosotros por teléfono.';
+
+test('a Spanish paragraph in an English document is a 3.1.2 finding unless its runs are marked', () => {
+  const unmarked = p(SPANISH);
+  const marked = p(SPANISH, '', '<w:lang w:val="es-MX"/>');
+  const english = p('This guide explains the benefits available to veterans and their families and how to apply for them online or at a regional office near you.');
+  const findings = byCriterion(clean(heading(1, 'x') + unmarked + marked + english), '3.1.2');
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0]?.kind, 'language-parts');
+  assert.match(findings[0]!.location, /^paragraph 2 /);
+  assert.match(findings[0]!.description, /appears to be in Spanish/);
+});
+
+test('in a Spanish document, the English paragraph is the one flagged', () => {
+  const es = STYLES.replace('<w:lang w:val="en-US"/>', '<w:lang w:val="es-ES"/>');
+  const english = p('This guide explains the benefits available to veterans and their families and how to apply for them online or at a regional office near you.');
+  const findings = byCriterion(clean(heading(1, 'x') + p(SPANISH) + english, { styles: es }), '3.1.2');
+  assert.equal(findings.length, 1);
+  assert.match(findings[0]!.description, /appears to be in English/);
+});
+
+test('text in a floating box or a frame is a 1.3.2 finding, counted once per box, and box text stays out of the body', () => {
+  // Word writes a text box twice: once as wps:txbx for modern readers and
+  // once as a v:textbox fallback. That is one box to a person.
+  const box = `<w:p><w:r><mc:AlternateContent xmlns:mc="m"><mc:Choice><w:drawing><wp:anchor xmlns:wp="p"><wps:txbx xmlns:wps="s"><w:txbxContent>${p('Key figure: 42%')}</w:txbxContent></wps:txbx></wp:anchor></w:drawing></mc:Choice><mc:Fallback><w:pict><v:shape xmlns:v="v"><v:textbox><w:txbxContent>${p('Key figure: 42%')}</w:txbxContent></v:textbox></v:shape></w:pict></mc:Fallback></mc:AlternateContent></w:r></w:p>`;
+  const framed = p('Sidebar text', '<w:framePr w:w="2000" w:hAnchor="page"/>');
+  const emptyBox = `<w:p><w:r><w:drawing><wp:anchor xmlns:wp="p"><wps:txbx xmlns:wps="s"><w:txbxContent><w:p/></w:txbxContent></wps:txbx></wp:anchor></w:drawing></w:r></w:p>`;
+  const findings = byCriterion(clean(heading(1, 'x') + box + framed + emptyBox), '1.3.2');
+  assert.deepEqual(
+    findings.map((f) => [f.kind, f.location]),
+    [
+      ['reading-order', 'text box 1 (“Key figure: 42%”), paragraph 2'],
+      ['reading-order', 'paragraph 3 (“Sidebar text”)'],
+    ],
+  );
+  // A link inside the box is found once, not once per copy of the box.
+  const boxWithLink = box.replace(/Key figure: 42%<\/w:t><\/w:r><\/w:p>/g, 'Key figure: 42%</w:t></w:r><w:hyperlink r:id="rId1" xmlns:r="r"><w:r><w:t>here</w:t></w:r></w:hyperlink></w:p>');
+  assert.equal(byCriterion(clean(heading(1, 'x') + boxWithLink), '2.4.4').length, 1);
+});
+
+test('a borderless multi-column table with paragraphs in its cells is a layout table; a data table is not', () => {
+  const cell = (inner: string) => `<w:tc>${inner}</w:tc>`;
+  const layout = `<w:tbl><w:tblPr><w:tblBorders><w:top w:val="none"/><w:left w:val="none"/><w:bottom w:val="none"/><w:right w:val="none"/><w:insideH w:val="none"/><w:insideV w:val="none"/></w:tblBorders></w:tblPr><w:tr>${cell(p('Left column first paragraph.') + p('Left column second paragraph.'))}${cell(p('Right column.'))}</w:tr></w:tbl>`;
+  const data = `<w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/></w:tblPr><w:tr><w:trPr><w:tblHeader/></w:trPr>${cell(p('Item'))}${cell(p('Cost'))}</w:tr><w:tr>${cell(p('Desk'))}${cell(p('$400'))}</w:tr></w:tbl>`;
+  const borderlessData = `<w:tbl><w:tblPr><w:tblBorders><w:top w:val="nil"/></w:tblBorders></w:tblPr><w:tr><w:trPr><w:tblHeader/></w:trPr>${cell(p('Item'))}${cell(p('Cost'))}</w:tr><w:tr>${cell(p('Desk'))}${cell(p('$400'))}</w:tr></w:tbl>`;
+  const findings = byCriterion(clean(heading(1, 'x') + layout + data + borderlessData), '1.3.2');
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0]?.kind, 'layout-table');
+  assert.match(findings[0]!.location, /^table 1/);
+});

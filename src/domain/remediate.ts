@@ -16,6 +16,8 @@
 import { adjustForContrast, isLargeText, minimumRatio, parseHex, toHex, type Rgb } from './contrast';
 import type { DocxParts } from './docx';
 import type { Applied } from './job';
+import type { Kind } from './kinds';
+import { detectLanguage, primarySubtag } from './language';
 import { attr, child, children, el, find, findAll, parseXml, serializeXml, text, textOf, type XmlElement } from './xml';
 
 export interface RemediationOptions {
@@ -29,6 +31,16 @@ export interface Remediation {
   parts: DocxParts;
   applied: Applied[];
 }
+
+/** The kinds this module fixes without a person. The job page reads it; a test pins it against what actually gets applied. */
+export const FIXABLE_KINDS: ReadonlySet<Kind> = new Set<Kind>([
+  'no-title',
+  'no-language',
+  'table-header',
+  'heading-skip',
+  'contrast',
+  'language-parts',
+]);
 
 const CORE_NS = {
   'xmlns:cp': 'http://schemas.openxmlformats.org/package/2006/metadata/core-properties',
@@ -160,9 +172,51 @@ export function remediateDocx(parts: DocxParts, options: RemediationOptions): Re
     }
   });
 
+  // 3.1.2 – passages in another language get their language on every run.
+  const documentLanguage = styles ? documentLanguageOf(styles, parts.settings) : 'en';
+  paragraphs.forEach((p, i) => {
+    const pText = findAll(p, 't').map(textOf).join('');
+    const detected = detectLanguage(pText, documentLanguage);
+    if (!detected) return;
+    const already = findAll(p, 'lang').some((l) => {
+      const v = attr(l, detected.slot) ?? attr(l, 'val');
+      return v !== undefined && primarySubtag(v) === detected.language;
+    });
+    if (already) return;
+    for (const r of findAll(p, 'r')) {
+      if (!findAll(r, 't').some((t) => textOf(t).trim() !== '')) continue;
+      const rPr = ensureChild(r, w('rPr'), 0);
+      const lang = child(rPr, 'lang') ?? (() => {
+        const made = el(w('lang'));
+        rPr.children.push(made);
+        return made;
+      })();
+      lang.attrs[w(detected.slot)] = detected.tag;
+    }
+    applied.push({
+      kind: 'language-parts',
+      location: `paragraph ${i + 1} (“${snippet(pText)}”)`,
+      description: `Marked the paragraph as ${detected.name} (${detected.tag}).`,
+    });
+  });
+
   out.document = serializeXml(document);
   if (styles && stylesChanged) out.styles = serializeXml(styles);
   return { parts: out, applied };
+}
+
+function documentLanguageOf(styles: XmlElement, settings: string | undefined): string {
+  const defaults = child(styles, 'docDefaults');
+  const rPr = defaults ? find(defaults, 'rPr') : undefined;
+  const lang = rPr ? child(rPr, 'lang') : undefined;
+  const v = lang ? (attr(lang, 'val') ?? attr(lang, 'eastAsia') ?? attr(lang, 'bidi')) : undefined;
+  if (v) return primarySubtag(v);
+  if (settings) {
+    const theme = child(parseXml(settings), 'themeFontLang');
+    const t = theme ? (attr(theme, 'val') ?? attr(theme, 'eastAsia') ?? attr(theme, 'bidi')) : undefined;
+    if (t) return primarySubtag(t);
+  }
+  return 'en';
 }
 
 // --- helpers ---------------------------------------------------------------
