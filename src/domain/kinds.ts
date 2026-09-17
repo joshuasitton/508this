@@ -29,7 +29,10 @@ export type Kind =
   | 'link-text'
   | 'contrast'
   | 'media'
-  | 'forms';
+  | 'forms'
+  | 'reading-order'
+  | 'layout-table'
+  | 'language-parts';
 
 export interface KindInfo {
   criterion: string;
@@ -95,6 +98,24 @@ export const KINDS: Record<Kind, KindInfo> = {
     title: 'Embedded audio or video',
     why: 'A recording carries information a person who cannot hear it, or cannot see it, has no other way to get. Captions and an audio description are what make it available to them.',
     fix: 'We flag each recording for a reviewer, who confirms captions and a description are present or arranges them.',
+  },
+  'reading-order': {
+    criterion: '1.3.2',
+    title: 'Text in floating boxes',
+    why: 'A screen reader reads the body in order and reaches a floating text box or frame late, out of sequence, or not at all. A pull quote that carries the key figure is a figure the reader may never hear.',
+    fix: 'We flag each floating box for a reviewer, who moves its text into the body where it belongs or confirms it is decorative.',
+  },
+  'layout-table': {
+    criterion: '1.3.2',
+    title: 'Tables used for layout',
+    why: 'A borderless table used to put two blocks of text side by side is still a table to a screen reader, which reads it cell by cell and announces row and column numbers around prose that has neither.',
+    fix: 'We flag each layout table for a reviewer, who converts it to ordinary paragraphs or columns.',
+  },
+  'language-parts': {
+    criterion: '3.1.2',
+    title: 'Passages in another language',
+    why: 'A screen reader uses the document language to choose its voice. A Spanish paragraph read with an English voice is close to unintelligible, and it happens silently.',
+    fix: 'We mark each passage with its language so the reader switches voice for it.',
   },
   forms: {
     criterion: '3.3.2',

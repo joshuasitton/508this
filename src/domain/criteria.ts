@@ -136,8 +136,8 @@ export function criteriaFor(kind: ContentKind): Criterion[] {
  *   nothing this criterion governs. The detector emits a finding if it sees
  *   media or form fields, which moves the criterion out of this class for
  *   that document.
- * - reviewer: only a person can tell. Reading order, colour as the only
- *   signal, images of text, whether headings describe their sections.
+ * - reviewer: only a person can tell. Colour as the only signal, sensory
+ *   instructions, images of text, whether headings describe their sections.
  */
 export type Coverage = 'checked' | 'static' | 'reviewer';
 
@@ -159,7 +159,7 @@ export const DOCUMENT_COVERAGE: Record<string, CoverageInfo> = {
   '1.2.4': { coverage: 'static', remark: STATIC_MEDIA },
   '1.2.5': { coverage: 'static', remark: STATIC_MEDIA },
   '1.3.1': { coverage: 'checked', remark: 'Headings run in order and every table has a header row.' },
-  '1.3.2': { coverage: 'reviewer', remark: 'A reviewer confirms the reading order matches the visual order.' },
+  '1.3.2': { coverage: 'checked', remark: 'Text flows in document order: no floating text boxes, frames or layout tables.' },
   '1.3.3': { coverage: 'reviewer', remark: 'A reviewer confirms no instruction relies on shape, size or position alone.' },
   '1.4.1': { coverage: 'reviewer', remark: 'A reviewer confirms colour is never the only way information is conveyed.' },
   '1.4.2': { coverage: 'static', remark: STATIC_MEDIA },
@@ -179,7 +179,7 @@ export const DOCUMENT_COVERAGE: Record<string, CoverageInfo> = {
   '2.4.6': { coverage: 'reviewer', remark: 'A reviewer confirms headings describe their sections.' },
   '2.4.7': { coverage: 'static', remark: STATIC_INTERACTIVE },
   '3.1.1': { coverage: 'checked', remark: 'The document declares its language.' },
-  '3.1.2': { coverage: 'reviewer', remark: 'A reviewer confirms passages in another language are marked.' },
+  '3.1.2': { coverage: 'checked', remark: 'Passages in another language are marked with their language.' },
   '3.2.1': { coverage: 'static', remark: STATIC_INTERACTIVE },
   '3.2.2': { coverage: 'static', remark: STATIC_FORMS },
   '3.2.3': { coverage: 'static', remark: 'Not required for documents.' },

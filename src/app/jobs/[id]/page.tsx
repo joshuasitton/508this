@@ -6,6 +6,7 @@ import { DOCUMENT_EXEMPT, labelFor } from '@/domain/criteria';
 import { assessAll, describeRemarks, describeSummary, summarise, type Finding } from '@/domain/findings';
 import { describeStatus } from '@/domain/job';
 import { groupByKind } from '@/domain/kinds';
+import { FIXABLE_KINDS } from '@/domain/remediate';
 import { getJob } from '@/server/jobs';
 import { remediateAction } from './actions';
 import styles from './page.module.css';
@@ -14,8 +15,7 @@ export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = { title: 'Report' };
 
-/** The kinds `remediateDocx` fixes without a person. Kept in step by the remediation test. */
-const FIXABLE = new Set(['no-title', 'no-language', 'table-header', 'heading-skip', 'contrast']);
+
 
 /**
  * The job page is the conformance report, before and after remediation, in
@@ -43,7 +43,7 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
   const review = assessments.filter((a) => a.status === 'Needs Review');
   const met = assessments.filter((a) => a.status === 'Supports');
   const exempt = [...DOCUMENT_EXEMPT].map(labelFor);
-  const fixable = job.findings.filter((f) => !f.remediated && FIXABLE.has(f.kind)).length;
+  const fixable = job.findings.filter((f) => !f.remediated && FIXABLE_KINDS.has(f.kind)).length;
 
   return (
     <>

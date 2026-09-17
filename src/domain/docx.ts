@@ -19,7 +19,8 @@
 import { contrastRatio, formatRatio, isLargeText, minimumRatio, parseHex, toHex, type Rgb } from './contrast';
 import type { Finding, Severity } from './findings';
 import { KINDS, type Kind } from './kinds';
-import { attr, child, children, find, findAll, parseXml, textOf, type XmlElement } from './xml';
+import { detectLanguage, primarySubtag } from './language';
+import { attr, child, children, elements, find, findAll, parseXml, textOf, type XmlElement } from './xml';
 
 export interface DocxParts {
   /** word/document.xml – required. */
@@ -60,6 +61,29 @@ function runText(el: XmlElement): string {
     .join('');
 }
 
+/** A paragraph's own text: its runs, minus anything inside a text box floating in it. */
+function ownText(el: XmlElement): string {
+  const skip = new Set<XmlElement>();
+  for (const box of findAll(el, 'txbxContent')) for (const t of findAll(box, 't')) skip.add(t);
+  return findAll(el, 't')
+    .filter((t) => !skip.has(t))
+    .map((t) => textOf(t))
+    .join('');
+}
+
+function descendants(root: XmlElement): XmlElement[] {
+  const out: XmlElement[] = [];
+  const walk = (node: XmlElement) => {
+    for (const c of node.children) {
+      if (c.type !== 'element') continue;
+      out.push(c);
+      walk(c);
+    }
+  };
+  walk(root);
+  return out;
+}
+
 function isOn(el: XmlElement | undefined): boolean {
   if (!el) return false;
   const v = attr(el, 'val');
@@ -85,10 +109,12 @@ interface StyleInfo {
   defaultPoints: number;
   /** Whether the document declares a default language anywhere. */
   hasLanguage: boolean;
+  /** The declared default language's primary subtag, e.g. "en". */
+  language: string;
 }
 
 function readStyles(styles: string | undefined, settings: string | undefined): StyleInfo {
-  const info: StyleInfo = { headingLevel: new Map(), defaultPoints: DEFAULT_POINTS, hasLanguage: false };
+  const info: StyleInfo = { headingLevel: new Map(), defaultPoints: DEFAULT_POINTS, hasLanguage: false, language: 'en' };
   if (styles) {
     const root = parseXml(styles);
     for (const style of children(root, 'style')) {
@@ -114,13 +140,19 @@ function readStyles(styles: string | undefined, settings: string | undefined): S
       const half = sz ? Number(attr(sz, 'val')) : NaN;
       if (Number.isFinite(half) && half > 0) info.defaultPoints = half / 2;
       const lang = child(rPr, 'lang');
-      if (lang && (attr(lang, 'val') || attr(lang, 'eastAsia') || attr(lang, 'bidi'))) info.hasLanguage = true;
+      if (lang && (attr(lang, 'val') || attr(lang, 'eastAsia') || attr(lang, 'bidi'))) {
+        info.hasLanguage = true;
+        info.language = primarySubtag(attr(lang, 'val') ?? attr(lang, 'eastAsia') ?? attr(lang, 'bidi') ?? 'en');
+      }
     }
   }
   if (settings && !info.hasLanguage) {
     const root = parseXml(settings);
     const theme = child(root, 'themeFontLang');
-    if (theme && (attr(theme, 'val') || attr(theme, 'eastAsia') || attr(theme, 'bidi'))) info.hasLanguage = true;
+    if (theme && (attr(theme, 'val') || attr(theme, 'eastAsia') || attr(theme, 'bidi'))) {
+      info.hasLanguage = true;
+      info.language = primarySubtag(attr(theme, 'val') ?? attr(theme, 'eastAsia') ?? attr(theme, 'bidi') ?? 'en');
+    }
   }
   return info;
 }
@@ -151,7 +183,21 @@ export function detectDocx(parts: DocxParts): Finding[] {
   const body = find(doc, 'body') ?? doc;
   const styles = readStyles(parts.styles, parts.settings);
 
-  const paragraphs: Paragraph[] = findAll(body, 'p').map((el, i) => ({ el, number: i + 1, text: runText(el) }));
+  // Word writes every text box twice – once in mc:Choice for modern readers
+  // and once in mc:Fallback for old ones – and the fallback is the same
+  // content. Everything under a Fallback is invisible to every check here,
+  // or each box, link, image and run in it would be found twice. Paragraphs
+  // inside text boxes are not body paragraphs either: they are located by
+  // their box, and their text is not part of the paragraph the box floats in.
+  const invisible = new Set<XmlElement>();
+  for (const root of findAll(body, 'Fallback')) for (const d of descendants(root)) invisible.add(d);
+  const visible = <T extends XmlElement>(list: T[]): T[] => list.filter((x) => !invisible.has(x));
+  const boxed = new Set<XmlElement>();
+  for (const box of findAll(body, 'txbxContent')) for (const d of descendants(box)) boxed.add(d);
+
+  const paragraphs: Paragraph[] = visible(findAll(body, 'p'))
+    .filter((el) => !boxed.has(el))
+    .map((el, i) => ({ el, number: i + 1, text: ownText(el) }));
   const enclosing = (el: XmlElement): Paragraph | undefined => {
     // Paragraph list is in document order; the enclosing one is the last that
     // contains this element. Linear, and documents are not that long.
@@ -188,7 +234,7 @@ export function detectDocx(parts: DocxParts): Finding[] {
   // 1.1.1 Non-text Content – every picture needs alternative text or a
   // decorative mark.
   let imageNumber = 0;
-  for (const drawing of findAll(body, 'drawing')) {
+  for (const drawing of visible(findAll(body, 'drawing'))) {
     imageNumber += 1;
     const docPr = find(drawing, 'docPr');
     const descr = docPr ? (attr(docPr, 'descr') ?? '').trim() : '';
@@ -209,7 +255,7 @@ export function detectDocx(parts: DocxParts): Finding[] {
   // 1.3.1 Info and Relationships – tables need a header row; headings must
   // not skip levels; a long document needs headings at all.
   let tableNumber = 0;
-  for (const tbl of findAll(body, 'tbl')) {
+  for (const tbl of visible(findAll(body, 'tbl'))) {
     tableNumber += 1;
     const firstRow = children(tbl, 'tr')[0];
     const trPr = firstRow ? child(firstRow, 'trPr') : undefined;
@@ -257,7 +303,7 @@ export function detectDocx(parts: DocxParts): Finding[] {
   }
 
   // 2.4.4 Link Purpose (In Context) – link text should say where it goes.
-  for (const link of findAll(body, 'hyperlink')) {
+  for (const link of visible(findAll(body, 'hyperlink'))) {
     const text = runText(link).trim();
     const p = enclosing(link);
     const at = p ? where(p) : 'document body';
@@ -325,7 +371,7 @@ export function detectDocx(parts: DocxParts): Finding[] {
   const MEDIA = ['videoFile', 'audioFile', 'audioCd', 'wavAudioFile', 'quickTimeFile'];
   let mediaNumber = 0;
   for (const local of MEDIA) {
-    for (const m of findAll(body, local)) {
+    for (const m of visible(findAll(body, local))) {
       mediaNumber += 1;
       const p = enclosing(m);
       out.push(
@@ -351,12 +397,91 @@ export function detectDocx(parts: DocxParts): Finding[] {
       ),
     );
   };
-  for (const sdt of findAll(body, 'sdt')) fieldAt(sdt, 'content control');
-  for (const instr of findAll(body, 'instrText')) {
+  for (const sdt of visible(findAll(body, 'sdt'))) fieldAt(sdt, 'content control');
+  for (const instr of visible(findAll(body, 'instrText'))) {
     if (/^\s*FORM(TEXT|CHECKBOX|DROPDOWN)\b/.test(textOf(instr))) fieldAt(instr, 'legacy form field');
   }
 
+  // 1.3.2 Meaningful Sequence – reading order is document order unless text
+  // lives in a floating box or frame, or a table is being used for layout.
+  let boxNumber = 0;
+  for (const box of visible(findAll(body, 'txbxContent'))) {
+    const inner = runText(box).trim();
+    if (!inner) continue;
+    boxNumber += 1;
+    const p = enclosing(box);
+    out.push(
+      finding(
+        'reading-order',
+        `text box ${boxNumber} (“${snippet(inner)}”)${p ? `, ${where(p)}` : ''}`,
+        'Text in a floating text box is read out of sequence or not at all.',
+        'partial',
+      ),
+    );
+  }
+  for (const p of paragraphs) {
+    const pPr = child(p.el, 'pPr');
+    if (!pPr || !child(pPr, 'framePr') || !p.text.trim()) continue;
+    out.push(
+      finding('reading-order', where(p), 'The paragraph is positioned in a frame, which is read out of sequence.', 'partial'),
+    );
+  }
+  tableNumber = 0;
+  for (const tbl of visible(findAll(body, 'tbl'))) {
+    tableNumber += 1;
+    if (!looksLikeLayout(tbl)) continue;
+    const p = enclosing(tbl);
+    out.push(
+      finding(
+        'layout-table',
+        `table ${tableNumber}${p ? `, after ${where(p)}` : ''}`,
+        'A borderless table with paragraphs of text in its cells is being used for layout, and is read cell by cell.',
+        'partial',
+      ),
+    );
+  }
+
+  // 3.1.2 Language of Parts – a passage in another language, not marked.
+  for (const p of paragraphs) {
+    const detected = detectLanguage(p.text, styles.language);
+    if (!detected) continue;
+    const marked = findAll(p.el, 'lang').some((l) => {
+      const v = attr(l, detected.slot) ?? attr(l, 'val');
+      return v !== undefined && primarySubtag(v) === detected.language;
+    });
+    if (marked) continue;
+    out.push(
+      finding(
+        'language-parts',
+        where(p),
+        `The paragraph appears to be in ${detected.name} but is not marked as such, so it is read with the document's default voice.`,
+        'partial',
+      ),
+    );
+  }
+
   return out;
+}
+
+/**
+ * A layout table: no visible borders, more than one column, and a cell with
+ * more than one paragraph of text. Conservative on purpose; a data table
+ * with borders switched off is rare, and a false flag costs a reviewer's
+ * time on every document.
+ */
+function looksLikeLayout(tbl: XmlElement): boolean {
+  const tblPr = child(tbl, 'tblPr');
+  const borders = tblPr ? child(tblPr, 'tblBorders') : undefined;
+  const style = tblPr ? attr(child(tblPr, 'tblStyle') ?? tblPr, 'val') : undefined;
+  const borderless = borders
+    ? elements(borders).every((b) => ['none', 'nil'].includes(attr(b, 'val') ?? ''))
+    : !style || /^TableNormal$/i.test(style);
+  if (!borderless) return false;
+  const rows = children(tbl, 'tr');
+  if (rows.length === 0 || rows.every((r) => children(r, 'tc').length < 2)) return false;
+  return rows.some((r) =>
+    children(r, 'tc').some((tc) => children(tc, 'p').filter((p) => runText(p).trim() !== '').length > 1),
+  );
 }
 
 function contains(ancestor: XmlElement, target: XmlElement): boolean {

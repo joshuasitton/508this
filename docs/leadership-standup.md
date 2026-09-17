@@ -8,6 +8,39 @@ for. Where an entry has since been overtaken, `docs/build-state.md` says so.
 
 ---
 
+## 2026-09-17, night — Two of the six reviewer criteria turn out to be checkable
+
+The Chairman asked whether the six criteria left to a reviewer were really
+not automatable. The answer: mostly they are, to a proposal; what is not
+automatable is the assurance. Two have deterministic rules in Word and were
+moved to "checked" tonight; the rest are model proposals for the review
+queue to present.
+
+### Done
+
+- **1.3.2 Meaningful Sequence is checked.** Reading order is document order
+  unless text is in a floating box, a frame, or a layout table, and each of
+  those is found. Word's duplicate fallback markup for text boxes is now
+  invisible to every check; the first version found each box twice.
+- **3.1.2 Language of Parts is checked and fixed.** A zero-dependency
+  language detector (script, then function words, conservative thresholds
+  that keep names and borrowed phrases quiet) finds passages in another
+  language, and remediation marks every run in them with the tag Word
+  writes. Verified on a python-docx file with an English and a Spanish
+  paragraph: the Spanish one is found, marked es-US, and re-detection is
+  clean; the paragraph full of Spanish names is left alone.
+- The reviewer bucket is now four criteria: 1.3.3, 1.4.1, 1.4.5, 2.4.6.
+
+### Next, in the order recommended to the Chairman
+
+1. Pattern checks for 1.3.3 (sensory instructions) and 1.4.1 (colour-only
+   emphasis), and OCR for 1.4.5 – detection only.
+2. The review queue, with model-drafted proposals for alt text, link text
+   and headings, one-click accept. The assurance stays with a person and the
+   conformance statement keeps a person's name.
+
+---
+
 ## 2026-09-17, evening — Remediation, and what the report is allowed to claim
 
 ### Done today

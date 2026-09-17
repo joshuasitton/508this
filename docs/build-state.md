@@ -4,6 +4,19 @@ The running project-level record. Sections are dated and kept in order rather
 than rewritten, so the reasoning stays readable. Decisions live in
 `docs/leadership-standup.md`; this file says where the code stands.
 
+## 2026-09-17, night — Reading order and language of parts
+
+`src/domain/language.ts` (the detector), reading-order and layout-table
+checks and the language check in `docx.ts`, the language fix in
+`remediate.ts`, `FIXABLE_KINDS` exported from there and read by the job
+page. 1.3.2 and 3.1.2 are "checked" in `DOCUMENT_COVERAGE`; four criteria
+remain "reviewer". 82 tests.
+
+**Verified** on a python-docx file with an English paragraph, a Spanish
+paragraph and a paragraph of Spanish names: one finding, on the Spanish
+paragraph; remediation marks its runs es-US and leaves the others; the
+output passes an independent CRC check and re-detects clean.
+
 ## 2026-09-17, evening — Remediation and the conformance statement
 
 On the same branch. `src/domain/remediate.ts`, `src/server/zip.ts`,

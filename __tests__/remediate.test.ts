@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { detectDocx, type DocxParts } from '../src/domain/docx';
-import { remediateDocx } from '../src/domain/remediate';
+import { FIXABLE_KINDS, remediateDocx } from '../src/domain/remediate';
 import { attr, child, children, find, findAll, parseXml, textOf } from '../src/domain/xml';
 
 const W = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"';
@@ -135,4 +135,34 @@ test('after remediation, re-detection finds nothing that remediation claims to f
   assert.deepEqual([...new Set(after.map((f) => f.kind))].sort(), ['image-alt', 'link-text']);
   const appliedKinds = new Set(r.applied.map((a) => a.kind));
   for (const k of appliedKinds) assert.ok(!after.some((f) => f.kind === k), `${k} still found after remediation`);
+});
+
+const SPANISH =
+  'Esta guía explica los beneficios disponibles para los veteranos y sus familias. Para solicitar los servicios, complete el formulario en línea o visite una oficina regional. Si tiene preguntas sobre su elegibilidad, comuníquese con nosotros por teléfono.';
+
+test('a passage in another language gets its language on every run with text, and nothing else changes', () => {
+  const twoRuns = `<w:p><w:r><w:t xml:space="preserve">${SPANISH.slice(0, 80)}</w:t></w:r><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">${SPANISH.slice(80)}</w:t></w:r><w:r><w:t xml:space="preserve"> </w:t></w:r></w:p>`;
+  const styles = STYLES.replace('<w:sz w:val="22"/>', '<w:sz w:val="22"/><w:lang w:val="en-US"/>');
+  const r = remediateDocx({ document: doc(heading(1, 'T') + twoRuns), styles, core: CORE_EMPTY.replace('<dc:title></dc:title>', '<dc:title>T</dc:title>') }, OPTS);
+  assert.deepEqual(r.applied.map((a) => a.kind), ['language-parts']);
+  assert.match(r.applied[0]!.description, /Marked the paragraph as Spanish \(es-US\)/);
+  const runs = findAll(parseXml(r.parts.document), 'r').filter((x) => findAll(x, 't').length > 0);
+  const langs = runs.map((x) => (find(x, 'lang') ? attr(find(x, 'lang')!, 'val') : undefined));
+  assert.deepEqual(langs, [undefined, 'es-US', 'es-US', undefined], 'heading untouched; both text runs marked; the whitespace run left alone');
+  assert.ok(find(runs[2]!, 'b'), 'existing run properties are kept');
+  assert.deepEqual(detectDocx(r.parts).map((f) => f.kind), [], 'and re-detection agrees');
+});
+
+test('FIXABLE_KINDS is exactly the set remediation applies', () => {
+  // The job page uses it to count what the button will fix. A kind listed
+  // here that remediation never applies would promise a fix that does not
+  // come; one missing would hide a fix that does.
+  const body =
+    heading(1, 'Report') +
+    heading(3, 'Deep') +
+    `<w:tbl>${row(['h1', 'h2'])}${row(['a', 'b'])}</w:tbl>` +
+    p('grey', '', '<w:color w:val="999999"/>') +
+    p(SPANISH);
+  const r = remediateDocx({ document: doc(body), styles: STYLES, core: CORE_EMPTY }, OPTS);
+  assert.deepEqual([...new Set(r.applied.map((a) => a.kind))].sort(), [...FIXABLE_KINDS].sort());
 });
