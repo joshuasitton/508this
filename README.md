@@ -191,6 +191,43 @@ still fails.
 
 ---
 
+## Reading the result
+
+The job page is the report, and it is written in the order a customer asks
+the questions, not the order the standard lists its clauses.
+
+**The verdict first.** "Does not conform to Section 508 yet", then one sentence
+with the numbers: how many of the criteria it owes have open issues, how many
+issues, how many are blocking. A person who reads nothing else knows where
+they stand. `summarise` and `describeSummary` in `findings.ts` produce it.
+
+**Findings grouped by kind, not by criterion.** A criterion number means
+everything to a specialist and nothing to a communications lead, and one
+criterion covers different problems: 1.3.1 is both a table without a header
+row and a heading that skips a level, which have different causes and
+different fixes. So every finding carries a *kind* as well as a criterion.
+`src/domain/kinds.ts` is the table of kinds, and each owns three sentences:
+its name in plain words, why it matters to someone using assistive technology,
+and what we do about it. The page groups by kind, blocking first, then the
+kinds with the most places to fix. The ACR still scores by criterion. A test
+pins that every kind maps to a criterion in the catalogue and that every
+finding the detector emits carries a kind, so the report cannot group a
+finding under one heading and score it under another.
+
+**The criteria it meets are there, but not first.** The conformance table
+lists only the shortfalls, in the Supports / Partially Supports / Does Not
+Support wording a buyer expects, with the remarks the ACR will carry. The
+criteria it already meets sit under a native disclosure, because the report is
+a claim about all of them and a buyer may want to see the passes, but
+twenty-eight rows of "no open issues" are not the news. The four E205.4
+exemptions are a footnote, named, so nobody wonders why the count is 34.
+
+**State is a word, not a colour.** Each place is labelled Blocking, Open or
+Fixed in text, with a border and no fill, so the page passes 1.4.1 Use of
+Color on its own report.
+
+---
+
 ## Storage, and why it is one file
 
 `src/server/jobs.ts` writes each job under `documents/<id>/` on local disk,

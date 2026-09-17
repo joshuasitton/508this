@@ -12,6 +12,7 @@
  */
 
 import { appliesTo, labelFor, type ContentKind, criteriaFor } from './criteria';
+import type { Kind } from './kinds';
 
 export type Severity =
   /** The document fails the criterion outright – e.g. a scanned PDF with no text layer. */
@@ -20,6 +21,8 @@ export type Severity =
   | 'partial';
 
 export interface Finding {
+  /** What kind of problem this is, in the customer's words. See `kinds.ts`. */
+  kind: Kind;
   /** WCAG 2.0 criterion id from `criteria.ts`. */
   criterion: string;
   /** Where in the document, in the customer's terms: "page 3", "slide 12", "table 2, row 4". */
@@ -86,21 +89,63 @@ export function progress(findings: readonly Finding[]): Progress {
   return { total, remediated, open, fraction: total === 0 ? 1 : remediated / total };
 }
 
-/** The sentence that goes in the report's Remarks column. One place. */
-export function describeAssessment(a: Assessment): string {
-  const label = labelFor(a.criterion);
+export interface Summary {
+  conforms: boolean;
+  /** Criteria this kind of content owes – 34 for a document, 38 for web. */
+  owed: number;
+  /** Owed criteria with at least one open finding. */
+  short: number;
+  blocking: number;
+  other: number;
+}
+
+export function summarise(findings: readonly Finding[], kind: ContentKind): Summary {
+  const assessments = assessAll(findings, kind);
+  const owed = assessments.filter((a) => a.status !== 'Not Applicable');
+  const short = owed.filter((a) => a.status !== 'Supports');
+  const open = short.flatMap((a) => a.open);
+  const blocking = open.filter((f) => f.severity === 'blocking').length;
+  return { conforms: short.length === 0, owed: owed.length, short: short.length, blocking, other: open.length - blocking };
+}
+
+/** The headline of the report, and the sentence under it. */
+export function describeSummary(s: Summary): { headline: string; detail: string } {
+  if (s.conforms) {
+    return {
+      headline: 'Conforms to Section 508',
+      detail: `No open issues on any of the ${s.owed} criteria this document owes.`,
+    };
+  }
+  const issues = s.blocking + s.other;
+  const parts: string[] = [];
+  if (s.blocking > 0) parts.push(`${s.blocking} ${s.blocking === 1 ? 'is' : 'are'} blocking`);
+  if (s.other > 0) parts.push(`${s.other} ${s.other === 1 ? 'is' : 'are'} partial`);
+  return {
+    headline: 'Does not conform to Section 508 yet',
+    detail: `${s.short} of the ${s.owed} criteria this document owes ${s.short === 1 ? 'has' : 'have'} open issues: ${issues} in all, of which ${parts.join(' and ')}. Fix them and the document conforms.`,
+  };
+}
+
+/** The Remarks column of the report, without the criterion's name. One place. */
+export function describeRemarks(a: Assessment): string {
   switch (a.status) {
     case 'Supports':
-      return `${label}: no open issues.`;
+      return 'No open issues.';
     case 'Not Applicable':
-      return `${label}: not required for this content under E205.4.`;
+      return 'Not required for this content under E205.4.';
     case 'Partially Supports':
     case 'Does Not Support': {
       const n = a.open.length;
       const where = a.open.map((f) => f.location).join(', ');
-      return `${label}: ${n} open ${n === 1 ? 'issue' : 'issues'} (${where}).`;
+      return `${n} open ${n === 1 ? 'issue' : 'issues'} (${where}).`;
     }
   }
+}
+
+/** The one-line form: criterion, then its remarks. */
+export function describeAssessment(a: Assessment): string {
+  const remarks = describeRemarks(a);
+  return `${labelFor(a.criterion)}: ${remarks.charAt(0).toLowerCase()}${remarks.slice(1)}`;
 }
 
 /** The sentence that names a finding to a person: what, where, and whether it is done. */

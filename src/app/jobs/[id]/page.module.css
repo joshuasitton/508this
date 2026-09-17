@@ -1,42 +1,137 @@
+.kicker {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.title {
+  font-size: clamp(1.5rem, 3vw, 2.25rem);
+  line-height: 1.2;
+  margin: 0 0 0.5rem;
+  overflow-wrap: anywhere;
+}
+
 .status {
   color: var(--muted);
   margin: 0 0 2rem;
 }
 
-.progress {
-  color: var(--muted);
-  margin: 0 0 1rem;
+.verdict,
+.verdictGood {
+  border-left: 5px solid var(--foreground);
+  padding: 1rem 1.25rem;
+  margin: 0 0 3rem;
+  max-width: 70ch;
 }
 
-.findings {
-  padding-left: 1.5rem;
-  margin: 0 0 3rem;
+.verdictGood {
+  border-left-color: var(--accent);
+}
+
+.verdictTitle {
+  font-size: 1.5rem;
+  margin: 0 0 0.5rem;
+}
+
+.verdictDetail {
+  margin: 0;
+}
+
+.group {
+  padding: 1.25rem 0 1.5rem;
+  border-top: 1px solid var(--rule);
   max-width: 80ch;
 }
 
-.findings li {
-  margin-bottom: 0.5rem;
+.groupTitle {
+  font-size: 1.25rem;
+  margin: 0 0 0.15rem;
 }
 
-.fixed {
+.count {
+  font-size: 0.9rem;
+  font-weight: 600;
   color: var(--muted);
+  margin: 0 0 0.75rem;
+}
+
+.why {
+  color: var(--muted);
+  margin: 0 0 1rem;
+}
+
+.places {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1rem;
+}
+
+.place,
+.placeFixed {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr;
+  gap: 0.5rem;
+  padding: 0.6rem 0;
+  border-top: 1px solid var(--rule);
+}
+
+.placeFixed {
+  color: var(--muted);
+}
+
+.state {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  padding: 0.1rem 0.4rem;
+  align-self: start;
+  justify-self: start;
+  margin-top: 0.15rem;
+}
+
+.placeBody {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.description {
+  color: var(--muted);
+}
+
+.fix {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border-left: 3px solid var(--accent);
+}
+
+.note,
+.footnote {
+  color: var(--muted);
+  max-width: 70ch;
 }
 
 .note {
-  color: var(--muted);
-  max-width: 70ch;
   margin: 0 0 1rem;
+}
+
+.footnote {
+  font-size: 0.9rem;
+  margin: 1.5rem 0 3rem;
 }
 
 .table {
   width: 100%;
   border-collapse: collapse;
+  margin-bottom: 1.5rem;
 }
 
 .table th,
 .table td {
   text-align: left;
-  padding: 0.5rem 0.75rem 0.5rem 0;
+  padding: 0.6rem 1rem 0.6rem 0;
   border-bottom: 1px solid var(--rule);
   vertical-align: top;
 }
@@ -48,5 +143,64 @@
 }
 
 .table tbody th {
-  font-weight: 400;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+.details summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 0.5rem 0;
+}
+
+.metList {
+  columns: 2;
+  column-gap: 2rem;
+  padding-left: 1.25rem;
+  margin: 0.5rem 0 0;
+}
+
+.metList li {
+  break-inside: avoid;
+  padding: 0.15rem 0;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.next {
+  padding-left: 1.5rem;
+  max-width: 70ch;
+}
+
+.next li {
+  margin-bottom: 0.5rem;
+}
+
+@media (max-width: 40rem) {
+  .place,
+  .placeFixed {
+    grid-template-columns: 1fr;
+    gap: 0.25rem;
+  }
+
+  .metList {
+    columns: 1;
+  }
+
+  /* Three columns do not fit a phone; let every cell wrap rather than the page scroll sideways. */
+  .table tbody th,
+  .nowrap {
+    white-space: normal;
+  }
+
+  .table th,
+  .table td {
+    padding-right: 0.5rem;
+  }
 }

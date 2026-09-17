@@ -18,6 +18,7 @@
 
 import { contrastRatio, formatRatio, isLargeText, minimumRatio, parseHex, type Rgb } from './contrast';
 import type { Finding, Severity } from './findings';
+import { KINDS, type Kind } from './kinds';
 import { attr, child, children, find, findAll, parseXml, textOf, type XmlElement } from './xml';
 
 export interface DocxParts {
@@ -38,8 +39,8 @@ const MIN_PARAGRAPHS_FOR_HEADINGS = 20;
 const GENERIC_LINK_TEXT = /^(click here|here|click|read more|more|link|this link|this|learn more|download|see more)[.!]?$/i;
 const BARE_URL = /^(https?:\/\/|www\.)\S+$/i;
 
-function finding(criterion: string, location: string, description: string, severity: Severity): Finding {
-  return { criterion, location, description, severity, remediated: false };
+function finding(kind: Kind, location: string, description: string, severity: Severity): Finding {
+  return { kind, criterion: KINDS[kind].criterion, location, description, severity, remediated: false };
 }
 
 function snippet(text: string): string {
@@ -160,7 +161,7 @@ export function detectDocx(parts: DocxParts): Finding[] {
   if (!titleEl || textOf(titleEl).trim() === '') {
     out.push(
       finding(
-        '2.4.2',
+        'no-title',
         'document properties',
         'The document has no title. Screen readers announce the filename instead.',
         'blocking',
@@ -172,7 +173,7 @@ export function detectDocx(parts: DocxParts): Finding[] {
   if (!styles.hasLanguage) {
     out.push(
       finding(
-        '3.1.1',
+        'no-language',
         'document defaults',
         'No document language is set, so a screen reader has to guess how to pronounce the text.',
         'blocking',
@@ -193,7 +194,7 @@ export function detectDocx(parts: DocxParts): Finding[] {
     const name = docPr ? attr(docPr, 'name') : undefined;
     out.push(
       finding(
-        '1.1.1',
+        'image-alt',
         `image ${imageNumber}${name ? ` (${name})` : ''}${p ? `, ${where(p)}` : ''}`,
         'The image has no alternative text and is not marked decorative.',
         'partial',
@@ -213,7 +214,7 @@ export function detectDocx(parts: DocxParts): Finding[] {
     const first = firstRow ? snippet(children(firstRow, 'tc').map(runText).join(' · ')) : '';
     out.push(
       finding(
-        '1.3.1',
+        'table-header',
         `table ${tableNumber}${first ? ` (“${first}”)` : ''}${p ? `, after ${where(p)}` : ''}`,
         'The table has no row marked as a header row, so cells are read without their column names.',
         'partial',
@@ -230,7 +231,7 @@ export function detectDocx(parts: DocxParts): Finding[] {
     if (previousLevel > 0 && level > previousLevel + 1) {
       out.push(
         finding(
-          '1.3.1',
+          'heading-skip',
           where(p),
           `Heading level ${level} follows heading level ${previousLevel}, skipping ${level - previousLevel - 1}. Screen reader users navigate by heading level and will think a section is missing.`,
           'partial',
@@ -243,7 +244,7 @@ export function detectDocx(parts: DocxParts): Finding[] {
   if (headings === 0 && textParagraphs >= MIN_PARAGRAPHS_FOR_HEADINGS) {
     out.push(
       finding(
-        '1.3.1',
+        'no-headings',
         'whole document',
         `The document has ${textParagraphs} paragraphs and no heading styles. Any visual headings are bold text, which assistive technology cannot navigate by.`,
         'partial',
@@ -257,11 +258,11 @@ export function detectDocx(parts: DocxParts): Finding[] {
     const p = enclosing(link);
     const at = p ? where(p) : 'document body';
     if (text === '') {
-      out.push(finding('2.4.4', at, 'A link has no text at all, so it is announced as just “link”.', 'partial'));
+      out.push(finding('link-text', at, 'A link has no text at all, so it is announced as just “link”.', 'partial'));
     } else if (GENERIC_LINK_TEXT.test(text)) {
       out.push(
         finding(
-          '2.4.4',
+          'link-text',
           at,
           `The link text is “${text}”, which does not say where the link goes when read on its own.`,
           'partial',
@@ -270,7 +271,7 @@ export function detectDocx(parts: DocxParts): Finding[] {
     } else if (BARE_URL.test(text)) {
       out.push(
         finding(
-          '2.4.4',
+          'link-text',
           at,
           `The link text is the bare address “${snippet(text)}”, which a screen reader spells out character by character.`,
           'partial',
@@ -305,7 +306,7 @@ export function detectDocx(parts: DocxParts): Finding[] {
       reported.add(key);
       out.push(
         finding(
-          '1.4.3',
+          'contrast',
           where(p),
           `Text “${snippet(text)}” is #${hex(fg)} on #${hex(bg)}, a contrast of ${formatRatio(ratio)}; it needs ${minimum}:1.`,
           'partial',

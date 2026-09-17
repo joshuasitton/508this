@@ -31,6 +31,13 @@ planted issues produces exactly those seven findings at the right paragraphs;
 the report table shows 34 owed criteria; the first Tab lands on the skip
 link; unknown and traversal-shaped job ids return 404.
 
+**The report page, second pass.** After the first run on Josh's Mac, the
+result was restructured for reading: verdict first, findings grouped by kind
+with plain-language "why" and "what we do" sentences owned by
+`src/domain/kinds.ts`, the shortfall table before a disclosure of the criteria
+met, and a "what happens next". Checked in light and dark schemes and at phone
+width, with a clean heading outline and no horizontal scroll.
+
 **Next, in order:** see `docs/sprint-2026-09-17.md`.
 
 ## 2026-09-17 — Founded

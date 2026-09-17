@@ -7,11 +7,14 @@ import {
   conforms,
   describeAssessment,
   describeFinding,
+  describeSummary,
   progress,
+  summarise,
   type Finding,
 } from '../src/domain/findings';
 
 const missingAlt: Finding = {
+  kind: 'image-alt',
   criterion: '1.1.1',
   location: 'page 3',
   description: 'The chart has no alternative text.',
@@ -20,6 +23,7 @@ const missingAlt: Finding = {
 };
 
 const scanned: Finding = {
+  kind: 'image-alt',
   criterion: '1.1.1',
   location: 'pages 1–12',
   description: 'The document is a scanned image with no text layer.',
@@ -110,4 +114,21 @@ test('a finding is named to a person with its state first', () => {
     describeFinding(fixed(scanned)),
     'Fixed – 1.1.1 Non-text Content, pages 1–12: The document is a scanned image with no text layer.',
   );
+});
+
+test('the summary counts what the document owes and what is open, and its headline follows', () => {
+  // 34 owed for a document. One partial finding on 1.1.1 → 1 criterion short,
+  // 0 blocking, 1 other. The stray 2.4.1 finding is exempt and counts nowhere.
+  const stray: Finding = { ...missingAlt, criterion: '2.4.1' };
+  const s = summarise([missingAlt, scanned, stray], 'document');
+  assert.deepEqual(s, { conforms: false, owed: 34, short: 1, blocking: 1, other: 1 });
+  assert.equal(describeSummary(s).headline, 'Does not conform to Section 508 yet');
+  assert.equal(
+    describeSummary(s).detail,
+    '1 of the 34 criteria this document owes has open issues: 2 in all, of which 1 is blocking and 1 is partial. Fix them and the document conforms.',
+  );
+  const clean = summarise([fixed(missingAlt)], 'document');
+  assert.deepEqual(clean, { conforms: true, owed: 34, short: 0, blocking: 0, other: 0 });
+  assert.equal(describeSummary(clean).headline, 'Conforms to Section 508');
+  assert.equal(summarise([], 'web').owed, 38);
 });
