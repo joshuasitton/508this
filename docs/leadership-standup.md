@@ -8,6 +8,52 @@ for. Where an entry has since been overtaken, `docs/build-state.md` says so.
 
 ---
 
+## 2026-09-18, later — Real contractor files arrive, and they are PDFs
+
+The Chairman sent example contractor files the app has to handle. He
+described three; two arrived: an Adobe Illustrator logo sheet and an InDesign
+infographic for a VA research centre. **Both are PDFs.** The third has not
+been seen and may change the picture again.
+
+### What they showed
+
+- The infographic is tagged and still fails: four figures with no alternative
+  text, no headings at all, and a title the reader is never told to display.
+  Its entire structure tree lives inside an object stream, so a reader that
+  could not open object streams would have reported it clean. That is the
+  most dangerous failure this product can have and it was one library
+  feature away.
+- The logo sheet is untagged. Tags are the only structure a PDF has, so it
+  fails at the first hurdle and nothing in it can carry a description until
+  it is tagged.
+
+### Decided by the engineering lead, for the Chairman to overturn
+
+**PDF moves ahead of PowerPoint and ahead of the ACR as a Word file.** The
+sprint deferred PDF on the reasoning that an untagged PDF has no structure to
+fix, only to rebuild. That reasoning still holds for remediation and is
+wrong for *detection*: both files produce accurate, useful findings today,
+and the customers who exist send PDFs. Reading and reporting landed this
+session; writing fixes back is the next branch.
+
+**Coverage is now per format.** A PDF cannot be checked for the things a Word
+file can – contrast is the clear case, since a PDF paints text with content
+stream operators rather than naming a colour. Seven criteria need a person
+for a PDF against four for a Word file. Reporting a PDF against the Word
+table would have claimed seven checks that never ran.
+
+### Decisions needed from the Chairman
+
+1. **The third file.** It was described but not attached.
+2. **Retention** – still open, still the gate on production storage, and now
+   more pressing: these are a real agency's files.
+3. **Untagged PDFs: scope and price.** Tagging a document from nothing is not
+   the same job as fixing a tagged one, and the logo sheet is the cheap end
+   of it – one page, one figure. A forty-page untagged report is a different
+   product. Recommended: price them separately from the start.
+
+---
+
 ## 2026-09-18 — The review queue
 
 ### Done

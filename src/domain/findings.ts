@@ -118,7 +118,7 @@ export function assess(
     const status: Status = open.some((f) => f.severity === 'blocking') ? 'Does Not Support' : 'Partially Supports';
     return { criterion: criterionId, status, open, dismissed };
   }
-  const basis = coverageOf(criterionId)?.coverage;
+  const basis = coverageOf(criterionId, kind)?.coverage;
   if (basis === 'reviewer' && !confirmed.has(criterionId)) {
     return { criterion: criterionId, status: 'Needs Review', open, dismissed };
   }
@@ -214,15 +214,15 @@ export function describeSummary(s: Summary): { headline: string; detail: string 
 }
 
 /** The Remarks column of the report, without the criterion's name. One place. */
-export function describeRemarks(a: Assessment): string {
+export function describeRemarks(a: Assessment, kind: ContentKind = 'docx'): string {
   const reviewed = a.dismissed.length
     ? ` ${a.dismissed.length} ${a.dismissed.length === 1 ? 'finding was' : 'findings were'} reviewed and judged not ${a.dismissed.length === 1 ? 'a failure' : 'failures'}${dismissedBy(a.dismissed)}.`
     : '';
   switch (a.status) {
     case 'Supports':
-      return `${coverageOf(a.criterion)?.remark ?? 'No open issues.'}${reviewed}`;
+      return `${coverageOf(a.criterion, kind)?.remark ?? 'No open issues.'}${reviewed}`;
     case 'Needs Review':
-      return `Waiting on a reviewer. ${coverageOf(a.criterion)?.remark ?? ''}`.trim();
+      return `Waiting on a reviewer. ${coverageOf(a.criterion, kind)?.remark ?? ''}`.trim();
     case 'Not Applicable':
       return 'Not required for this content under E205.4.';
     case 'Partially Supports':
@@ -240,8 +240,8 @@ function dismissedBy(dismissed: readonly Finding[]): string {
 }
 
 /** The one-line form: criterion, then its remarks. */
-export function describeAssessment(a: Assessment): string {
-  const remarks = describeRemarks(a);
+export function describeAssessment(a: Assessment, kind: ContentKind = 'docx'): string {
+  const remarks = describeRemarks(a, kind);
   return `${labelFor(a.criterion)}: ${remarks.charAt(0).toLowerCase()}${remarks.slice(1)}`;
 }
 

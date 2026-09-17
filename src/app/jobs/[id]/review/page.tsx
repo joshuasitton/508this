@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
-import { DOCUMENT_COVERAGE, labelFor } from '@/domain/criteria';
+import { coverageOf, labelFor } from '@/domain/criteria';
 import { assessAll, describeSummary, findingKey, isOpen, summarise, type Finding } from '@/domain/findings';
 import { KINDS, REVIEW_INPUT } from '@/domain/kinds';
 import { getJob } from '@/server/jobs';
@@ -45,12 +45,12 @@ export default async function ReviewPage({
   if (!job) notFound();
 
   const confirmed = new Set(Object.keys(job.confirmations ?? {}));
-  const summary = summarise(job.findings, 'document', confirmed);
+  const summary = summarise(job.findings, job.format, confirmed);
   const verdict = describeSummary(summary);
   const toDecide = job.findings.filter((f) => isOpen(f) && !f.decision);
   const decided = job.findings.filter((f) => f.decision);
-  const reviewCriteria = assessAll(job.findings, 'document', confirmed).filter(
-    (a) => DOCUMENT_COVERAGE[a.criterion]?.coverage === 'reviewer' && a.status !== 'Not Applicable',
+  const reviewCriteria = assessAll(job.findings, job.format, confirmed).filter(
+    (a) => coverageOf(a.criterion, job.format)?.coverage === 'reviewer' && a.status !== 'Not Applicable',
   );
   const reviewer = job.reviewer ?? '';
   const message = problem ? PROBLEMS[problem] : undefined;
@@ -72,7 +72,7 @@ export default async function ReviewPage({
         </p>
       )}
 
-      {!job.remediatedAt && (
+      {!job.remediatedAt && job.format === 'docx' && (
         <p className={styles.note}>
           Automatic remediation has not run yet. Run it from the report first so the queue holds only what needs a
           person.
@@ -120,7 +120,7 @@ export default async function ReviewPage({
               <li key={a.criterion} className={styles.criterion}>
                 <div>
                   <strong>{labelFor(a.criterion)}</strong>
-                  <span className={styles.remark}>{DOCUMENT_COVERAGE[a.criterion]?.remark}</span>
+                  <span className={styles.remark}>{coverageOf(a.criterion, job.format)?.remark}</span>
                   {a.open.length > 0 && (
                     <span className={styles.remark}>
                       {a.open.length} open {a.open.length === 1 ? 'finding' : 'findings'} must be decided first.

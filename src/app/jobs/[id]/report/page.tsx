@@ -27,9 +27,9 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
   if (!job) notFound();
 
   const confirmed = new Set(Object.keys(job.confirmations ?? {}));
-  const summary = summarise(job.findings, 'document', confirmed);
+  const summary = summarise(job.findings, job.format, confirmed);
   const verdict = describeSummary(summary);
-  const byId = new Map(assessAll(job.findings, 'document', confirmed).map((a) => [a.criterion, a]));
+  const byId = new Map(assessAll(job.findings, job.format, confirmed).map((a) => [a.criterion, a]));
   const fixed = job.findings.filter((f) => f.remediated).length;
   const date = new Date(job.remediatedAt ?? job.createdAt);
 
@@ -45,7 +45,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
           <dt>Standard</dt>
           <dd>Revised Section 508 Standards (36 CFR Part 1194), incorporating WCAG 2.0 Level A and AA</dd>
           <dt>Content</dt>
-          <dd>Non-web document (Word)</dd>
+          <dd>Non-web document ({job.format === 'pdf' ? 'PDF' : 'Word'})</dd>
           <dt>Evaluated</dt>
           <dd>{date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</dd>
           {job.reviewer && (
@@ -87,7 +87,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
                   <th scope="row">{labelFor(c.id)}</th>
                   <td>{c.level}</td>
                   <td className={styles.nowrap}>{a.status}</td>
-                  <td>{describeRemarks(a)}</td>
+                  <td>{describeRemarks(a, job.format)}</td>
                 </tr>
               );
             })}

@@ -271,14 +271,103 @@ still fails.
 
 ---
 
+## PDFs
+
+Two real contractor files arrived on 18 September and settled the question of
+what to build next. Both are PDFs out of Adobe tools, and between them they
+cover the two classes the whole format divides into.
+
+**A tagged PDF.** An InDesign infographic for a VA research centre: marked as
+tagged, a language, a title, a structure tree with a document, an article,
+seven stories, twelve paragraphs and four figures. Every one of those four
+figures has no alternative text, there is not a single heading in it, and it
+is not set to display its own title. Three real findings, all of them things
+a buyer's checker would raise.
+
+**An untagged PDF.** An Illustrator logo sheet: one page of vector artwork
+with a few words set into it, no tag tree at all, no language. Tags are the
+only structure a PDF has, so this one fails at the first hurdle, and until it
+is tagged there is nowhere in the file to put a description of the artwork.
+
+### The reader
+
+`src/domain/pdf.ts` is a PDF parser, because there was no way around one. A
+PDF is not a format you can skim with a regular expression: objects are
+reached through a cross reference table, that table may itself be a
+compressed stream, and in anything Acrobat has touched most objects live
+inside other objects. The VA file keeps its entire structure tree inside an
+object stream; a reader without object stream support sees an empty document
+and reports it as clean, which is the worst possible failure for this
+product.
+
+So the reader handles the object grammar, classic `xref` tables, PDF 1.5
+cross reference streams with the PNG predictors Adobe writes, object streams,
+and the `/Prev` chains every linearized file has. Decompression is passed in
+rather than imported, exactly as `domain/xml.ts` leaves unzipping to
+`server/unzip.ts`, so the domain keeps its no-dependency rule and `npm test`
+still runs with nothing installed.
+
+Three deliberate refusals. An encrypted PDF is refused with a sentence saying
+to remove the password, because guessing at permissions handling is how you
+corrupt somebody's file. Filters other than Flate are refused, because they
+decode picture data nothing here reads. And a file whose cross reference is
+broken is *not* refused: the reader scans for objects instead, since a
+document nobody can open is exactly the kind that arrives needing
+remediation.
+
+### What is checked
+
+`src/domain/pdfDetect.ts`, same contract as the Word detector. Tags present;
+a language; a title, and a reader told to display it; figures with
+alternative text; headings, and their levels; tables with header cells; link
+annotations that say where they go; whether a page paints any text at all, or
+is a scan. Locations are page numbers, which makes a reviewer's job easier
+here than in Word, where a `.docx` has no pages until it is laid out.
+
+The role map is applied before any tag is read. InDesign tags paragraphs with
+the designer's own style names and maps them in `/RoleMap`, so a detector
+that read the raw tag would see no paragraphs in the VA file and stay silent
+on a document with no headings.
+
+### Why coverage is now per format
+
+The report's honesty line had to grow. `WORD_COVERAGE` said what a Word file
+can be checked for; a PDF is not the same document. A `.docx` names its text
+colour in an attribute, so contrast is checked. A PDF paints text with
+operators in a content stream, and short of interpreting the whole graphics
+state nothing here can measure it, so for a PDF contrast is a reviewer's job
+and the statement says so in the remark.
+
+Seven criteria need a person for a PDF against four for a Word file. That is
+the honest count, and it is the whole reason `ContentKind` is now `'web' |
+'docx' | 'pdf'` rather than `'web' | 'document'`: the format decides what the
+service may claim. Reporting a PDF against the Word coverage table would
+claim seven checks that never ran, which is the same lie as saying "Supports"
+on nothing.
+
+### What is not here yet
+
+Writing fixes back into a PDF. The job page says so plainly rather than
+offering a button that does nothing. Three of the findings on these two files
+have one right answer and are a small change to the catalogue – a language, a
+title, the flag that displays it – and the right way to make them is an
+incremental update, appending the changed objects and a new cross reference
+so every byte of the original is preserved. That mirrors what the .docx path
+already does by writing changed parts over the original archive, and it is
+the next branch. Building a tag tree for an untagged file is the harder half
+and comes after.
+
+---
+
 ## What "Supports" is allowed to mean
 
 The report's honesty line is `DOCUMENT_COVERAGE` in `src/domain/criteria.ts`.
 A criterion with no findings is not thereby met. It is met on one of three
 bases, and each criterion is assigned one:
 
-- **checked** – an automated check in `docx.ts` looked and found nothing.
-  Eight criteria, plus 4.1.1 Parsing, which the reader itself vouches for.
+- **checked** – an automated check looked and found nothing. Eight criteria
+  for a Word file and five for a PDF, plus 4.1.1 Parsing, which the reader
+  itself vouches for.
 - **static** – a Word document with no interactive or time-based content has
   nothing the criterion governs: keyboard traps, timing, flashing, focus,
   forms, captions. Twenty-two criteria. The detector emits a `media` or

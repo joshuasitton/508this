@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { CRITERIA, DOCUMENT_COVERAGE, DOCUMENT_EXEMPT, appliesTo, criteriaFor, criterion, labelFor } from '../src/domain/criteria';
+import { CRITERIA, WORD_COVERAGE, DOCUMENT_EXEMPT, appliesTo, criteriaFor, criterion, labelFor } from '../src/domain/criteria';
 import { KINDS } from '../src/domain/kinds';
 
 test('the catalogue is exactly WCAG 2.0 Level A and AA', () => {
@@ -39,10 +39,10 @@ test('non-web documents are not held to the four set-of-pages criteria', () => {
   // would make the customer pay for work the standard does not ask of them.
   assert.deepEqual([...DOCUMENT_EXEMPT].sort(), ['2.4.1', '2.4.5', '3.2.3', '3.2.4']);
   for (const id of DOCUMENT_EXEMPT) {
-    assert.equal(appliesTo(id, 'document'), false, id);
+    assert.equal(appliesTo(id, 'docx'), false, id);
     assert.equal(appliesTo(id, 'web'), true, id);
   }
-  assert.equal(criteriaFor('document').length, 34);
+  assert.equal(criteriaFor('docx').length, 34);
   assert.equal(criteriaFor('web').length, 38);
 });
 
@@ -65,16 +65,16 @@ test('every criterion has a coverage class and a remark, and the checked ones ar
   // behind it would claim a check that does not exist.
   const detected = new Set(Object.values(KINDS).map((k) => k.criterion));
   for (const c of CRITERIA) {
-    const info = DOCUMENT_COVERAGE[c.id];
+    const info = WORD_COVERAGE[c.id];
     assert.ok(info, `${c.id} has no coverage`);
     assert.ok(info.remark.length > 10, `${c.id} has no remark`);
     if (info.coverage === 'checked' && c.id !== '4.1.1') {
       assert.ok(detected.has(c.id), `${c.id} is "checked" but no kind produces it`);
     }
   }
-  assert.equal(Object.keys(DOCUMENT_COVERAGE).length, 38);
+  assert.equal(Object.keys(WORD_COVERAGE).length, 38);
   assert.deepEqual(
-    Object.entries(DOCUMENT_COVERAGE).filter(([, v]) => v.coverage === 'reviewer').map(([k]) => k),
+    Object.entries(WORD_COVERAGE).filter(([, v]) => v.coverage === 'reviewer').map(([k]) => k),
     ['1.3.3', '1.4.1', '1.4.5', '2.4.6'],
   );
 });
