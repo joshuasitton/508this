@@ -32,7 +32,11 @@ export type Kind =
   | 'forms'
   | 'reading-order'
   | 'layout-table'
-  | 'language-parts';
+  | 'language-parts'
+  | 'sensory'
+  | 'colour-words'
+  | 'colour-only'
+  | 'chart';
 
 export interface KindInfo {
   criterion: string;
@@ -116,6 +120,30 @@ export const KINDS: Record<Kind, KindInfo> = {
     title: 'Passages in another language',
     why: 'A screen reader uses the document language to choose its voice. A Spanish paragraph read with an English voice is close to unintelligible, and it happens silently.',
     fix: 'We mark each passage with its language so the reader switches voice for it.',
+  },
+  sensory: {
+    criterion: '1.3.3',
+    title: 'Instructions that rely on position, shape, size or sound',
+    why: '"Click the button on the left" or "wait until you hear the tone" is an instruction that fails for a person who cannot see the page or hear it. The standard asks that the thing be named as well: "the Submit button, on the left".',
+    fix: 'We flag each sentence for a reviewer, who adds the name or label so the instruction works without the sense it assumes.',
+  },
+  'colour-words': {
+    criterion: '1.4.1',
+    title: 'Colour as the only signal in the text',
+    why: '"Required fields are marked in red" tells a person who cannot distinguish red from black nothing at all, and a screen reader does not announce colour. About one man in twelve has some form of colour-vision deficiency.',
+    fix: 'We flag each sentence for a reviewer, who adds a second cue: an asterisk, a label, bold, or a word.',
+  },
+  'colour-only': {
+    criterion: '1.4.1',
+    title: 'Text set apart by colour alone',
+    why: 'A phrase in red among black text is emphasis to a sighted reader and nothing to anyone else. Bold, italic, underline or a word carries the emphasis to everyone; colour on its own carries it to some.',
+    fix: 'We flag each run for a reviewer, who adds bold or italic alongside the colour, or removes the colour if it meant nothing.',
+  },
+  chart: {
+    criterion: '1.4.1',
+    title: 'Charts',
+    why: 'A chart whose series differ only by colour cannot be read by a person who cannot tell the colours apart, and a chart of any kind cannot be read by a screen reader unless its data is also given as text.',
+    fix: 'We flag each chart for a reviewer, who confirms the series are distinguishable by pattern or label and the data appears in a table or the text.',
   },
   forms: {
     criterion: '3.3.2',

@@ -16,10 +16,11 @@
  * report; it must never go anywhere else (see the invariant in CLAUDE.md).
  */
 
-import { contrastRatio, formatRatio, isLargeText, minimumRatio, parseHex, toHex, type Rgb } from './contrast';
+import { contrastRatio, formatRatio, isLargeText, minimumRatio, parseHex, relativeLuminance, toHex, type Rgb } from './contrast';
 import type { Finding, Severity } from './findings';
 import { KINDS, type Kind } from './kinds';
 import { detectLanguage, primarySubtag } from './language';
+import { findColourWords, findSensory } from './phrases';
 import { attr, child, children, elements, find, findAll, parseXml, textOf, type XmlElement } from './xml';
 
 export interface DocxParts {
@@ -441,6 +442,88 @@ export function detectDocx(parts: DocxParts): Finding[] {
     );
   }
 
+  // 1.3.3 Sensory Characteristics and 1.4.1 Use of Color, in the prose: the
+  // sentences a reviewer has to judge, found for them.
+  for (const p of paragraphs) {
+    for (const hit of findSensory(p.text)) {
+      out.push(
+        finding(
+          'sensory',
+          where(p),
+          `The instruction “${snippet(hit.sentence)}” relies on ${hit.kind === 'position' ? 'a position on the page' : hit.kind === 'sound' ? 'a sound' : `a ${hit.kind}`} (“${hit.phrase}”), which a person who cannot ${hit.kind === 'sound' ? 'hear it' : 'see the page'} has no way to follow.`,
+          'partial',
+        ),
+      );
+    }
+    for (const hit of findColourWords(p.text)) {
+      out.push(
+        finding(
+          'colour-words',
+          where(p),
+          `“${snippet(hit.sentence)}” uses colour as the signal (“${hit.phrase}”), which a screen reader does not announce and a colour-blind reader may not see.`,
+          'partial',
+        ),
+      );
+    }
+  }
+
+  // 1.4.1 – colour-only emphasis: a coloured run among plain ones, with no
+  // other cue. Hyperlinks and styled runs are skipped; their colour comes
+  // from a style that also underlines or otherwise marks them.
+  for (const p of paragraphs) {
+    const inLink = new Set<XmlElement>();
+    for (const h of findAll(p.el, 'hyperlink')) for (const r of findAll(h, 'r')) inLink.add(r);
+    const runs = findAll(p.el, 'r').filter((r) => !inLink.has(r) && findAll(r, 't').some((t) => textOf(t).trim() !== ''));
+    if (runs.length < 2) continue;
+    const plain: XmlElement[] = [];
+    const colouredNoCue: XmlElement[] = [];
+    let colouredWithCue = 0;
+    for (const r of runs) {
+      const rPr = child(r, 'rPr');
+      if (rPr && child(rPr, 'rStyle')) continue;
+      const colorEl = rPr ? child(rPr, 'color') : undefined;
+      const rgb = colorEl ? parseColour(attr(colorEl, 'val')) : null;
+      const theme = colorEl ? attr(colorEl, 'themeColor') : undefined;
+      const isDefault = !rgb || /^(text1|tx1|dark1|dk1)$/i.test(theme ?? '') || relativeLuminanceOf(rgb) < 0.02;
+      if (isDefault) {
+        plain.push(r);
+        continue;
+      }
+      const cue = ['b', 'i', 'u', 'strike', 'dstrike', 'highlight', 'shd', 'caps', 'smallCaps', 'vertAlign', 'em'].some((c) =>
+        isOn(child(rPr!, c)),
+      );
+      if (cue) colouredWithCue += 1;
+      else colouredNoCue.push(r);
+    }
+    void colouredWithCue;
+    if (plain.length === 0 || colouredNoCue.length === 0) continue;
+    const first = colouredNoCue[0]!;
+    const colorEl = child(child(first, 'rPr')!, 'color')!;
+    out.push(
+      finding(
+        'colour-only',
+        where(p),
+        `Text “${snippet(runText(first))}” is set apart from the surrounding text by colour alone (#${(attr(colorEl, 'val') ?? '').toUpperCase()}), with no bold, italic, underline or other cue.`,
+        'partial',
+      ),
+    );
+  }
+
+  // 1.4.1 – charts. Every embedded chart goes to the reviewer.
+  let chartNumber = 0;
+  for (const c of visible(findAll(body, 'chart'))) {
+    chartNumber += 1;
+    const p = enclosing(c);
+    out.push(
+      finding(
+        'chart',
+        `chart ${chartNumber}${p ? `, ${where(p)}` : ''}`,
+        'The document embeds a chart. A reviewer confirms its series are distinguishable without colour and its data is given as text.',
+        'partial',
+      ),
+    );
+  }
+
   // 3.1.2 Language of Parts – a passage in another language, not marked.
   for (const p of paragraphs) {
     const detected = detectLanguage(p.text, styles.language);
@@ -482,6 +565,10 @@ function looksLikeLayout(tbl: XmlElement): boolean {
   return rows.some((r) =>
     children(r, 'tc').some((tc) => children(tc, 'p').filter((p) => runText(p).trim() !== '').length > 1),
   );
+}
+
+function relativeLuminanceOf(rgb: Rgb): number {
+  return relativeLuminance(rgb);
 }
 
 function contains(ancestor: XmlElement, target: XmlElement): boolean {

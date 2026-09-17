@@ -8,6 +8,32 @@ for. Where an entry has since been overtaken, `docs/build-state.md` says so.
 
 ---
 
+## 2026-09-18 — The judgement criteria, screened
+
+### Done
+
+- **1.3.3 and 1.4.1 are screened.** Pattern checks find every sentence
+  whose instruction depends on a position, shape, size or sound, and every
+  sentence that uses colour as the signal; a markup check finds text set
+  apart by colour alone; every embedded chart is flagged. The criteria stay
+  reviewer-class – a match needs a person's judgement and a non-match is not
+  proof – but the reviewer now reads the flagged sentences, not the
+  document. Verified on a python-docx file: the instruction on the left,
+  the fields marked in red, the red deadline and the green/amber/red status
+  line are found; "see the table below" and "the Red Cross" are not.
+- **1.4.5 Images of Text waits.** OCR needs an engine and none is available
+  without a dependency. It joins the vision-model pass that the review
+  queue brings.
+
+### Next
+
+The review queue. Every finding kind now exists; what is missing is the
+screen where a person confirms, edits or dismisses each one, and confirms
+the four reviewer criteria, so that a document can be reported as
+conformant.
+
+---
+
 ## 2026-09-17, night — Two of the six reviewer criteria turn out to be checkable
 
 The Chairman asked whether the six criteria left to a reviewer were really

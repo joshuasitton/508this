@@ -226,11 +226,45 @@ The fix is deterministic: every run with text in the flagged paragraph gets
 the East Asian slot, ar-SA in the bidi slot), existing run properties kept.
 Re-detection then finds nothing, which is the contract.
 
+### Judgement criteria, screened
+
+1.3.3 Sensory Characteristics and 1.4.1 Use of Color stay reviewer-class:
+only a person can say whether "the box on the left" also has a label a
+screen reader gets. What a pattern can do is find every sentence that needs
+the judgement, so the reviewer reads twelve sentences instead of forty pages.
+`src/domain/phrases.ts` holds the patterns.
+
+A sensory phrase – a position ("on the left", "in the upper right corner"),
+a shape ("the round icon"), a size ("the large button"), a sound ("until you
+hear the tone") – counts only in a sentence that is telling the reader to do
+something. "The chapel on the left of the plaza" is description; "click the
+button on the left" is an instruction that fails without sight. "Above" and
+"below" are not in the list on purpose: WCAG's own guidance treats "see the
+section below" as a reference to reading order, and nearly every long
+document says it.
+
+Colour words need no instruction verb. "Required fields are marked in red"
+is an instruction in effect, and "figures shown in green are final" is a
+legend that nobody who cannot see green can use. "The Red Cross" and "the
+Green Party" stay quiet because the patterns want the colour attached to a
+thing on the page – a field, a link, a row – or to a marking verb.
+
+Two more 1.4.1 screens work on the markup rather than the prose. A run set
+in a colour among plain runs, with no bold, italic, underline or other cue,
+is emphasis a colour-blind reader does not get; hyperlinks and styled runs
+are skipped because their colour comes from a style that also underlines.
+And every embedded chart is flagged, because a chart whose series differ
+only by colour cannot be read by everyone and a chart of any kind cannot be
+read by a screen reader unless its data is also given as text.
+
+Images of text (1.4.5) would need OCR, which needs an engine. None is
+available without a dependency, so that one waits for the vision model pass
+the review queue will bring.
+
 ### What detection cannot see
 
-Images of text (1.4.5), colour as the only signal (1.4.1), instructions that
-rely on shape or position (1.3.3), and whether alt text is *good* are
-judgement calls. They are the reviewer's,
+Images of text (1.4.5), whether a flagged sentence really leaves a reader
+stranded (1.3.3, 1.4.1), and whether alt text is *good* are judgement calls. They are the reviewer's,
 and later a model's to propose. A check that guessed at them would produce
 findings nobody can act on and, worse, a clean report on a document that
 still fails.

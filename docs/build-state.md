@@ -4,6 +4,13 @@ The running project-level record. Sections are dated and kept in order rather
 than rewritten, so the reasoning stays readable. Decisions live in
 `docs/leadership-standup.md`; this file says where the code stands.
 
+## 2026-09-18 — Sensory and colour screens
+
+`src/domain/phrases.ts` (the patterns and sentence splitter), four kinds
+(`sensory`, `colour-words`, `colour-only`, `chart`), the checks in
+`docx.ts`. 1.3.3 and 1.4.1 remain "reviewer" with their remarks naming the
+screen. 90 tests. No OCR engine here, so 1.4.5 is unchanged.
+
 ## 2026-09-17, night — Reading order and language of parts
 
 `src/domain/language.ts` (the detector), reading-order and layout-table
