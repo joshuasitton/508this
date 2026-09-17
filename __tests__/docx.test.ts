@@ -211,3 +211,41 @@ test('a borderless multi-column table with paragraphs in its cells is a layout t
   assert.equal(findings[0]?.kind, 'layout-table');
   assert.match(findings[0]!.location, /^table 1/);
 });
+
+test('sensory and colour-word instructions are findings for a reviewer, once per sentence', () => {
+  const body =
+    heading(1, 'How to apply') +
+    p('To continue, click the button on the left. Required fields are marked in red.') +
+    p('See the table below for the full list. The Red Cross reviewed it.');
+  const findings = detectDocx(clean(body)).filter((f) => f.kind === 'sensory' || f.kind === 'colour-words');
+  assert.deepEqual(
+    findings.map((f) => [f.kind, f.criterion]),
+    [
+      ['sensory', '1.3.3'],
+      ['colour-words', '1.4.1'],
+    ],
+  );
+  assert.match(findings[0]!.description, /relies on a position on the page \(“on the left”\)/);
+  assert.match(findings[1]!.description, /uses colour as the signal \(“marked in red”\)/);
+});
+
+test('text set apart by colour alone is a 1.4.1 finding; with another cue, in a link, or as a whole paragraph it is not', () => {
+  const run = (t: string, rPr = '') => `<w:r>${rPr ? `<w:rPr>${rPr}</w:rPr>` : ''}<w:t xml:space="preserve">${t}</w:t></w:r>`;
+  const alone = `<w:p>${run('Deadline is ')}${run('30 June', '<w:color w:val="C00000"/>')}${run('.')}</w:p>`;
+  const withBold = `<w:p>${run('Deadline is ')}${run('30 June', '<w:color w:val="C00000"/><w:b/>')}${run('.')}</w:p>`;
+  const link = `<w:p>${run('See ')}<w:hyperlink r:id="rId1" xmlns:r="r">${run('the guidance page', '<w:rStyle w:val="Hyperlink"/><w:color w:val="0563C1"/>')}</w:hyperlink>${run('.')}</w:p>`;
+  const whole = `<w:p>${run('All of this ', '<w:color w:val="C00000"/>')}${run('is red.', '<w:color w:val="C00000"/>')}</w:p>`;
+  const themedText = `<w:p>${run('Plain ')}${run('also plain', '<w:color w:val="000000" w:themeColor="text1"/>')}</w:p>`;
+  const findings = byCriterion(clean(heading(1, 'x') + alone + withBold + link + whole + themedText), '1.4.1');
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0]?.kind, 'colour-only');
+  assert.equal(findings[0]?.location, 'paragraph 2 (“Deadline is 30 June.”)');
+  assert.match(findings[0]!.description, /“30 June” is set apart .* by colour alone \(#C00000\)/);
+});
+
+test('an embedded chart is a 1.4.1 finding for a reviewer', () => {
+  const chart = `<w:p><w:r><w:drawing><wp:inline xmlns:wp="p"><wp:docPr id="3" name="Chart 1" descr="Spend by quarter"/><a:graphic xmlns:a="a"><a:graphicData><c:chart xmlns:c="c" r:id="rId7" xmlns:r="r"/></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>`;
+  const findings = detectDocx(clean(heading(1, 'x') + chart)).filter((f) => f.kind === 'chart');
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0]?.location, 'chart 1, paragraph 2');
+});
