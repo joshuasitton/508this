@@ -27,7 +27,7 @@ function finding(kind: Kind, location: string, description: string, severity: Se
   return f;
 }
 
-interface StructElement {
+export interface StructElement {
   /** The tag after the role map has been applied: P, H1, Figure, Table… */
   role: string;
   /** The tag as written, which may be a designer's own style name. */

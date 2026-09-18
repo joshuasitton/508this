@@ -8,6 +8,60 @@ for. Where an entry has since been overtaken, `docs/build-state.md` says so.
 
 ---
 
+## 2026-09-18, late — "mostly PDF" changes the company, not just the sprint
+
+### What the Chairman said
+
+The documents will mostly be PDFs.
+
+### What that means, plainly
+
+The sprint was built around Word, on the reasoning that a `.docx` is XML and
+nearly everything the standard asks about is readable and rewritable. That
+reasoning is sound and now largely irrelevant. Tagged PDF export – next in
+the plan this morning – only matters when the input is a Word file, and has
+been dropped from the front of the queue.
+
+The harder consequence, which the team should not soften: **on the two real
+PDFs in hand, the service cannot make either one conformant.** The
+infographic goes from six open findings to four and the logo sheet from four
+to two, and both remain, correctly, non-conformant. A business whose inputs
+are mostly PDFs is a business whose product, as built, improves documents it
+cannot certify.
+
+### Decided by engineering, for the Chairman to overturn
+
+**Triage before more engineering.** `npm run triage` classifies a folder of
+real documents into scan, untagged, tagged and structured. The share in the
+last two is the share that any structure editing could ever reach. Two files
+is not a sample, and the two in hand are one of each. Building heading-level
+editing on a guess about that ratio is how a remediation service ends up
+able to fix the files nobody sends.
+
+**What the service may say per tier lives in the code**, in
+`promiseFor(tier)`, not in sales copy – so it cannot drift from what the
+software does. Two of the four tiers say in as many words that the document
+cannot be certified, and a test holds them to it.
+
+### The decision that is no longer queued
+
+**Pricing for untagged PDFs is not a pending item any more; it is the
+offer.** If most documents arrive untagged, "508This makes your document
+conformant" is false for most customers, and what replaces it has to be
+decided before anyone is sold anything. Marketing and sales both wait on
+this, and so does the landing page.
+
+### What was asked of the Chairman, and could not be done
+
+He asked for the PDF folder on his desktop to be used. This session runs in
+a cloud container, not on his Mac, and cannot reach it. Building the triage
+as a command he runs locally is the better answer anyway: the files are
+federal records, retention is still undecided, and the repository's own rule
+is that a customer document's contents never leave the box. The triage
+prints counts and tags and nothing else.
+
+---
+
 ## 2026-09-18, late — what a demo found that the tests did not
 
 ### Done

@@ -4,6 +4,46 @@ The running project-level record. Sections are dated and kept in order rather
 than rewritten, so the reasoning stays readable. Decisions live in
 `docs/leadership-standup.md`; this file says where the code stands.
 
+## 2026-09-18, late — PDF triage, before building any more
+
+The Chairman said the documents will mostly be PDFs. That changes the
+roadmap more than any code did today: a PDF is four different products
+wearing one file extension, and the tagged PDF export that was next in the
+sprint only matters when the input is a `.docx`.
+
+`npm run triage -- <folder>` classifies a folder into scan / untagged /
+tagged / structured and prints what the service can honestly promise for
+each. `src/domain/triage.ts` is the pure part, `scripts/triage.ts` walks the
+folder. It prints counts, page numbers and tags and **no document content**:
+it runs on the customer's machine over federal records, and the output is
+the kind of thing that gets pasted into a chat. 162 tests.
+
+**Why it was built before the next feature.** Structure editing only reaches
+the tagged and structured tiers. The share of real documents in those two
+decides whether the next build is heading levels in a tag tree or a
+different offer entirely, and two files is not a sample – the two in hand
+are one of each.
+
+**What the two known files say:**
+
+```
+HK-Hokua-LogoIdeas-v01.pdf      untagged     1 page,  0 figures,  0 paragraphs,  4 issues
+VA_CHERP_Infographic_v6.pdf     tagged       1 page,  4 figures, 12 paragraphs,  6 issues
+```
+
+**The finding behind it.** The infographic's tag tree was read directly: 12
+`P`, 13 `Span`, 7 `Sect`, 4 `Figure`, and InDesign role-maps a single
+`NormalParagraphStyle` to `P` for every paragraph. There are no headings in
+the structure because there were none in the source. Promoting one to `H2`
+is not the one-field edit alt text was: the `Figure` elements are indirect
+objects (25, 26, 27), which is why `/Alt` works, but the paragraph elements
+are **inline dictionaries inside their parent's `/K` array** with no object
+number to anchor to. It needs a path anchor, a rewrite of the parent object,
+and per-paragraph text extraction – content-stream parsing and ToUnicode
+decoding – so a reviewer can see which paragraph they are promoting. That is
+the biggest single piece since the reader, and it is not worth starting
+until the triage says what share of documents it would reach.
+
 ## 2026-09-18, night — one name field, and where the name lives
 
 Found by demonstrating the product, not by a test. The review queue asked for

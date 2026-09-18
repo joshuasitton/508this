@@ -345,6 +345,38 @@ service may claim. Reporting a PDF against the Word coverage table would
 claim seven checks that never ran, which is the same lie as saying "Supports"
 on nothing.
 
+### Triage: what kind of PDF is it?
+
+A PDF is four different products wearing one file extension, and which one a
+customer has sent decides whether the service can certify their document,
+improve it, or do nothing useful at all. `npm run triage -- <folder>` reads a
+folder of real documents and says which.
+
+| Tier | What it is | What 508This can honestly do |
+|---|---|---|
+| **scan** | no text layer on any page | nothing. Pictures of words need OCR first, which this is not |
+| **untagged** | real text, no tag tree | language and title, and that is all. **Cannot be certified** |
+| **tagged** | a tag tree with no headings in it | alternative text on the figures; the missing heading structure is the gap |
+| **structured** | tagged, with headings | the closest to certifiable; usually alt text and a reviewer's judgement |
+
+It exists because the roadmap after PDF-first depends entirely on what
+fraction of real customer documents are already tagged, and **guessing that
+number and building for the guess is how a remediation service ends up able
+to fix the files nobody sends.** Structure editing only reaches the last two
+tiers. If most of a customer's documents are untagged, the right answer is
+not more engineering, it is a different offer.
+
+`src/domain/triage.ts` also owns `promiseFor(tier)` — the sentence the
+service may truthfully say about a document of that kind. It lives with the
+code rather than in sales copy so it cannot drift from what the software
+actually does, and a test asserts that the two tiers which cannot reach
+conformance say so in as many words.
+
+The script prints counts, page numbers and tags and **never a word of any
+document's contents**. It runs on the customer's own machine over their own
+folder; the output is the sort of thing somebody pastes into a chat, and
+these are federal records.
+
 ### What is not here yet
 
 Writing fixes back into a PDF. The job page says so plainly rather than

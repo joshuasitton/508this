@@ -24,6 +24,7 @@ npm run typecheck     # tsc --noEmit
 npm run lint          # eslint, including the jsx-a11y rules
 npm run dev           # http://localhost:3000
 npm run build         # what Vercel runs
+npm run triage -- DIR # classify a folder of PDFs; prints no document content
 ```
 
 ## Where things are
