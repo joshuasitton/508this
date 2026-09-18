@@ -4,6 +4,38 @@ The running project-level record. Sections are dated and kept in order rather
 than rewritten, so the reasoning stays readable. Decisions live in
 `docs/leadership-standup.md`; this file says where the code stands.
 
+## 2026-09-18, night — one name field, and where the name lives
+
+Found by demonstrating the product, not by a test. The review queue asked for
+the reviewer's name in a hidden field on every decision form, so on the VA
+infographic – four undescribed figures, three forms each – there were
+**fifteen “Your name” boxes on one screen**, under a heading promising “type
+it once; each button below carries it”. The field at the top of that section
+was inert: it carried `form="none"` and submitted nothing.
+
+`setReviewer` in the job store is now the only thing that writes the name,
+and `decideAction` and `confirmAction` read it back from the record instead
+of taking it from the form. `reviewerName` in `domain/job.ts` normalises it
+in one place, because the same string is printed into the job record and into
+a text run of the Word conformance report, which rejects control characters
+outright. The decision controls appear only once there is a name; before
+that the findings are listed to read with a line saying what unlocks them.
+Handing over is a form under a disclosure, and decisions already made keep
+the name they were made under. 154 tests.
+
+**Verified in the browser**, because that is where the bug was: one name
+input before identifying and one after (the handover form), **zero hidden
+name fields**, thirteen decision buttons and seven Confirm buttons that only
+appear once a name exists, a decision correctly attributed with no name field
+in its form, and a handover that leaves the earlier decision attributed to
+the earlier reviewer.
+
+**A regression caught in the same pass:** `.reviewerLine` was a flex
+container from when it held a label beside an input. Leaving it flex once it
+became a sentence put every text node in its own flex item, so the name sat
+on one line and “. This name goes on the statement” began the next. It is a
+plain paragraph now.
+
 ## 2026-09-18, night — the statement as a Word file
 
 `src/domain/acr.ts` computes the Accessibility Conformance Report from a job:
