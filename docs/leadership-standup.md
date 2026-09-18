@@ -8,6 +8,48 @@ for. Where an entry has since been overtaken, `docs/build-state.md` says so.
 
 ---
 
+## 2026-09-18, late — what a demo found that the tests did not
+
+### Done
+
+The review queue asks for the reviewer's name once, and means it. It asked
+fifteen times on the Chairman's own infographic, under a heading promising
+once.
+
+### Worth the team's attention
+
+**This was found by running the product for somebody, not by a test, and
+every test was green while it was true.** 148 of them. What they check is
+what the code computes; nobody had looked at the screen with a real document
+on it since the queue was built, and the document that exposed it was the
+first one with four figures in it. Design's standing request — that a
+screen gets looked at with a real customer file before it is called done —
+is granted, and `docs/build-state.md` now records the browser check for each
+screen rather than only the test count.
+
+**The name moved to the record.** Engineering's reasoning, and it is the
+repo's usual one: the name was in two places at once, and the fact in
+question is whose name goes on a representation to the federal government.
+One writer, one reader, and a decision form that cannot supply a name at all.
+
+**Deciding now waits on a name.** Product's call. A decision nobody's name
+is on is not worth recording, so there is nothing to decide with until there
+is a name to record it under. The findings are still readable before that;
+only the controls wait.
+
+**Handing over does not rewrite history.** A second reviewer taking a job
+over is ordinary. Re-attributing what the first one vouched for would be
+forging a signature, so decisions keep the name they were made under and a
+test pins it.
+
+### Decisions needed from the Chairman
+
+The third contractor file is **withdrawn** at the Chairman's instruction; the
+two in hand are the scope. Retention and third-party calls, and pricing for
+untagged PDFs, are unchanged and still with him.
+
+---
+
 ## 2026-09-18, night — the deliverable is a file
 
 ### Done

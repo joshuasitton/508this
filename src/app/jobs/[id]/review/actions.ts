@@ -4,12 +4,20 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 
 import type { Decision } from '@/domain/findings';
-import { confirm, decide, unconfirm, undecide } from '@/server/jobs';
+import { confirm, decide, getJob, setReviewer, unconfirm, undecide } from '@/server/jobs';
 
 /**
- * The reviewer's hands. Every action needs a name, because the name goes on
- * the statement; a form without one goes back with the field marked. Nothing
- * about the document is logged on any path.
+ * The reviewer's hands.
+ *
+ * Every decision is attributed, because the name goes on the conformance
+ * statement and a statement with nobody's name on it is not an assurance.
+ * The name is set once by `identifyAction` and read from the job record by
+ * everything else; it is deliberately *not* a field on the decision forms.
+ * It used to be, and that meant fifteen "Your name" boxes on one screen, a
+ * promise at the top of the page that the page did not keep, and one fact
+ * stored in two places that could go out of step.
+ *
+ * Nothing about the document is logged on any path.
  */
 function field(formData: FormData, name: string): string {
   const v = formData.get(name);
@@ -23,10 +31,21 @@ function back(id: string, problem?: string): never {
   redirect(`/jobs/${id}/review${problem ? `?problem=${problem}` : ''}`);
 }
 
+/** The name that goes on the statement, set once for the job. */
+export async function identifyAction(formData: FormData): Promise<void> {
+  const id = field(formData, 'id');
+  if (!(await setReviewer(id, field(formData, 'reviewer')))) back(id, 'name');
+  back(id);
+}
+
+async function reviewerOf(id: string): Promise<string> {
+  return (await getJob(id))?.reviewer ?? '';
+}
+
 export async function decideAction(formData: FormData): Promise<void> {
   const id = field(formData, 'id');
   const key = field(formData, 'key');
-  const by = field(formData, 'reviewer');
+  const by = await reviewerOf(id);
   const action = field(formData, 'action');
   const value = field(formData, 'value');
   const note = field(formData, 'note');
@@ -49,7 +68,7 @@ export async function undoAction(formData: FormData): Promise<void> {
 
 export async function confirmAction(formData: FormData): Promise<void> {
   const id = field(formData, 'id');
-  const by = field(formData, 'reviewer');
+  const by = await reviewerOf(id);
   if (!by) back(id, 'name');
   await confirm(id, field(formData, 'criterion'), by);
   back(id);

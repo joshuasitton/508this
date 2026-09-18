@@ -69,6 +69,13 @@ npm run build         # what Vercel runs
 - **A dismissal is a judgement, not a change.** A reviewer can dismiss a
   finding with a reason; that removes it from the count and puts the name
   and reason in the report. It never touches the document.
+- **The reviewer's name lives on the job, not on a form.** `setReviewer` is
+  the only thing that writes it; `decideAction` and `confirmAction` read it
+  back from the record rather than trusting a field the form supplied. It was
+  a hidden input on every decision form once, which put fifteen “Your name”
+  boxes on one screen and two copies of one fact that could go out of step –
+  and the fact is whose name goes on a representation to the government.
+  Changing the reviewer never rewrites decisions already made.
 - **The catalogue is WCAG 2.0, not the newest WCAG.** The regulation
   incorporates 2.0 by reference. Adding a 2.1 or 2.2 criterion makes the report
   claim a legal requirement that does not exist. If a customer wants 2.2, that

@@ -471,9 +471,33 @@ with its remark, and a Confirm button that is disabled while any finding on
 it is still open. Confirming moves the row from "Needs Review" to "Supports"
 under the reviewer's name.
 
-**A name.** Asked once, carried in every form, printed on the statement. A
-statement with nobody's name on it is not an assurance, and an Accessibility
-Conformance Report is a representation to the government.
+**A name, asked before anything can be decided.** A statement with nobody's
+name on it is not an assurance, and an Accessibility Conformance Report is a
+representation to the government, so every decision is attributed. The
+reviewer says who they are once; `identifyAction` writes it to the job, and
+everything afterwards reads it from there.
+
+That is the second version of this. The first carried the name in a hidden
+field on each decision form, with a note at the top of the page promising
+"type it once; each button below carries it" — which the page did not do,
+because until a first decision existed there was nothing to carry, so every
+form rendered its own "Your name" box instead. On the VA infographic, with
+four undescribed figures and three forms each, that was **fifteen name boxes
+on one screen** under a heading saying the opposite. It was found by
+demonstrating the product rather than by a test, which is the argument for
+running the thing end to end and looking at it.
+
+Two things fixed it. The name moved to the record, so the page has exactly
+one field however many findings the document turned up and the actions read
+the name server-side rather than trusting a field the form supplies. And the
+decision controls appear only once there is a name — which is also the
+honest order, because a decision nobody's name is on is not worth recording.
+Until then the findings are listed to read, with a line saying what unlocks
+them.
+
+Handing over is a form too, under a disclosure. Decisions already made keep
+the name they were made under: re-attributing somebody else's judgement is
+forging a signature, and a test pins it.
 
 Every decision goes through one path in `src/server/jobs.ts`: the delivered
 document is rebuilt from the original – automatic remediation, then the
@@ -487,8 +511,8 @@ not what the button claimed; an applied decision that re-detection still
 finds is shown as "not applied", which is a bug report against the fix.
 
 There is no client JavaScript on the page. Every button is a form, the name
-field is an ordinary input, and a missing name or reason comes back as a
-sentence in a live region.
+field is an ordinary input, the handover is a `<details>`, and a missing name
+or reason comes back as a sentence in a live region.
 
 ### What is deliberately not here yet
 
@@ -496,9 +520,11 @@ Model-drafted proposals. The queue works today with the reviewer writing the
 alt text and the link wording; the next step drafts them with a vision model
 and a language model so the reviewer edits instead of writes. That is the
 first part of the product that sends anything out, and it waits on the
-retention decision. Accounts are also not here: the reviewer is a name
-typed on the first decision, which is right for a service run by one person
-and wrong the day there are two.
+retention decision. Accounts are also not here: the reviewer is a name typed
+on the job, which is right for a service run by one person and wrong the day
+there are two. What it buys in the meantime is that the name is *stated*
+rather than inferred, so the day it becomes a signed-in identity there is one
+place to change.
 
 ---
 

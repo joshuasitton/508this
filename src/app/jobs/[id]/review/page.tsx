@@ -4,9 +4,10 @@ import { notFound } from 'next/navigation';
 
 import { coverageOf, labelFor } from '@/domain/criteria';
 import { assessAll, describeSummary, findingKey, isOpen, summarise, type Finding } from '@/domain/findings';
+import { MAX_REVIEWER } from '@/domain/job';
 import { KINDS, REVIEW_INPUT } from '@/domain/kinds';
 import { getJob } from '@/server/jobs';
-import { confirmAction, decideAction, unconfirmAction, undoAction } from './actions';
+import { confirmAction, decideAction, identifyAction, unconfirmAction, undoAction } from './actions';
 import styles from './page.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -23,9 +24,15 @@ const PROBLEMS: Record<string, string> = {
 /**
  * The review queue: everything a person has to decide, one item at a time,
  * with the place, the quotation and the reason beside each. No client
- * JavaScript; every button is a form. The reviewer's name is asked once and
- * carried in each form, because it goes on the statement and a statement
- * with nobody's name on it is not an assurance.
+ * JavaScript; every button is a form.
+ *
+ * The reviewer says who they are once, before anything can be decided, and
+ * the name is then read from the job record rather than carried in each
+ * form. Carrying it in each form is what this page used to do, and on a PDF
+ * with four undescribed figures that was fifteen “Your name” boxes on one
+ * screen under a heading promising the opposite. Asking first is also the
+ * honest order: a decision nobody's name is on is not worth recording, so
+ * there is nothing to decide with until there is a name.
  *
  * Deciding writes into the document (alt text, link wording, decorative)
  * or into the record (a dismissal with its reason). Either way the job is
@@ -83,15 +90,30 @@ export default async function ReviewPage({
         <h2 id="who-title" className={styles.h2}>
           Reviewer
         </h2>
-        <p className={styles.note}>
-          Your name goes on the conformance statement beside every decision you make. Type it once; each button below
-          carries it.
-        </p>
-        <p className={styles.reviewerLine}>
-          <label htmlFor="reviewer-name">Name</label>{' '}
-          <input id="reviewer-name" form="none" defaultValue={reviewer} className={styles.input} readOnly={!!reviewer} />
-          {reviewer && <span className={styles.muted}> (set on your first decision)</span>}
-        </p>
+        {reviewer ? (
+          <>
+            <p className={styles.reviewerLine}>
+              Reviewing as <strong>{reviewer}</strong>. This name goes on the conformance statement beside every
+              decision you make.
+            </p>
+            <details className={styles.swap}>
+              <summary>Hand over to someone else</summary>
+              <p className={styles.note}>
+                Decisions already made keep the name they were made under. Changing this only affects what happens
+                next.
+              </p>
+              <IdentifyForm jobId={job.id} label="New reviewer’s name" button="Hand over" />
+            </details>
+          </>
+        ) : (
+          <>
+            <p className={styles.note}>
+              Your name goes on the conformance statement beside every decision you make, so say who you are before
+              deciding anything. You only type it once.
+            </p>
+            <IdentifyForm jobId={job.id} label="Your name" button="Start reviewing" />
+          </>
+        )}
       </section>
 
       <section aria-labelledby="decide-title">
@@ -99,8 +121,14 @@ export default async function ReviewPage({
           To decide
         </h2>
         {toDecide.length === 0 && <p className={styles.note}>Nothing waits on a decision.</p>}
+        {toDecide.length > 0 && !reviewer && (
+          <p className={styles.gate}>
+            Read them here; enter your name above to decide them. Every decision is recorded under the name it was
+            made under, so the statement can say who vouched for what.
+          </p>
+        )}
         {toDecide.map((f) => (
-          <ReviewItem key={findingKey(f)} f={f} jobId={job.id} reviewer={reviewer} />
+          <ReviewItem key={findingKey(f)} f={f} jobId={job.id} canDecide={!!reviewer} />
         ))}
       </section>
 
@@ -113,6 +141,7 @@ export default async function ReviewPage({
           any, are in the decisions above. Confirming one moves it from “Needs Review” to “Supports” in the statement,
           under your name.
         </p>
+        {!reviewer && <p className={styles.gate}>Enter your name above to confirm these.</p>}
         <ul className={styles.criteria}>
           {reviewCriteria.map((a) => {
             const c = job.confirmations?.[a.criterion];
@@ -140,8 +169,7 @@ export default async function ReviewPage({
                   <form action={confirmAction} className={styles.inline}>
                     <input type="hidden" name="id" value={job.id} />
                     <input type="hidden" name="criterion" value={a.criterion} />
-                    <ReviewerField reviewer={reviewer} />
-                    <button type="submit" className={styles.button} disabled={a.open.length > 0}>
+                    <button type="submit" className={styles.button} disabled={!reviewer || a.open.length > 0}>
                       Confirm
                     </button>
                   </form>
@@ -187,18 +215,26 @@ export default async function ReviewPage({
   );
 }
 
-function ReviewerField({ reviewer }: { reviewer: string }) {
-  return reviewer ? (
-    <input type="hidden" name="reviewer" value={reviewer} />
-  ) : (
-    <label className={styles.nameField}>
-      <span>Your name</span>
-      <input name="reviewer" required className={styles.input} />
-    </label>
+/**
+ * The one place a name is typed. Everything else reads it from the job, so
+ * there is exactly one field on the page whatever the document turned up.
+ */
+function IdentifyForm({ jobId, label, button }: { jobId: string; label: string; button: string }) {
+  return (
+    <form action={identifyAction} className={styles.identify}>
+      <input type="hidden" name="id" value={jobId} />
+      <label className={styles.nameField}>
+        <span>{label}</span>
+        <input name="reviewer" required maxLength={MAX_REVIEWER} autoComplete="name" className={styles.input} />
+      </label>
+      <button type="submit" className={styles.button}>
+        {button}
+      </button>
+    </form>
   );
 }
 
-function ReviewItem({ f, jobId, reviewer }: { f: Finding; jobId: string; reviewer: string }) {
+function ReviewItem({ f, jobId, canDecide }: { f: Finding; jobId: string; canDecide: boolean }) {
   const info = KINDS[f.kind];
   const input = REVIEW_INPUT[f.kind];
   const key = findingKey(f);
@@ -206,7 +242,6 @@ function ReviewItem({ f, jobId, reviewer }: { f: Finding; jobId: string; reviewe
     <>
       <input type="hidden" name="id" value={jobId} />
       <input type="hidden" name="key" value={key} />
-      <ReviewerField reviewer={reviewer} />
     </>
   );
   return (
@@ -219,7 +254,7 @@ function ReviewItem({ f, jobId, reviewer }: { f: Finding; jobId: string; reviewe
       </p>
       <p className={styles.why}>{info.why}</p>
 
-      {input === 'alt' && (
+      {canDecide && input === 'alt' && (
         <div className={styles.forms}>
           <form action={decideAction} className={styles.form}>
             {base}
@@ -242,7 +277,7 @@ function ReviewItem({ f, jobId, reviewer }: { f: Finding; jobId: string; reviewe
         </div>
       )}
 
-      {input === 'text' && (
+      {canDecide && input === 'text' && (
         <form action={decideAction} className={styles.form}>
           {base}
           <input type="hidden" name="action" value="apply" />
@@ -256,6 +291,7 @@ function ReviewItem({ f, jobId, reviewer }: { f: Finding; jobId: string; reviewe
         </form>
       )}
 
+      {canDecide && (
       <form action={decideAction} className={styles.form}>
         {base}
         <input type="hidden" name="action" value="dismiss" />
@@ -267,6 +303,7 @@ function ReviewItem({ f, jobId, reviewer }: { f: Finding; jobId: string; reviewe
           Dismiss
         </button>
       </form>
+      )}
     </article>
   );
 }

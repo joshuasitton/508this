@@ -25,7 +25,7 @@ import { detectPdf } from '@/domain/pdfDetect';
 import { applyPdfDecisions, remediatePdf } from '@/domain/pdfRemediate';
 import type { PdfValue } from '@/domain/pdf';
 import { findingKey, isOpen, summarise, type Decision, type Finding } from '@/domain/findings';
-import type { Format, Job } from '@/domain/job';
+import { reviewerName, type Format, type Job } from '@/domain/job';
 import { applyDecisions, remediateDocx } from '@/domain/remediate';
 import { readDocxParts, writeDocx } from './docx';
 import { readPdf, writePdf } from './pdf';
@@ -180,6 +180,26 @@ function statusOf(job: Job): Job['status'] {
   const touched = job.findings.some((f) => f.decision) || confirmed.size > 0;
   if (touched) return 'in-review';
   return job.remediatedAt ? 'remediated' : 'detected';
+}
+
+/**
+ * Who is reviewing this job. The name is asked once, stored here, and read
+ * from here by every decision – it is never carried in the form that makes
+ * the decision. A name in a hidden field is a second copy of the same fact,
+ * and the two copies going out of step would put the wrong person's name
+ * beside a decision on a federal conformance statement.
+ *
+ * Changing it does not touch decisions already made: each one recorded the
+ * name it was made under, and rewriting those would be forging a signature.
+ */
+export async function setReviewer(id: string, name: string): Promise<Job | null> {
+  const job = await getJob(id);
+  if (!job) return null;
+  const clean = reviewerName(name);
+  if (!clean) return null;
+  job.reviewer = clean;
+  await writeFile(path.join(dirFor(id), 'job.json'), JSON.stringify(job, null, 2));
+  return job;
 }
 
 /** A reviewer's decision on one finding, then a rebuild. Returns null for an unknown job or finding. */

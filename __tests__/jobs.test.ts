@@ -10,7 +10,8 @@ import { zip } from './helpers/zip';
 // module is loaded and the module is loaded dynamically.
 const root = mkdtempSync(path.join(tmpdir(), '508this-jobs-'));
 process.env.DOCUMENTS_DIR = root;
-const { confirm, createJob, decide, getJob, getJobFile, remediateJob, unconfirm, undecide } = await import('../src/server/jobs');
+const { confirm, createJob, decide, getJob, getJobFile, remediateJob, setReviewer, unconfirm, undecide } =
+  await import('../src/server/jobs');
 const { unzip } = await import('../src/server/unzip');
 
 const W = 'xmlns:w="w"';
@@ -130,4 +131,41 @@ test('a reviewer’s decisions and confirmations take a job from remediated to d
   assert.equal(j.findings[0]!.remediated, false, 'undoing the decision rebuilds without it');
   assert.equal(j.findings[0]!.decision, undefined);
   assert.equal(await decide(job.id, 'no-such|finding', { action: 'dismiss', by, at }), null);
+});
+
+test('the reviewer is named once, and the name is the job\u2019s rather than a form\u2019s', async () => {
+  // The review page used to carry the name in a hidden field on every
+  // decision form \u2013 fifteen of them on a PDF with four undescribed figures.
+  // The name now lives here, so there is one field on the page and one copy
+  // of the fact.
+  const job = await createJob('named.docx', 'docx', docx);
+  assert.equal(job.reviewer, undefined);
+  const named = (await setReviewer(job.id, '  J.\tSitton  '))!;
+  assert.equal(named.reviewer, 'J. Sitton', 'normalised on the way in');
+  assert.equal((await getJob(job.id))!.reviewer, 'J. Sitton', 'and written to the record');
+});
+
+test('a blank name is refused rather than stored as a nameless signature', async () => {
+  const job = await createJob('blank.docx', 'docx', docx);
+  assert.equal(await setReviewer(job.id, '   '), null);
+  assert.equal((await getJob(job.id))!.reviewer, undefined);
+  assert.equal(await setReviewer('00000000-0000-4000-8000-00000000dead', 'Nobody'), null);
+});
+
+test('handing over does not rewrite the decisions the last reviewer made', async () => {
+  // A second reviewer taking the job over is normal; re-attributing what the
+  // first one already vouched for would be forging a signature.
+  const job = await remediateJob((await createJob('handover.docx', 'docx', docx)).id);
+  const first = job!.findings.find((f) => !f.remediated);
+  await setReviewer(job!.id, 'First Reviewer');
+  await decide(job!.id, `${first!.kind}|${first!.location}`, {
+    action: 'dismiss',
+    note: 'Checked by hand.',
+    by: 'First Reviewer',
+    at: new Date().toISOString(),
+  });
+  const after = (await setReviewer(job!.id, 'Second Reviewer'))!;
+  assert.equal(after.reviewer, 'Second Reviewer');
+  const decided = after.findings.find((f) => f.decision)!;
+  assert.equal(decided.decision!.by, 'First Reviewer');
 });

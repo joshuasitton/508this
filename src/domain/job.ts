@@ -102,6 +102,34 @@ export function describeUploadProblem(reason: UploadProblem): string {
   }
 }
 
+/**
+ * The longest a reviewer's name may be. It is printed in a table cell of
+ * the conformance statement beside every decision they made, so it has to
+ * fit on a line; it is not a security boundary.
+ */
+export const MAX_REVIEWER = 120;
+
+/**
+ * A reviewer's name, as it will appear on the statement.
+ *
+ * It is normalised in one place because it is written into two documents
+ * that are not the same kind of thing – the Word conformance report and the
+ * job record – and a name that differed between them would put two people's
+ * signatures on one assurance. Control characters go because Word rejects
+ * them outright in a text run; runs of whitespace collapse because a name
+ * pasted out of a signature block arrives with newlines in it.
+ *
+ * Returns the empty string for anything that is not a usable name, and the
+ * caller treats that as "no name given" rather than storing a blank.
+ */
+export function reviewerName(raw: string): string {
+  const clean = raw
+    .replace(/[\x00-\x1f\x7f]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return clean.slice(0, MAX_REVIEWER).trim();
+}
+
 /** Progress-to-delivery in the customer's words. */
 export function describeStatus(status: JobStatus): string {
   switch (status) {
