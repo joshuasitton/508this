@@ -3,30 +3,34 @@ import assert from 'node:assert/strict';
 
 import { MAX_UPLOAD_BYTES, checkUpload, describeStatus, describeUploadProblem, formatFor } from '../src/domain/job';
 
-const PK = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x14, 0x00]);
+const PK = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x14, 0x00]); // a zip, so a .docx
+const PDF = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31]); // "%PDF-1"
 const NOT_PK = new Uint8Array([0xd0, 0xcf, 0x11, 0xe0]); // a legacy .doc
 
-test('only .docx is accepted, case-insensitively', () => {
+test('Word documents and PDFs are accepted, case-insensitively; nothing else is', () => {
   assert.equal(formatFor('Report.DOCX'), 'docx');
-  assert.equal(formatFor('report.pdf'), null);
+  assert.equal(formatFor('Infographic.PDF'), 'pdf');
+  assert.equal(formatFor('deck.pptx'), null);
   assert.equal(formatFor('report.doc'), null);
 });
 
 test('problems are reported in the order a person can act on them', () => {
   assert.deepEqual(checkUpload('', 0, PK), { ok: false, reason: 'no-file' });
-  assert.deepEqual(checkUpload('report.pdf', 10, PK), { ok: false, reason: 'unsupported-format' });
+  assert.deepEqual(checkUpload('deck.pptx', 10, PK), { ok: false, reason: 'unsupported-format' });
   assert.deepEqual(checkUpload('report.docx', MAX_UPLOAD_BYTES + 1, PK), { ok: false, reason: 'too-large' });
   assert.deepEqual(checkUpload('report.docx', 10, NOT_PK), { ok: false, reason: 'not-a-document' });
   assert.deepEqual(checkUpload('report.docx', MAX_UPLOAD_BYTES, PK), { ok: true, format: 'docx' });
+  assert.deepEqual(checkUpload('infographic.pdf', 1000, PDF), { ok: true, format: 'pdf' });
 });
 
-test('a renamed legacy .doc is caught by its signature, not its name', () => {
-  // The most common bad upload: someone renames report.doc to report.docx.
-  // The reader would fail on it later with a zip error; the person deserves
-  // the sentence that tells them what to do instead.
-  const r = checkUpload('report.docx', 100, NOT_PK);
-  assert.equal(r.ok, false);
-  assert.match(describeUploadProblem(r.ok ? 'no-file' : r.reason), /save it as \.docx/);
+test('each format is checked against its own signature, so a file whose name lies is caught', () => {
+  // The two common bad uploads: someone renames report.doc to report.docx,
+  // and someone renames a PDF to .docx because the form asked for Word.
+  // Either would fail later with something unhelpful from a reader.
+  assert.deepEqual(checkUpload('report.docx', 100, NOT_PK), { ok: false, reason: 'not-a-document' });
+  assert.deepEqual(checkUpload('report.docx', 100, PDF), { ok: false, reason: 'not-a-document' });
+  assert.deepEqual(checkUpload('report.pdf', 100, PK), { ok: false, reason: 'not-a-document' });
+  assert.match(describeUploadProblem('not-a-document'), /not what its name says/);
 });
 
 test('every status and problem has a sentence', () => {

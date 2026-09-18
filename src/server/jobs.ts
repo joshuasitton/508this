@@ -21,10 +21,12 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 
 import { detectDocx } from '@/domain/docx';
+import { detectPdf } from '@/domain/pdfDetect';
 import { findingKey, isOpen, summarise, type Decision, type Finding } from '@/domain/findings';
 import type { Format, Job } from '@/domain/job';
 import { applyDecisions, remediateDocx } from '@/domain/remediate';
 import { readDocxParts, writeDocx } from './docx';
+import { readPdf } from './pdf';
 
 const ROOT = process.env.DOCUMENTS_DIR ?? path.join(process.cwd(), 'documents');
 const ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -34,10 +36,15 @@ function dirFor(id: string): string {
   return path.join(ROOT, id);
 }
 
+/** Detection for whichever format the job is. The one place the two paths meet. */
+function detect(format: Format, bytes: Uint8Array): Finding[] {
+  return format === 'pdf' ? detectPdf(readPdf(bytes)) : detectDocx(readDocxParts(bytes));
+}
+
 export async function createJob(filename: string, format: Format, bytes: Uint8Array): Promise<Job> {
   // Detect before writing anything, so a document the reader rejects is
   // never stored.
-  const findings = detectDocx(readDocxParts(bytes));
+  const findings = detect(format, bytes);
   const job: Job = {
     id: randomUUID(),
     createdAt: new Date().toISOString(),
@@ -90,13 +97,16 @@ async function redetect(job: Job): Promise<Job> {
 export type JobFile = 'original' | 'remediated';
 
 /** The bytes of a job's document, or null if the job or the file does not exist. */
-export async function getJobFile(id: string, which: JobFile): Promise<{ bytes: Uint8Array; filename: string } | null> {
+export async function getJobFile(
+  id: string,
+  which: JobFile,
+): Promise<{ bytes: Uint8Array; filename: string; format: Job['format'] } | null> {
   const job = await getJob(id);
   if (!job) return null;
   if (which === 'remediated' && !job.remediatedAt) return null;
   try {
     const bytes = await readFile(path.join(dirFor(id), `${which}.${job.format}`));
-    return { bytes: new Uint8Array(bytes), filename: deliveredName(job.filename, which) };
+    return { bytes: new Uint8Array(bytes), filename: deliveredName(job.filename, which), format: job.format };
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
     throw error;
@@ -133,11 +143,22 @@ export async function remediateJob(id: string): Promise<Job | null> {
  */
 async function rebuild(job: Job): Promise<Job> {
   const original = new Uint8Array(await readFile(path.join(dirFor(job.id), `original.${job.format}`)));
+  // Automatic remediation is a .docx path for now; a PDF job is detected,
+  // reviewed and reported, and its findings go to a person. The PDF
+  // remediator is the next branch, and until it exists saying otherwise
+  // would be a promise the service cannot keep.
+  if (job.format === 'pdf') {
+    const findings = job.findings.map((f) => ({ ...f }));
+    const updated: Job = { ...job, findings };
+    updated.status = statusOf(updated);
+    await writeFile(path.join(dirFor(job.id), 'job.json'), JSON.stringify(updated, null, 2));
+    return updated;
+  }
   const parts = readDocxParts(original);
   const auto = remediateDocx(parts, { fallbackTitle: stem(job.filename) });
   const reviewed = applyDecisions(auto.parts, job.findings);
   const remediated = writeDocx(original, reviewed.parts);
-  const after = detectDocx(readDocxParts(remediated));
+  const after = detect(job.format, remediated);
 
   const still = new Set(after.map(key));
   const findings: Finding[] = job.findings.map((f) => ({ ...f, remediated: !still.has(key(f)) }));
@@ -163,7 +184,7 @@ async function rebuild(job: Job): Promise<Job> {
  */
 function statusOf(job: Job): Job['status'] {
   const confirmed = new Set(Object.keys(job.confirmations ?? {}));
-  if (summarise(job.findings, 'document', confirmed).conforms) return 'delivered';
+  if (summarise(job.findings, job.format, confirmed).conforms) return 'delivered';
   const touched = job.findings.some((f) => f.decision) || confirmed.size > 0;
   if (touched) return 'in-review';
   return job.remediatedAt ? 'remediated' : 'detected';

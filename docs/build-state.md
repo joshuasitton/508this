@@ -4,6 +4,31 @@ The running project-level record. Sections are dated and kept in order rather
 than rewritten, so the reasoning stays readable. Decisions live in
 `docs/leadership-standup.md`; this file says where the code stands.
 
+## 2026-09-18, later — PDFs are read, checked and reported
+
+`src/domain/pdf.ts` (the parser: object grammar, classic and stream cross
+references, PNG predictors, object streams, `/Prev` chains, scan-to-rebuild
+recovery), `src/server/pdf.ts` (inflate), `src/domain/pdfDetect.ts` (the
+checks), three PDF finding kinds, `PDF_COVERAGE` and a per-format
+`ContentKind`. Intake accepts `.pdf` and checks the `%PDF` signature.
+111 tests.
+
+**Verified** against the two real contractor files, in the browser on the
+production build. The logo sheet: four findings, three blocking, led by the
+missing tag tree. The infographic: six findings across four figures with no
+alternative text, no headings, and a title that is never displayed. Both show
+seven criteria waiting on a reviewer and the statement says "Non-web document
+(PDF)". The Word flow still reaches "Conforms to Section 508", checked in the
+same run.
+
+**A regression caught by that browser run, not by the tests:** a bulk rename
+of the `'document'` content kind to `'docx'` also renamed the upload form's
+field, so every upload of either format came back "Choose a document to
+upload". The domain tests all passed. The browser is the only thing that saw
+it.
+
+**Next:** writing fixes back into a PDF, by incremental update.
+
 ## 2026-09-18 — The review queue
 
 `/jobs/[id]/review` with its actions; `Decision`, `isOpen`, `findingKey`,

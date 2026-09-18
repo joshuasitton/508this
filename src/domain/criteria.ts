@@ -22,8 +22,18 @@ export type Level = 'A' | 'AA';
 
 export type Principle = 'Perceivable' | 'Operable' | 'Understandable' | 'Robust';
 
-/** What kind of thing is being assessed. Decides which criteria apply. */
-export type ContentKind = 'web' | 'document';
+/**
+ * What is being assessed. It decides two things: which criteria apply at all
+ * (E205.4 exempts non-web documents from four of them) and, for a document,
+ * what the service is able to check by machine. Those differ by format – a
+ * .docx says its text colour in an attribute, a PDF says it in a content
+ * stream nobody here interprets – so the format is part of the kind.
+ */
+export type ContentKind = 'web' | 'docx' | 'pdf';
+
+export function isDocument(kind: ContentKind): boolean {
+  return kind !== 'web';
+}
 
 export interface Criterion {
   /** WCAG 2.0 number, e.g. "1.1.1". Unique across the catalogue. */
@@ -131,13 +141,22 @@ export function criteriaFor(kind: ContentKind): Criterion[] {
  * Review" in the report, never "Supports", because a buyer reads Supports
  * as a claim and the claim has to have a basis.
  *
- * - checked: an automated check in `docx.ts` covers it.
+ * - checked: an automated check covers it, in `docx.ts` or `pdfDetect.ts`.
  * - static: a Word document with no interactive or time-based content has
  *   nothing this criterion governs. The detector emits a finding if it sees
  *   media or form fields, which moves the criterion out of this class for
  *   that document.
  * - reviewer: only a person can tell. Colour as the only signal, sensory
  *   instructions, images of text, whether headings describe their sections.
+ *
+ * The three classes are not the same for every format, and pretending they
+ * were would be the same lie as saying "Supports" on nothing. A .docx names
+ * its text colour in an attribute, so contrast is checked; a PDF paints text
+ * with operators in a content stream, and short of interpreting the whole
+ * graphics state nothing here can measure it, so for a PDF contrast is a
+ * reviewer's job and the report says so. Seven criteria need a person for a
+ * PDF against four for a Word file, and that is the honest count, not a
+ * defect to be papered over.
  */
 export type Coverage = 'checked' | 'static' | 'reviewer';
 
@@ -151,7 +170,7 @@ const STATIC_INTERACTIVE = 'A static document has no interactive content this cr
 const STATIC_MEDIA = 'The document contains no audio or video.';
 const STATIC_FORMS = 'The document contains no form fields.';
 
-export const DOCUMENT_COVERAGE: Record<string, CoverageInfo> = {
+export const WORD_COVERAGE: Record<string, CoverageInfo> = {
   '1.1.1': { coverage: 'checked', remark: 'Every image has alternative text or is marked decorative.' },
   '1.2.1': { coverage: 'static', remark: STATIC_MEDIA },
   '1.2.2': { coverage: 'static', remark: STATIC_MEDIA },
@@ -192,8 +211,62 @@ export const DOCUMENT_COVERAGE: Record<string, CoverageInfo> = {
   '4.1.2': { coverage: 'static', remark: STATIC_FORMS },
 };
 
-export function coverageOf(id: string): CoverageInfo | undefined {
-  return DOCUMENT_COVERAGE[id];
+const PDF_STATIC_INTERACTIVE = 'A static PDF has no interactive content this criterion governs.';
+const PDF_MEDIA = 'The PDF embeds no audio or video.';
+const PDF_FORMS = 'The PDF has no form fields.';
+
+export const PDF_COVERAGE: Record<string, CoverageInfo> = {
+  '1.1.1': { coverage: 'checked', remark: 'Every figure in the tag tree carries alternative text.' },
+  '1.2.1': { coverage: 'static', remark: PDF_MEDIA },
+  '1.2.2': { coverage: 'static', remark: PDF_MEDIA },
+  '1.2.3': { coverage: 'static', remark: PDF_MEDIA },
+  '1.2.4': { coverage: 'static', remark: PDF_MEDIA },
+  '1.2.5': { coverage: 'static', remark: PDF_MEDIA },
+  '1.3.1': { coverage: 'checked', remark: 'The PDF is tagged, its headings run in order and its tables have header cells.' },
+  '1.3.2': { coverage: 'reviewer', remark: 'A reviewer confirms the tag order matches the visual order of the page.' },
+  '1.3.3': { coverage: 'reviewer', remark: 'A reviewer confirms no instruction relies on shape, size, position or sound alone.' },
+  '1.4.1': { coverage: 'reviewer', remark: 'A reviewer confirms colour is never the only way information is conveyed.' },
+  '1.4.2': { coverage: 'static', remark: PDF_MEDIA },
+  '1.4.3': {
+    coverage: 'reviewer',
+    remark: 'A reviewer confirms the contrast of text against its background. A PDF paints text with content-stream operators, so this is not measured by machine.',
+  },
+  '1.4.4': { coverage: 'static', remark: 'The PDF has a real text layer, which reflows and scales in a reader.' },
+  '1.4.5': { coverage: 'reviewer', remark: 'A reviewer confirms no image is used in place of text.' },
+  '2.1.1': { coverage: 'static', remark: PDF_STATIC_INTERACTIVE },
+  '2.1.2': { coverage: 'static', remark: PDF_STATIC_INTERACTIVE },
+  '2.2.1': { coverage: 'static', remark: PDF_STATIC_INTERACTIVE },
+  '2.2.2': { coverage: 'static', remark: 'The PDF has no moving or auto-updating content.' },
+  '2.3.1': { coverage: 'static', remark: 'The PDF has no flashing content.' },
+  '2.4.1': { coverage: 'static', remark: 'Not required for documents.' },
+  '2.4.2': { coverage: 'checked', remark: 'The PDF has a title and is set to show it in the window.' },
+  '2.4.3': { coverage: 'static', remark: PDF_STATIC_INTERACTIVE },
+  '2.4.4': { coverage: 'checked', remark: 'Every link says where it goes.' },
+  '2.4.5': { coverage: 'static', remark: 'Not required for documents.' },
+  '2.4.6': { coverage: 'reviewer', remark: 'A reviewer confirms headings describe their sections.' },
+  '2.4.7': { coverage: 'static', remark: PDF_STATIC_INTERACTIVE },
+  '3.1.1': { coverage: 'checked', remark: 'The PDF declares its language.' },
+  '3.1.2': { coverage: 'reviewer', remark: 'A reviewer confirms passages in another language are marked.' },
+  '3.2.1': { coverage: 'static', remark: PDF_STATIC_INTERACTIVE },
+  '3.2.2': { coverage: 'static', remark: PDF_FORMS },
+  '3.2.3': { coverage: 'static', remark: 'Not required for documents.' },
+  '3.2.4': { coverage: 'static', remark: 'Not required for documents.' },
+  '3.3.1': { coverage: 'static', remark: PDF_FORMS },
+  '3.3.2': { coverage: 'static', remark: PDF_FORMS },
+  '3.3.3': { coverage: 'static', remark: PDF_FORMS },
+  '3.3.4': { coverage: 'static', remark: PDF_FORMS },
+  '4.1.1': { coverage: 'checked', remark: 'The PDF\u2019s structure parsed without error.' },
+  '4.1.2': { coverage: 'static', remark: PDF_FORMS },
+};
+
+export const COVERAGE: Record<Exclude<ContentKind, 'web'>, Record<string, CoverageInfo>> = {
+  docx: WORD_COVERAGE,
+  pdf: PDF_COVERAGE,
+};
+
+export function coverageOf(id: string, kind: ContentKind = 'docx'): CoverageInfo | undefined {
+  if (kind === 'web') return undefined;
+  return COVERAGE[kind][id];
 }
 
 /** Short form used everywhere a criterion is named to a person: "1.1.1 Non-text Content". */

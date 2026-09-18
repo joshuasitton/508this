@@ -16,7 +16,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const utf8 = encodeURIComponent(file.filename);
   return new Response(Buffer.from(file.bytes), {
     headers: {
-      'Content-Type': ACCEPTED.docx.mime,
+      'Content-Type': ACCEPTED[file.format].mime,
       'Content-Disposition': `attachment; filename="${ascii}"; filename*=UTF-8''${utf8}`,
       'Content-Length': String(file.bytes.byteLength),
       'Cache-Control': 'private, no-store',

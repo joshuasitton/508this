@@ -35,20 +35,20 @@ const scanned: Finding = {
 const fixed = (f: Finding): Finding => ({ ...f, remediated: true });
 
 test('a criterion with no open findings Supports', () => {
-  assert.equal(assess('1.1.1', [], 'document').status, 'Supports');
-  assert.equal(assess('1.1.1', [fixed(missingAlt)], 'document').status, 'Supports');
+  assert.equal(assess('1.1.1', [], 'docx').status, 'Supports');
+  assert.equal(assess('1.1.1', [fixed(missingAlt)], 'docx').status, 'Supports');
 });
 
 test('a partial finding makes Partially Supports; a blocking one makes Does Not Support', () => {
-  assert.equal(assess('1.1.1', [missingAlt], 'document').status, 'Partially Supports');
-  assert.equal(assess('1.1.1', [missingAlt, scanned], 'document').status, 'Does Not Support');
+  assert.equal(assess('1.1.1', [missingAlt], 'docx').status, 'Partially Supports');
+  assert.equal(assess('1.1.1', [missingAlt, scanned], 'docx').status, 'Does Not Support');
 });
 
 test('remediated findings do not count against the delivered document', () => {
   // Deliberate: the report describes what we hand back, not what we received.
   // Counting fixed findings would mean a perfectly remediated document could
   // never be reported as conformant, which is the one thing the customer buys.
-  const a = assess('1.1.1', [fixed(scanned), missingAlt], 'document');
+  const a = assess('1.1.1', [fixed(scanned), missingAlt], 'docx');
   assert.equal(a.status, 'Partially Supports');
   assert.deepEqual(a.open, [missingAlt]);
 });
@@ -57,7 +57,7 @@ test('an exempt criterion is Not Applicable to a document even with a finding fi
   // A finding mis-filed under 2.4.1 on a PDF must not fail the document. The
   // standard exempts it; our bookkeeping does not get a vote.
   const stray: Finding = { ...missingAlt, criterion: '2.4.1' };
-  assert.equal(assess('2.4.1', [stray], 'document').status, 'Not Applicable');
+  assert.equal(assess('2.4.1', [stray], 'docx').status, 'Not Applicable');
   assert.equal(assess('2.4.1', [stray], 'web').status, 'Partially Supports');
 });
 
@@ -67,27 +67,27 @@ test('a document conforms when nothing it owes is open and every reviewer criter
   // Deliberate: with nothing confirmed, an empty findings list is NOT
   // conformance. Four criteria can only be vouched for by a person, and
   // "nobody looked" must never read as "Supports" to a federal buyer.
-  assert.equal(conforms([], 'document'), false);
-  assert.equal(conforms([], 'document', ALL_REVIEWER), true);
-  assert.equal(conforms([missingAlt], 'document', ALL_REVIEWER), false);
-  assert.equal(conforms([fixed(missingAlt)], 'document', ALL_REVIEWER), true);
+  assert.equal(conforms([], 'docx'), false);
+  assert.equal(conforms([], 'docx', ALL_REVIEWER), true);
+  assert.equal(conforms([missingAlt], 'docx', ALL_REVIEWER), false);
+  assert.equal(conforms([fixed(missingAlt)], 'docx', ALL_REVIEWER), true);
   const stray: Finding = { ...missingAlt, criterion: '3.2.3' };
-  assert.equal(conforms([stray], 'document', ALL_REVIEWER), true, 'exempt criterion cannot block a document');
+  assert.equal(conforms([stray], 'docx', ALL_REVIEWER), true, 'exempt criterion cannot block a document');
   assert.equal(conforms([stray], 'web', ALL_REVIEWER), false);
 });
 
 test('a criterion only a person can vouch for is Needs Review until confirmed, never Supports by default', () => {
-  assert.equal(assess('1.4.1', [], 'document').status, 'Needs Review');
-  assert.equal(assess('1.4.1', [], 'document', new Set(['1.4.1'])).status, 'Supports');
-  assert.equal(assess('2.1.1', [], 'document').status, 'Supports', 'static: a document has nothing this governs');
-  assert.equal(assess('1.1.1', [], 'document').status, 'Supports', 'checked: the detector looked');
-  assert.match(describeRemarks(assess('1.4.1', [], 'document')), /^Waiting on a reviewer\./);
-  assert.match(describeRemarks(assess('2.1.1', [], 'document')), /static document/);
-  assert.match(describeRemarks(assess('1.1.1', [], 'document')), /alternative text/);
+  assert.equal(assess('1.4.1', [], 'docx').status, 'Needs Review');
+  assert.equal(assess('1.4.1', [], 'docx', new Set(['1.4.1'])).status, 'Supports');
+  assert.equal(assess('2.1.1', [], 'docx').status, 'Supports', 'static: a document has nothing this governs');
+  assert.equal(assess('1.1.1', [], 'docx').status, 'Supports', 'checked: the detector looked');
+  assert.match(describeRemarks(assess('1.4.1', [], 'docx')), /^Waiting on a reviewer\./);
+  assert.match(describeRemarks(assess('2.1.1', [], 'docx')), /static document/);
+  assert.match(describeRemarks(assess('1.1.1', [], 'docx')), /alternative text/);
 });
 
 test('assessAll covers every criterion once, in catalogue order', () => {
-  const all = assessAll([], 'document');
+  const all = assessAll([], 'docx');
   assert.equal(all.length, 38);
   assert.equal(all[0]!.criterion, '1.1.1');
   assert.equal(all[37]!.criterion, '4.1.2');
@@ -106,19 +106,19 @@ test('progress is a fraction of findings remediated, and an empty job is complet
 
 test('the report sentence is owned here, one per status', () => {
   assert.equal(
-    describeAssessment(assess('1.1.1', [], 'document')),
+    describeAssessment(assess('1.1.1', [], 'docx')),
     '1.1.1 Non-text Content: every image has alternative text or is marked decorative.',
   );
   assert.equal(
-    describeAssessment(assess('2.4.1', [], 'document')),
+    describeAssessment(assess('2.4.1', [], 'docx')),
     '2.4.1 Bypass Blocks: not required for this content under E205.4.',
   );
   assert.equal(
-    describeAssessment(assess('1.1.1', [missingAlt], 'document')),
+    describeAssessment(assess('1.1.1', [missingAlt], 'docx')),
     '1.1.1 Non-text Content: 1 open issue (page 3).',
   );
   assert.equal(
-    describeAssessment(assess('1.1.1', [missingAlt, scanned], 'document')),
+    describeAssessment(assess('1.1.1', [missingAlt, scanned], 'docx')),
     '1.1.1 Non-text Content: 2 open issues (page 3, pages 1–12).',
   );
 });
@@ -142,7 +142,7 @@ test('the summary counts what the document owes and what is open, and its headli
   // 34 owed for a document. One partial finding on 1.1.1 → 1 criterion short,
   // 0 blocking, 1 other. The stray 2.4.1 finding is exempt and counts nowhere.
   const stray: Finding = { ...missingAlt, criterion: '2.4.1' };
-  const s = summarise([missingAlt, scanned, stray], 'document');
+  const s = summarise([missingAlt, scanned, stray], 'docx');
   assert.deepEqual(s, { conforms: false, owed: 34, short: 1, review: 4, blocking: 1, other: 1 });
   assert.equal(describeSummary(s).headline, 'Does not conform to Section 508 yet');
   assert.equal(
@@ -151,11 +151,11 @@ test('the summary counts what the document owes and what is open, and its headli
   );
   // The middle state: nothing open, but nobody has confirmed the reviewer
   // criteria. This must not read as conformance.
-  const checked = summarise([fixed(missingAlt)], 'document');
+  const checked = summarise([fixed(missingAlt)], 'docx');
   assert.deepEqual(checked, { conforms: false, owed: 34, short: 0, review: 4, blocking: 0, other: 0 });
   assert.equal(describeSummary(checked).headline, 'Passes every automated check');
   assert.match(describeSummary(checked).detail, /not reported as conformant until/);
-  const clean = summarise([fixed(missingAlt)], 'document', ALL_REVIEWER);
+  const clean = summarise([fixed(missingAlt)], 'docx', ALL_REVIEWER);
   assert.deepEqual(clean, { conforms: true, owed: 34, short: 0, review: 0, blocking: 0, other: 0 });
   assert.equal(describeSummary(clean).headline, 'Conforms to Section 508');
   assert.equal(summarise([], 'web').owed, 38);

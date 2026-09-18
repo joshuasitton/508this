@@ -36,7 +36,10 @@ export type Kind =
   | 'sensory'
   | 'colour-words'
   | 'colour-only'
-  | 'chart';
+  | 'chart'
+  | 'pdf-untagged'
+  | 'pdf-title-not-shown'
+  | 'pdf-no-text';
 
 export interface KindInfo {
   criterion: string;
@@ -145,6 +148,24 @@ export const KINDS: Record<Kind, KindInfo> = {
     why: 'A chart whose series differ only by colour cannot be read by a person who cannot tell the colours apart, and a chart of any kind cannot be read by a screen reader unless its data is also given as text.',
     fix: 'We flag each chart for a reviewer, who confirms the series are distinguishable by pattern or label and the data appears in a table or the text.',
   },
+  'pdf-untagged': {
+    criterion: '1.3.1',
+    title: 'The PDF has no tags',
+    why: 'Tags are the only structure a PDF has. Without them a screen reader gets a bag of characters in whatever order they were painted, with no headings, no paragraphs, no tables and nowhere to put alternative text. Everything else the standard asks for depends on this one thing.',
+    fix: 'We build the tag tree: headings, paragraphs, lists, tables and figures, in the order a person reads them. On a design comp with no running text, that can be a single tagged figure with a description of what it shows.',
+  },
+  'pdf-title-not-shown': {
+    criterion: '2.4.2',
+    title: 'The title is set but not shown',
+    why: 'The PDF carries a title, but the reader is not told to use it, so the window and the tab show the filename instead. A screen reader announces the same filename when the document opens.',
+    fix: 'We set the flag that tells the reader to display the title. Nothing visible in the document changes.',
+  },
+  'pdf-no-text': {
+    criterion: '1.1.1',
+    title: 'The PDF has no text, only pictures of text',
+    why: 'A scanned or flattened page is an image to everything except a human eye. A screen reader finds nothing to read, nobody can search or select the words, and no amount of tagging fixes it until the text exists.',
+    fix: 'We run character recognition over each page, add the recovered text behind the image, and a reviewer checks it against the original before anything else is done.',
+  },
   forms: {
     criterion: '3.3.2',
     title: 'Form fields',
@@ -179,6 +200,9 @@ export const REVIEW_INPUT: Record<Kind, ReviewInput> = {
   'reading-order': 'judge',
   'layout-table': 'judge',
   'language-parts': 'judge',
+  'pdf-untagged': 'judge',
+  'pdf-title-not-shown': 'judge',
+  'pdf-no-text': 'judge',
   sensory: 'judge',
   'colour-words': 'judge',
   'colour-only': 'judge',

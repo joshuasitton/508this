@@ -35,15 +35,18 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
   if (!job) notFound();
 
   const confirmed = new Set(Object.keys(job.confirmations ?? {}));
-  const summary = summarise(job.findings, 'document', confirmed);
+  const summary = summarise(job.findings, job.format, confirmed);
   const verdict = describeSummary(summary);
   const groups = groupByKind(job.findings);
-  const assessments = assessAll(job.findings, 'document', confirmed);
+  const assessments = assessAll(job.findings, job.format, confirmed);
   const short = assessments.filter((a) => a.status === 'Partially Supports' || a.status === 'Does Not Support');
   const review = assessments.filter((a) => a.status === 'Needs Review');
   const met = assessments.filter((a) => a.status === 'Supports');
   const exempt = [...DOCUMENT_EXEMPT].map(labelFor);
-  const fixable = job.findings.filter((f) => !f.remediated && FIXABLE_KINDS.has(f.kind)).length;
+  // Automatic remediation is a .docx path for now; a PDF job goes straight
+  // to the reviewer rather than being offered a button that does nothing.
+  const automatic = job.format === 'docx';
+  const fixable = automatic ? job.findings.filter((f) => !f.remediated && FIXABLE_KINDS.has(f.kind)).length : 0;
 
   return (
     <>
@@ -60,9 +63,16 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
 
       <section className={styles.actions} aria-labelledby="actions-title">
         <h2 id="actions-title" className={styles.actionsTitle}>
-          {job.remediatedAt ? 'Your documents' : 'Fix it'}
+          {job.remediatedAt ? 'Your documents' : automatic ? 'Fix it' : 'What happens to this PDF'}
         </h2>
-        {!job.remediatedAt && (
+        {!automatic && !job.remediatedAt && (
+          <p className={styles.actionNote}>
+            Automatic remediation writes into Word documents today. This PDF has been checked in full and every
+            finding goes to a reviewer, who decides each one. Writing fixes back into a PDF is the next thing being
+            built.
+          </p>
+        )}
+        {!job.remediatedAt && automatic && (
           <form action={remediateAction} className={styles.actionForm}>
             <input type="hidden" name="id" value={job.id} />
             <button type="submit" className={styles.button} disabled={fixable === 0}>
@@ -77,11 +87,13 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
         )}
         {job.remediatedAt && (
           <ul className={styles.downloads}>
-            <li>
-              <a href={`/jobs/${job.id}/download`} className={styles.button}>
-                Download the remediated document
-              </a>
-            </li>
+            {automatic && (
+              <li>
+                <a href={`/jobs/${job.id}/download`} className={styles.button}>
+                  Download the remediated document
+                </a>
+              </li>
+            )}
             <li>
               <Link href={`/jobs/${job.id}/review`} className={styles.button}>
                 {summary.conforms ? 'Review record' : 'Review what is left'}
@@ -178,7 +190,7 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
                 <tr key={a.criterion}>
                   <th scope="row">{labelFor(a.criterion)}</th>
                   <td className={styles.nowrap}>{a.status}</td>
-                  <td>{describeRemarks(a)}</td>
+                  <td>{describeRemarks(a, job.format)}</td>
                 </tr>
               ))}
             </tbody>
@@ -192,7 +204,7 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
             <ul className={styles.metList}>
               {review.map((a) => (
                 <li key={a.criterion}>
-                  {labelFor(a.criterion)} <span className={styles.muted}>{describeRemarks(a).replace(/^Waiting on a reviewer\.\s*/, '')}</span>
+                  {labelFor(a.criterion)} <span className={styles.muted}>{describeRemarks(a, job.format).replace(/^Waiting on a reviewer\.\s*/, '')}</span>
                 </li>
               ))}
             </ul>
@@ -219,7 +231,9 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
       <section aria-labelledby="next-title">
         <h2 id="next-title">What happens next</h2>
         <ol className={styles.next}>
-          {!job.remediatedAt && <li>Press the button above. The issues with one right answer are fixed in the document.</li>}
+          {!job.remediatedAt && automatic && (
+            <li>Press the button above. The issues with one right answer are fixed in the document.</li>
+          )}
           <li>
             What is left goes to <Link href={`/jobs/${job.id}/review`}>the review queue</Link>, where a person decides each
             remaining finding and confirms the criteria only a person can judge.

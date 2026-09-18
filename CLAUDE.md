@@ -31,8 +31,8 @@ npm run build         # what Vercel runs
 | Path | What lives there |
 |---|---|
 | `src/app/` | App Router pages and layouts, one folder per route; `jobs/[id]/review` is the queue |
-| `src/domain/` | pure functions: the criteria catalogue and coverage, findings, the Word detector and remediator, the job model |
-| `src/server/` | Node-only code: the zip reader and writer, the .docx part reader, the job store |
+| `src/domain/` | pure functions: the criteria catalogue and coverage, findings, the Word and PDF detectors, the Word remediator, the PDF reader, the job model |
+| `src/server/` | Node-only code: the zip reader and writer, the .docx part reader, the PDF reader's inflate, the job store |
 | `__tests__/` | tests, against the domain layer and the server layer's pure parts |
 | `scripts/ts-resolve.mjs` | lets Node run the TypeScript domain with no bundler |
 | `docs/` | project-level state and the leadership standup log |
@@ -48,6 +48,12 @@ npm run build         # what Vercel runs
   plus the E205.4 exception for non-web documents. `domain/findings.ts` owns
   both a criterion's status *and* the sentence that states it in the report.
   A value defined in two places drifts; it drifted repeatedly in Loadsy.
+- **Coverage is per format, and so is what may be claimed.** `COVERAGE` in
+  `domain/criteria.ts` has a table for each of `docx` and `pdf`, because they
+  can be checked for different things: a PDF's text colour lives in a content
+  stream nobody here interprets, so contrast is a reviewer's job for a PDF
+  and a machine check for a Word file. Never report one format against the
+  other's table.
 - **"Supports" is never said on nothing.** `DOCUMENT_COVERAGE` in
   `domain/criteria.ts` gives every criterion a basis – an automated check, a
   static document having nothing the criterion governs, or a reviewer – and a
