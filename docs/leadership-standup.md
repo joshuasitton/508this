@@ -8,6 +8,41 @@ for. Where an entry has since been overtaken, `docs/build-state.md` says so.
 
 ---
 
+## 2026-09-18, evening — PDFs are fixed as well as checked
+
+### Done
+
+Writing fixes back into a PDF, by incremental update: the original bytes are
+untouched and the changed objects are appended with a new cross reference. On
+the Chairman's two files the whole change is about 350 bytes on the end of a
+file of 400 KB or 1 MB, and both open in an independent reader with the
+language, the title and the display-title flag set and every word of text
+still extracting.
+
+The logo sheet goes from four open findings to two; the infographic from six
+to five. Neither reaches conformance, correctly: what is left is a missing tag
+tree, missing headings and four figures with no description, and none of those
+has one right answer.
+
+### Decided by the engineering lead, for the Chairman to overturn
+
+**Automatic tagging of an untagged PDF is not on the roadmap as an automatic
+fix.** It is not remediation with one right answer; it is deciding what every
+mark on a page is and in what order a person reads it. It belongs to a
+reviewer with a tool, and that tool is a larger product than the one being
+built. This is the same line already drawn at alternative text, and the logo
+sheet is the proof it sits in the right place.
+
+### Decisions needed from the Chairman
+
+1. **The third file**, described but never attached.
+2. **Retention**, still the gate on production storage.
+3. **Pricing for untagged PDFs**, sharper now: the service can improve an
+   untagged file but cannot make it conformant, and a customer has to be told
+   that before they pay rather than after.
+
+---
+
 ## 2026-09-18, later — Real contractor files arrive, and they are PDFs
 
 The Chairman sent example contractor files the app has to handle. He

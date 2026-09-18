@@ -72,7 +72,7 @@ export default async function ReviewPage({
         </p>
       )}
 
-      {!job.remediatedAt && job.format === 'docx' && (
+      {!job.remediatedAt && (
         <p className={styles.note}>
           Automatic remediation has not run yet. Run it from the report first so the queue holds only what needs a
           person.

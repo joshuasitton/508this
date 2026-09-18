@@ -85,6 +85,12 @@ npm run build         # what Vercel runs
   not make it in code by accident. `src/server/jobs.ts` is the local-disk
   store for development and hand-run jobs; it is the one file to replace,
   and nothing that stores a document in production merges before the decision.
+- **A remediated file is the original with changes appended or overlaid,
+  never a rebuild.** `writeDocx` writes changed parts over the original
+  archive; `incrementalUpdate` appends changed objects and a new cross
+  reference to a PDF, matching the original's cross reference kind. Both keep
+  every untouched byte, which is the honest answer to "what did you do to my
+  document".
 - **Never put a secret in a `NEXT_PUBLIC_` variable** — they are bundled into
   the browser in plaintext.
 
@@ -105,6 +111,12 @@ project's environment, which is more than Loadsy's could; a failing
   or to `docs/`, explain the reasoning and name the failure the decision
   prevents.
 - Prose in this repo uses en dashes and real punctuation. Match it.
+- **Never pipe `npm run build` or `npm run typecheck` into `head`.** The pipe
+  closes, the command takes SIGPIPE, and it dies partway through having
+  printed enough to look successful. It cost a debugging round when
+  `next start` then reported no production build, and a type error in a test
+  reached the build because a truncated `typecheck` had "passed". Redirect to
+  a file and grep that.
 
 ## How the project is run
 

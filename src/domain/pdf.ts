@@ -356,6 +356,10 @@ export class PdfDocument {
   private readonly cache = new Map<number, PdfValue>();
   private readonly objStmCache = new Map<number, Map<number, PdfValue>>();
   readonly trailer: PdfDict = new Map();
+  /** Byte offset of the newest cross reference section, for an update's /Prev. */
+  startXref = -1;
+  /** Whether that newest section is a cross reference stream rather than a table. */
+  xrefIsStream = false;
 
   readonly bytes: Uint8Array;
   private readonly inflate: Inflate;
@@ -386,6 +390,7 @@ export class PdfDocument {
     let ok = false;
     if (m) {
       try {
+        this.startXref = Number(m[1]);
         this.readXrefChain(Number(m[1]));
         ok = this.xref.size > 0 && this.trailer.has('Root');
       } catch {
@@ -403,14 +408,28 @@ export class PdfDocument {
   private readXrefChain(start: number) {
     const seen = new Set<number>();
     let at: number | undefined = start;
+    let first = true;
     while (at !== undefined && !seen.has(at) && at >= 0 && at < this.bytes.length) {
       seen.add(at);
-      at = this.readXrefSection(at);
+      const wasStream = this.readXrefSection(at);
+      if (first) {
+        this.xrefIsStream = wasStream.isStream;
+        first = false;
+      }
+      at = wasStream.prev;
     }
   }
 
-  /** Reads one section, returns the /Prev offset if there is one. */
-  private readXrefSection(at: number): number | undefined {
+  /** One more than the highest object number the file uses. */
+  get size(): number {
+    const declared = Number(this.resolve(this.trailer.get('Size')) ?? 0);
+    let highest = 0;
+    for (const num of this.xref.keys()) highest = Math.max(highest, num);
+    return Math.max(declared, highest + 1);
+  }
+
+  /** Reads one section, reporting its kind and the /Prev offset if there is one. */
+  private readXrefSection(at: number): { prev: number | undefined; isStream: boolean } {
     this.lexer.pos = at;
     this.lexer.skipSpace();
     if (this.lexer.peekToken() === 'xref') {
@@ -432,12 +451,12 @@ export class PdfDocument {
             }
           }
           const prev = dict.get('Prev');
-          return typeof prev === 'number' ? prev : undefined;
+          return { prev: typeof prev === 'number' ? prev : undefined, isStream: false };
         }
-        if (!/^\d+$/.test(t)) return undefined;
+        if (!/^\d+$/.test(t)) return { prev: undefined, isStream: false };
         const first = Number(this.lexer.token());
         const count = Number(this.lexer.token());
-        if (!Number.isFinite(count)) return undefined;
+        if (!Number.isFinite(count)) return { prev: undefined, isStream: false };
         for (let i = 0; i < count; i++) {
           const offset = Number(this.lexer.token());
           this.lexer.token(); // generation
@@ -457,7 +476,7 @@ export class PdfDocument {
     this.readXrefStream(stream);
     for (const [k, v] of stream.dict) if (!this.trailer.has(k)) this.trailer.set(k, v);
     const prev = stream.dict.get('Prev');
-    return typeof prev === 'number' ? prev : undefined;
+    return { prev: typeof prev === 'number' ? prev : undefined, isStream: true };
   }
 
   private readXrefStream(stream: PdfStream) {

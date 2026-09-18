@@ -7,6 +7,7 @@ import { assessAll, describeRemarks, describeSummary, isOpen, stateOf, summarise
 import { describeStatus } from '@/domain/job';
 import { groupByKind } from '@/domain/kinds';
 import { FIXABLE_KINDS } from '@/domain/remediate';
+import { PDF_FIXABLE_KINDS } from '@/domain/pdfRemediate';
 import { getJob } from '@/server/jobs';
 import { remediateAction } from './actions';
 import styles from './page.module.css';
@@ -43,10 +44,11 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
   const review = assessments.filter((a) => a.status === 'Needs Review');
   const met = assessments.filter((a) => a.status === 'Supports');
   const exempt = [...DOCUMENT_EXEMPT].map(labelFor);
-  // Automatic remediation is a .docx path for now; a PDF job goes straight
-  // to the reviewer rather than being offered a button that does nothing.
-  const automatic = job.format === 'docx';
-  const fixable = automatic ? job.findings.filter((f) => !f.remediated && FIXABLE_KINDS.has(f.kind)).length : 0;
+  // Both formats have automatic remediation now; what each can fix differs,
+  // so the count comes from that format's own list.
+  const automatic = true;
+  const canFix = job.format === 'pdf' ? PDF_FIXABLE_KINDS : (FIXABLE_KINDS as ReadonlySet<string>);
+  const fixable = job.findings.filter((f) => !f.remediated && canFix.has(f.kind)).length;
 
   return (
     <>
@@ -63,15 +65,8 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
 
       <section className={styles.actions} aria-labelledby="actions-title">
         <h2 id="actions-title" className={styles.actionsTitle}>
-          {job.remediatedAt ? 'Your documents' : automatic ? 'Fix it' : 'What happens to this PDF'}
+          {job.remediatedAt ? 'Your documents' : 'Fix it'}
         </h2>
-        {!automatic && !job.remediatedAt && (
-          <p className={styles.actionNote}>
-            Automatic remediation writes into Word documents today. This PDF has been checked in full and every
-            finding goes to a reviewer, who decides each one. Writing fixes back into a PDF is the next thing being
-            built.
-          </p>
-        )}
         {!job.remediatedAt && automatic && (
           <form action={remediateAction} className={styles.actionForm}>
             <input type="hidden" name="id" value={job.id} />
@@ -87,13 +82,11 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
         )}
         {job.remediatedAt && (
           <ul className={styles.downloads}>
-            {automatic && (
-              <li>
-                <a href={`/jobs/${job.id}/download`} className={styles.button}>
-                  Download the remediated document
-                </a>
-              </li>
-            )}
+            <li>
+              <a href={`/jobs/${job.id}/download`} className={styles.button}>
+                Download the remediated document
+              </a>
+            </li>
             <li>
               <Link href={`/jobs/${job.id}/review`} className={styles.button}>
                 {summary.conforms ? 'Review record' : 'Review what is left'}
@@ -231,7 +224,7 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
       <section aria-labelledby="next-title">
         <h2 id="next-title">What happens next</h2>
         <ol className={styles.next}>
-          {!job.remediatedAt && automatic && (
+          {!job.remediatedAt && (
             <li>Press the button above. The issues with one right answer are fixed in the document.</li>
           )}
           <li>
