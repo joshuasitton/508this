@@ -130,3 +130,10 @@
     page-break-inside: avoid;
   }
 }
+
+.draft {
+  font-weight: 500;
+  border: 2px solid var(--foreground);
+  padding: 0.6rem 0.9rem;
+  margin: 0 0 1.25rem;
+}
