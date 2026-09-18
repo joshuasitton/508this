@@ -22,11 +22,13 @@ import path from 'node:path';
 
 import { detectDocx } from '@/domain/docx';
 import { detectPdf } from '@/domain/pdfDetect';
+import { applyPdfDecisions, remediatePdf } from '@/domain/pdfRemediate';
+import type { PdfValue } from '@/domain/pdf';
 import { findingKey, isOpen, summarise, type Decision, type Finding } from '@/domain/findings';
 import type { Format, Job } from '@/domain/job';
 import { applyDecisions, remediateDocx } from '@/domain/remediate';
 import { readDocxParts, writeDocx } from './docx';
-import { readPdf } from './pdf';
+import { readPdf, writePdf } from './pdf';
 
 const ROOT = process.env.DOCUMENTS_DIR ?? path.join(process.cwd(), 'documents');
 const ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -143,17 +145,7 @@ export async function remediateJob(id: string): Promise<Job | null> {
  */
 async function rebuild(job: Job): Promise<Job> {
   const original = new Uint8Array(await readFile(path.join(dirFor(job.id), `original.${job.format}`)));
-  // Automatic remediation is a .docx path for now; a PDF job is detected,
-  // reviewed and reported, and its findings go to a person. The PDF
-  // remediator is the next branch, and until it exists saying otherwise
-  // would be a promise the service cannot keep.
-  if (job.format === 'pdf') {
-    const findings = job.findings.map((f) => ({ ...f }));
-    const updated: Job = { ...job, findings };
-    updated.status = statusOf(updated);
-    await writeFile(path.join(dirFor(job.id), 'job.json'), JSON.stringify(updated, null, 2));
-    return updated;
-  }
+  if (job.format === 'pdf') return rebuildPdf(job, original);
   const parts = readDocxParts(original);
   const auto = remediateDocx(parts, { fallbackTitle: stem(job.filename) });
   const reviewed = applyDecisions(auto.parts, job.findings);
@@ -229,6 +221,36 @@ export async function unconfirm(id: string, criterion: string): Promise<Job | nu
   job.status = statusOf(job);
   await writeFile(path.join(dirFor(id), 'job.json'), JSON.stringify(job, null, 2));
   return job;
+}
+
+/**
+ * The PDF path of `rebuild`, with the same contract: the delivered file is
+ * a pure function of the original and the record, and a finding counts as
+ * fixed only when re-detection no longer finds it.
+ */
+async function rebuildPdf(job: Job, original: Uint8Array): Promise<Job> {
+  const doc = readPdf(original);
+  const auto = remediatePdf(doc, { fallbackTitle: stem(job.filename) });
+  const reviewed = applyPdfDecisions(doc, job.findings);
+  const trailerExtras = new Map<string, PdfValue>([...auto.trailerExtras, ...reviewed.trailerExtras]);
+  const remediated = writePdf(doc, [...auto.edits, ...reviewed.edits], trailerExtras);
+  const after = detectPdf(readPdf(remediated));
+
+  const still = new Set(after.map(key));
+  const findings: Finding[] = job.findings.map((f) => ({ ...f, remediated: !still.has(key(f)) }));
+  const known = new Set(findings.map(key));
+  for (const f of after) if (!known.has(key(f))) findings.push(f);
+
+  const updated: Job = {
+    ...job,
+    findings,
+    applied: [...auto.applied, ...reviewed.applied],
+    remediatedAt: new Date().toISOString(),
+  };
+  updated.status = statusOf(updated);
+  await writeFile(path.join(dirFor(job.id), `remediated.${job.format}`), remediated);
+  await writeFile(path.join(dirFor(job.id), 'job.json'), JSON.stringify(updated, null, 2));
+  return updated;
 }
 
 function key(f: Finding): string {

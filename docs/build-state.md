@@ -4,6 +4,28 @@ The running project-level record. Sections are dated and kept in order rather
 than rewritten, so the reasoning stays readable. Decisions live in
 `docs/leadership-standup.md`; this file says where the code stands.
 
+## 2026-09-18, evening — PDF remediation
+
+`src/domain/pdfWrite.ts` (serialization and `incrementalUpdate`),
+`src/domain/pdfRemediate.ts` (language, title, display-title, and a
+reviewer's alternative text by structure-element object number), `writePdf`
+in `src/server/pdf.ts`, and `rebuildPdf` in the job store on the same
+contract as the Word path. The fix button is offered for both formats.
+126 tests.
+
+**Verified** on both real files through the production build: uploaded,
+fixed, downloaded, and the downloads opened with an independent library.
+Language, title and display-title all set; the original preserved byte for
+byte with 311 and 380 bytes appended; text still extracting; the tag tree
+untouched.
+
+**A bug the tests could not see:** the string helper returned the delimited
+form and the serializer wrapped it a second time, so a file came back with
+its language set to "(en-US)". Found by reading the output with another
+library. The convention is now content bytes in, delimiters added by
+`serialize`, with a round-trip test over accented, Japanese and
+astral-plane text.
+
 ## 2026-09-18, later — PDFs are read, checked and reported
 
 `src/domain/pdf.ts` (the parser: object grammar, classic and stream cross
