@@ -31,8 +31,8 @@ npm run build         # what Vercel runs
 | Path | What lives there |
 |---|---|
 | `src/app/` | App Router pages and layouts, one folder per route; `jobs/[id]/review` is the queue |
-| `src/domain/` | pure functions: the criteria catalogue and coverage, findings, the Word and PDF detectors, the Word remediator, the PDF reader, the job model |
-| `src/server/` | Node-only code: the zip reader and writer, the .docx part reader, the PDF reader's inflate, the job store |
+| `src/domain/` | pure functions: the criteria catalogue and coverage, findings, the Word and PDF detectors, the Word remediator, the PDF reader, the job model, the conformance report |
+| `src/server/` | Node-only code: the zip reader and writer, the .docx part reader, the PDF reader's inflate, the job store, the report packer |
 | `__tests__/` | tests, against the domain layer and the server layer's pure parts |
 | `scripts/ts-resolve.mjs` | lets Node run the TypeScript domain with no bundler |
 | `docs/` | project-level state and the leadership standup log |
@@ -91,6 +91,19 @@ npm run build         # what Vercel runs
   reference to a PDF, matching the original's cross reference kind. Both keep
   every untouched byte, which is the honest answer to "what did you do to my
   document".
+- **The conformance report is one model with two renderings.**
+  `domain/acr.ts` computes the statement from the job; the report page and
+  the Word file (`domain/acrDocx.ts`) lay out what it produced and decide
+  nothing – not a status, not a remark, not the date. The customer reads one
+  and hands over the other, and the two saying different things about the
+  same document is the failure this product cannot survive.
+- **The conformance report must itself pass `detectDocx`, and a test says so.**
+  `__tests__/acrDocx.test.ts` builds the report, zips it, unzips it and runs
+  the detector over it, expecting nothing. That is why the file carries a
+  title and a language, why its headings are real and unskipped, why every
+  table names its header row – and why **nothing in it is marked by colour**.
+  Tinting the rows that wait on a reviewer would be a 1.4.1 failure of the
+  exact kind the report flags in other people's documents.
 - **Never put a secret in a `NEXT_PUBLIC_` variable** — they are bundled into
   the browser in plaintext.
 

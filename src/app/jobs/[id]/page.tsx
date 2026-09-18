@@ -101,6 +101,10 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
               <span className={styles.muted}> – printable, in the layout a buyer expects</span>
             </li>
             <li>
+              <a href={`/jobs/${job.id}/report/download`}>Conformance statement as a Word file</a>
+              <span className={styles.muted}> – the copy a contracting officer files</span>
+            </li>
+            <li>
               <a href={`/jobs/${job.id}/download?which=original`}>Original as uploaded</a>
             </li>
           </ul>

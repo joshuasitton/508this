@@ -539,6 +539,96 @@ Color on its own report.
 
 ---
 
+## The statement as a file
+
+The job page and the printable statement are for reading. What the customer
+actually needs to hand over is a file: a contracting officer wants the
+Accessibility Conformance Report in their record, attached to the proposal,
+and a URL that may not resolve in two years is not a record. So
+`/jobs/<id>/report/download` returns the statement as a **Word file**.
+
+Word and not PDF, which is the choice a 508 vendor is expected to get wrong.
+A customer's next move with a conformance report is to paste it into a
+proposal, into their own VPAT, or into a spreadsheet of criteria their
+compliance office keeps; a PDF is where text goes to stop being editable.
+The irony of a remediation service shipping an inaccessible PDF of its own
+statement is the second reason.
+
+**One model, two renderings.** `src/domain/acr.ts` computes the report once
+from the job — the facts, the verdict, one row per criterion, the notes — and
+both the page and the .docx lay out what it produced and decide nothing.
+Statuses still come from `assess`, remarks from `describeRemarks`, the
+headline from `describeSummary`; nothing in the ACR module rewords them,
+because a report that reworded its own remarks would be a second opinion on
+the same evidence. Before this existed the report page computed its own
+table, which is exactly the shape of the bug this repository keeps finding:
+one concept, two definitions, drifting.
+
+Two things the model owns that neither rendering may override:
+
+- **The date is written out.** `reportDate` maps a month to its name rather
+  than calling `toLocaleDateString`, because a Node build without full ICU
+  formats the same instant differently and the same job must produce the same
+  statement on every machine that renders it.
+- **A draft says so.** A statement with a criterion still waiting on a
+  reviewer is an honest working document and a dishonest deliverable. It
+  carries "Draft — not a deliverable" at the top, the count of what is
+  outstanding, and a note saying Needs Review is not a conformance term. That
+  is the same line `describeSummary` draws; the file just cannot be handed on
+  without it being visible.
+
+**The file is built, not stored.** It is a function of the job, and the job
+is what changes — a reviewer confirms a criterion and last minute's draft is
+this minute's deliverable. Storing the .docx would mean two records of one
+assessment and a way for them to disagree. The timestamp written into it is
+the job's, not the clock's, so downloading twice gives identical bytes and a
+customer comparing two copies is not told they differ.
+
+### It is built by hand, and it passes 508This
+
+`src/domain/acrDocx.ts` writes every byte of the WordprocessingML: the
+document, the styles, the relationships, the content types, the core
+properties. No template file is checked in, which keeps `npm test` runnable
+with nothing installed and keeps a binary out of the repository;
+`src/server/acr.ts` adds the two things the domain may not have, a UTF-8
+encoder and the zip from `server/zip.ts`.
+
+The constraint that shaped it is that **the conformance report is itself a
+document 508This finds conformant**, and a test asserts precisely that: build
+the report, zip it, unzip it, read the parts, run `detectDocx`, expect no
+findings — for a Word job, a PDF job, a job with open findings and a
+remediated one. A negative control was run against each fix in turn (strip
+the language, strip the title, strip the header rows, strip the heading
+styles) and each produces exactly the finding it should, so the green is not
+green because the test is looking at nothing.
+
+What that constraint forced:
+
+- Headings are real heading styles carrying outline levels, running 1, 2, 2,
+  2… with no skips — the same thing the product demands of a customer.
+- Every table names its header row with `w:tblHeader`, so a conformance level
+  is read with its column name and the header repeats across a page break.
+  Each table also carries `w:tblDescription`, which a screen reader announces
+  before the first cell.
+- **Nothing in the report is marked by colour.** A row still waiting on a
+  reviewer is the obvious thing to tint, and tinting it would be a 1.4.1 Use
+  of Color failure of exactly the kind the report flags in other people's
+  documents. The status word carries the signal, and the remarks say it again
+  in a sentence.
+- The document declares its language and carries a title — the two findings
+  the detector raises against almost every file that arrives.
+- A customer's filename goes into the title and the first table, so it is
+  escaped as XML and stripped of control characters, which Word rejects
+  outright. A file called `Q3 <Draft> "final" & more.docx` has a test.
+
+The check that matters most is not in the test suite: the generated report
+was uploaded back into the running product as a customer document. It comes
+back "Passes every automated check — no open issues", with the four reviewer
+criteria outstanding, which is the honest verdict for any Word file nobody
+has read yet.
+
+---
+
 ## Storage, and why it is one file
 
 `src/server/jobs.ts` writes each job under `documents/<id>/` on local disk,

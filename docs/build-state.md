@@ -4,6 +4,44 @@ The running project-level record. Sections are dated and kept in order rather
 than rewritten, so the reasoning stays readable. Decisions live in
 `docs/leadership-standup.md`; this file says where the code stands.
 
+## 2026-09-18, night — the statement as a Word file
+
+`src/domain/acr.ts` computes the Accessibility Conformance Report from a job:
+the facts, the verdict, one row per criterion, the notes, and whether it is a
+statement or a draft. `src/domain/acrDocx.ts` writes it as WordprocessingML
+by hand — document, styles, relationships, content types, core properties,
+no template file checked in — and `src/server/acr.ts` encodes and zips it.
+`/jobs/<id>/report/download` serves it; the report page and the job page link
+to it. 148 tests.
+
+**The report page no longer computes anything.** It was building its own
+criterion table alongside the one the Word file would build, which is the bug
+this repository keeps finding in other clothes: one concept, two definitions.
+Both renderings now lay out `buildAcr` and decide nothing.
+
+**Verified.** The whole way round in `__tests__/acrDocx.test.ts`: build the
+report, zip it, unzip it, read the parts, run `detectDocx`, expect no
+findings — for a Word job, a PDF job, a job with open findings and a
+remediated one. A negative control was run against each fix in turn (strip
+the language, the title, the header rows, the heading styles) and each
+produced exactly the finding it should, so the green is not green because the
+test is looking at nothing.
+
+Then through the production build in Chromium: the infographic uploaded,
+fixed, its statement downloaded as a .docx and opened with python-docx —
+title, language `en-US`, eight headings, five tables, 38 criterion rows, every
+first row a header row. Then the strongest check available: **that generated
+report was uploaded back into the running product as a customer document, and
+came back "Passes every automated check — no open issues"**, with the four
+reviewer criteria outstanding, which is the honest verdict for a Word file
+nobody has read yet.
+
+**Word and not PDF**, deliberately. The customer's next move is to paste the
+statement into a proposal or their own VPAT, and a PDF is where text goes to
+stop being editable. Nothing in the file is marked by colour either: tinting
+the rows that wait on a reviewer would be a 1.4.1 failure of exactly the kind
+the report flags in other people's documents.
+
 ## 2026-09-18, evening — PDF remediation
 
 `src/domain/pdfWrite.ts` (serialization and `incrementalUpdate`),

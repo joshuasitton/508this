@@ -8,6 +8,66 @@ for. Where an entry has since been overtaken, `docs/build-state.md` says so.
 
 ---
 
+## 2026-09-18, night — the deliverable is a file
+
+### Done
+
+The conformance statement now downloads as a **Word file** from the job page
+and the statement page. It is built from the same model the screen renders,
+so the copy the customer reads and the copy they hand to a contracting
+officer cannot disagree.
+
+### Decided by product and engineering, for the Chairman to overturn
+
+**Word, not PDF.** Sales argued for PDF on the grounds that it looks final.
+Product's answer carried: the customer's next move is to paste the statement
+into a proposal, into their own VPAT, or into the spreadsheet of criteria
+their compliance office keeps, and a PDF is where text goes to stop being
+editable. A remediation service handing over an inaccessible PDF of its own
+conformance report is the second reason, and the one that would end up in a
+screenshot.
+
+**An unconfirmed statement is stamped a draft.** Design asked for the draft
+banner to be dropped from the downloaded file, on the grounds that it makes
+the deliverable look unfinished to the customer's buyer. Refused: it looks
+unfinished because it is. A statement with criteria nobody has confirmed is
+an honest working document and a dishonest deliverable, and the moment it can
+leave the building without saying so is the moment the product starts lying
+for the customer instead of for them. Confirming the four criteria takes a
+reviewer minutes; the banner disappears on its own.
+
+**Nothing in the report is marked by colour.** Raised by design as a
+readability question and settled on the standard: the rows waiting on a
+reviewer are the obvious thing to tint, and tinting them would be a 1.4.1 Use
+of Color failure of the exact kind the report flags in other people's
+documents. The status word carries it.
+
+### The engineering note worth keeping
+
+The report is a document, so it is held to the product's own standard: a test
+builds the .docx, unzips it and runs the Word detector over it, expecting
+nothing. Then the generated report was uploaded back into the running product
+as if a customer had sent it, and came back clean. Marketing may use that; it
+is true and it is checkable.
+
+### Decisions needed from the Chairman
+
+Unchanged from this evening.
+
+1. **The third contractor file, still not arrived.** The two attached again
+   this afternoon are byte-identical to the two already in hand. Sales cannot
+   scope the third case, and if it is a scan rather than a document it is a
+   different product: there is no text to fix, only OCR to run, and no version
+   of this service makes that file conformant without someone retyping it.
+2. **Retention and third-party calls.** Still the gate on production storage
+   and on the next build step: model-drafted alternative text means sending a
+   customer's figure to a vision model, and nothing leaves the box until the
+   Chairman says what may.
+3. **Pricing for untagged PDFs.** Unchanged, and the logo sheet is still the
+   worked example.
+
+---
+
 ## 2026-09-18, evening — PDFs are fixed as well as checked
 
 ### Done
