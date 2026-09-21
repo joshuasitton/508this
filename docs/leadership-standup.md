@@ -8,6 +8,81 @@ for. Where an entry has since been overtaken, `docs/build-state.md` says so.
 
 ---
 
+## 2026-09-21 — Retention, decided
+
+The Chairman settled the decision that has gated production storage since
+founding. All three parts below are **decided**, not recommended.
+
+### 1. Documents are deleted seven days after the customer downloads them
+
+A deliverable that is downloaded once does not need a month at rest. The
+seven days exist so a customer who loses the file is not re-reviewed from
+scratch, and for no other reason.
+
+**With one consequence the question nearly missed.** The job record is not
+free of document content: the Word detector writes a quotation into every
+finding by design – `paragraph 4 (“Outcomes by site”)` – because a reviewer
+has to find the place by eye. PDF findings carry page numbers and are clean.
+Deleting the files and keeping a record full of the customer's own sentences
+would be a retention policy with a hole in it, so **the record is scrubbed of
+its quotations at delivery.** The `CLAUDE.md` invariant only ever covered
+logs; it now covers the record.
+
+### 2. One figure at a time may go to a vision model, under zero data retention
+
+Never the whole document, never its text, never a Word file's XML: the
+cropped image of a single figure, to draft alternative text that a reviewer
+edits or rejects. Disclosed in a customer-facing policy in plain words.
+
+The argument was one real file. The Chairman's own desktop turned up a
+12-page federal submission with **76 undescribed figures** – a day of a
+reviewer's time, and well under a dollar of model time at current rates.
+Drafted alt text was never a cost problem; it was a permission problem, and
+the permission now exists.
+
+### 3. v1 accepts Controlled Unclassified Information
+
+**This one went against the recommendation, and the Chairman's call stands.**
+The recommendation was to decline CUI at intake, on the reasoning that most
+documents needing an ACR are bound for publication and therefore are not CUI
+anyway, so refusing it would cost almost no real customers and would keep the
+service out of NIST SP 800-171 scope for v1.
+
+Accepted as decided. Two things follow that the team should not discover
+later:
+
+**The two model decisions compose conservatively.** Zero data retention is a
+vendor's commitment about storage; it is not a FedRAMP authorisation, and the
+two are not substitutes. So **no part of a CUI document goes to a vision
+model** – a document the customer marks CUI is described entirely by hand.
+Recorded as the engineering reading of decisions 2 and 3 together; the
+Chairman can overturn it, but it should not be overturned silently.
+
+**Accounts stop being a v1.1 nicety.** 800-171 requires identification and
+authentication. A reviewer typing their name into a box is not
+authentication, and yesterday's work that moved that name onto the job record
+is exactly the seam where real accounts go. Nothing that stores a CUI
+document in production merges before that exists, which puts sign-in ahead of
+several things previously ranked above it.
+
+### What this unblocks, in order
+
+1. **Drafted alternative text.** The vision pass, one figure at a time, with
+   the reviewer editing rather than writing. The Hermes submission is the
+   test case and the sales demonstration.
+2. **Accounts and audit logging**, now required rather than deferred.
+3. **Production storage**, with deletion, scrubbing and encryption at rest
+   built in from the first commit rather than retrofitted.
+
+### Still with the Chairman
+
+**Pricing per tier.** Unchanged and now the last strategic item outstanding:
+the triage says what the service can honestly promise for each of scan,
+untagged, tagged and structured, and what a customer is charged for each is
+not an engineering decision.
+
+---
+
 ## 2026-09-18, late — "mostly PDF" changes the company, not just the sprint
 
 ### What the Chairman said
