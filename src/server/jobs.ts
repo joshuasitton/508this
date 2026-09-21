@@ -25,6 +25,9 @@ import { detectPdf } from '@/domain/pdfDetect';
 import { applyPdfDecisions, remediatePdf } from '@/domain/pdfRemediate';
 import type { PdfValue } from '@/domain/pdf';
 import { findingKey, isOpen, summarise, type Decision, type Finding } from '@/domain/findings';
+import type { NoImage } from '@/domain/alt';
+import { imageForFinding } from './figures';
+import { draftAltText, VisionUnavailableError, visionConfigured } from './vision';
 import { reviewerName, type Format, type Job } from '@/domain/job';
 import { applyDecisions, remediateDocx } from '@/domain/remediate';
 import { readDocxParts, writeDocx } from './docx';
@@ -43,7 +46,12 @@ function detect(format: Format, bytes: Uint8Array): Finding[] {
   return format === 'pdf' ? detectPdf(readPdf(bytes)) : detectDocx(readDocxParts(bytes));
 }
 
-export async function createJob(filename: string, format: Format, bytes: Uint8Array): Promise<Job> {
+export async function createJob(
+  filename: string,
+  format: Format,
+  bytes: Uint8Array,
+  options: { cui?: boolean } = {},
+): Promise<Job> {
   // Detect before writing anything, so a document the reader rejects is
   // never stored.
   const findings = detect(format, bytes);
@@ -55,6 +63,7 @@ export async function createJob(filename: string, format: Format, bytes: Uint8Ar
     status: 'detected',
     findings,
   };
+  if (options.cui) job.cui = true;
   const dir = dirFor(job.id);
   await mkdir(dir, { recursive: true });
   await writeFile(path.join(dir, `original.${format}`), bytes);
@@ -200,6 +209,50 @@ export async function setReviewer(id: string, name: string): Promise<Job | null>
   job.reviewer = clean;
   await writeFile(path.join(dirFor(id), 'job.json'), JSON.stringify(job, null, 2));
   return job;
+}
+
+export type ProposeResult =
+  | { ok: true; job: Job }
+  | { ok: false; reason: NoImage | 'cui' | 'refused' | 'unavailable' | 'not-found' };
+
+/**
+ * Draft a description for one figure, for the reviewer to edit or throw
+ * away. It is stored as a proposal and changes nothing in the document: a
+ * wrong description is a finding, not a fix, and only a named person can
+ * turn one into a decision.
+ *
+ * Refuses outright for a document the customer marked CUI. That is the
+ * Chairman's retention decision composed with his CUI decision, and it is
+ * enforced here rather than in the page, because a page is a thing a person
+ * can navigate around.
+ */
+export async function propose(id: string, findingKeyValue: string): Promise<ProposeResult> {
+  const job = await getJob(id);
+  if (!job) return { ok: false, reason: 'not-found' };
+  if (job.cui) return { ok: false, reason: 'cui' };
+  if (!visionConfigured()) return { ok: false, reason: 'unavailable' };
+
+  const target = job.findings.find((f) => findingKey(f) === findingKeyValue);
+  if (!target || !isOpen(target) || target.kind !== 'image-alt') return { ok: false, reason: 'not-found' };
+
+  const original = new Uint8Array(await readFile(path.join(dirFor(job.id), `original.${job.format}`)));
+  const found = imageForFinding(original, job.format, target);
+  if (!found.ok) return { ok: false, reason: found.reason };
+
+  let draft;
+  try {
+    draft = await draftAltText(found.image);
+  } catch (error) {
+    // Nothing about the document goes into this path: the shape of the
+    // failure is all that is kept.
+    if (error instanceof VisionUnavailableError) return { ok: false, reason: 'unavailable' };
+    return { ok: false, reason: 'refused' };
+  }
+  if (draft.refused || !draft.text) return { ok: false, reason: 'refused' };
+
+  target.proposal = { text: draft.text, at: new Date().toISOString() };
+  await writeFile(path.join(dirFor(job.id), 'job.json'), JSON.stringify(job, null, 2));
+  return { ok: true, job };
 }
 
 /** A reviewer's decision on one finding, then a rebuild. Returns null for an unknown job or finding. */

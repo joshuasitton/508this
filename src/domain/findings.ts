@@ -56,6 +56,18 @@ export interface Finding {
    */
   anchor?: string;
   decision?: Decision;
+  /**
+   * A description drafted by a model, waiting for a person. It is **not** a
+   * decision and nothing in the document changes because of it: it is put
+   * in the box the reviewer was going to type in, and becomes a decision
+   * only when they press the button with their name on the job.
+   */
+  proposal?: Proposal;
+}
+
+export interface Proposal {
+  text: string;
+  at: string;
 }
 
 export function isDismissed(f: Finding): boolean {

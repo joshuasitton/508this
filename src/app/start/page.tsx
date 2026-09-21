@@ -55,6 +55,17 @@ export default async function Start({ searchParams }: { searchParams: Promise<{ 
           aria-describedby="document-hint"
           className={styles.file}
         />
+        <p className={styles.declare}>
+          <label>
+            <input type="checkbox" name="cui" value="yes" /> This document is Controlled Unclassified Information.
+          </label>
+          <span className={styles.declareNote}>
+            Tick this and no part of the document is ever sent outside 508This – every description is written by a
+            person here. Leave it unticked and the image of a single figure may be sent to a model to draft a
+            description, which a reviewer then edits or rejects. Nothing else about the document ever leaves, in
+            either case.
+          </span>
+        </p>
         <button type="submit" className={styles.button}>
           Check the document
         </button>

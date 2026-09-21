@@ -12,6 +12,11 @@ import { createJob } from '@/server/jobs';
  * document – not its name, not its size, not a byte of it – is logged on
  * either path; the invariant in CLAUDE.md is a rule about this function
  * before it is a rule about anything else.
+ *
+ * The CUI declaration is taken here and nowhere else. A document marked
+ * Controlled Unclassified Information never has any part of it sent to a
+ * model, so the answer has to be recorded before the job exists rather than
+ * asked for later when a reviewer is in a hurry.
  */
 export async function startJob(formData: FormData): Promise<void> {
   const entry = formData.get('document');
@@ -24,7 +29,7 @@ export async function startJob(formData: FormData): Promise<void> {
 
   let id: string;
   try {
-    const job = await createJob(file.name, check.format, bytes);
+    const job = await createJob(file.name, check.format, bytes, { cui: formData.get('cui') === 'yes' });
     id = job.id;
   } catch (error) {
     if (error instanceof NotADocxError) return back('not-a-document');

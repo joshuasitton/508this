@@ -26,6 +26,13 @@ export interface Job {
   confirmations?: Record<string, { by: string; at: string }>;
   /** The reviewer named on the statement. Set the first time a person decides anything. */
   reviewer?: string;
+  /**
+   * The customer marked this document Controlled Unclassified Information
+   * at intake. Nothing about it goes to a third-party model – zero data
+   * retention is a storage commitment and not a FedRAMP authorisation – so
+   * every description in it is written by a person.
+   */
+  cui?: boolean;
 }
 
 /** One change remediation made, in the customer's words. */

@@ -56,3 +56,22 @@
   font-size: 0.9rem;
   max-width: 60ch;
 }
+
+.declare {
+  margin: 1.25rem 0 0;
+  max-width: 60ch;
+}
+
+.declare label {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  font-weight: 500;
+}
+
+.declareNote {
+  display: block;
+  margin-top: 0.4rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
