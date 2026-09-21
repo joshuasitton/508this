@@ -46,6 +46,15 @@ export interface Triage {
   pages: number;
   figures: number;
   figuresWithoutAlt: number;
+  /**
+   * Raster images in the file. A figure can only be *described* by a model
+   * if there are pixels to send it, and a PDF figure is only sometimes made
+   * of them – artwork out of Illustrator or InDesign is vector, drawn with
+   * path operators, with no image in the file at all. Figures without
+   * images are the reviewer's to describe by hand, or nobody's until
+   * somebody writes a renderer.
+   */
+  rasterImages: number;
   paragraphs: number;
   headings: number;
   tables: number;
@@ -81,6 +90,7 @@ export function triagePdf(facts: PdfFacts, findings: readonly Finding[]): Triage
     tier,
     pages: facts.pages,
     figures: figures.length,
+    rasterImages: facts.rasterImages,
     figuresWithoutAlt: findings.filter((f) => f.kind === 'image-alt').length,
     paragraphs,
     headings,
@@ -109,6 +119,19 @@ export function promiseFor(tier: Tier): string {
   }
 }
 
+/**
+ * Whether a vision pass could help this document at all: it has figures
+ * nobody has described, and pixels to send for them.
+ *
+ * A document with four undescribed figures and no raster images is not a
+ * smaller version of the same problem – it is a different one. Drafting its
+ * descriptions means rendering vector artwork to an image first, which is a
+ * PDF renderer, which is a product and not a feature.
+ */
+export function canDraftAltText(t: Triage): boolean {
+  return t.figuresWithoutAlt > 0 && t.rasterImages > 0;
+}
+
 /** One line per tier: how many of a folder's documents landed in it. */
 export function countByTier(all: readonly Triage[]): Record<Tier, number> {
   const counts = { scan: 0, untagged: 0, tagged: 0, structured: 0 };
@@ -122,6 +145,24 @@ export function countByTier(all: readonly Triage[]): Record<Tier, number> {
  * repository is building, and finding that out from a folder is cheaper
  * than finding it out from a customer.
  */
+/**
+ * The sentence for the vision pass: of the documents with figures nobody has
+ * described, how many have any pixels to send. Reported separately from the
+ * tier mix because it is a separate decision – the tiers say what structure
+ * editing could reach, this says what drafted alternative text could.
+ */
+export function describeFigures(all: readonly Triage[]): string {
+  const needing = all.filter((t) => t.figuresWithoutAlt > 0);
+  if (needing.length === 0) return 'No document has a figure waiting for a description.';
+  const draftable = needing.filter(canDraftAltText);
+  const undescribed = needing.reduce((n, t) => n + t.figuresWithoutAlt, 0);
+  return `${undescribed} figures across ${needing.length} ${
+    needing.length === 1 ? 'document' : 'documents'
+  } have no description. ${draftable.length} of those documents contain raster images a model could be shown; in the other ${
+    needing.length - draftable.length
+  } the artwork is vector, so there is nothing to send without rendering the page first.`;
+}
+
 export function describeMix(counts: Record<Tier, number>): string {
   const total = TIERS.reduce((n, t) => n + counts[t], 0);
   if (total === 0) return 'No PDFs were read.';

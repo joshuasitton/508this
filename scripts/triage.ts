@@ -16,7 +16,16 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 
 import { detectPdf, readPdfFacts } from '../src/domain/pdfDetect';
-import { TIERS, countByTier, describeMix, promiseFor, triagePdf, type Tier, type Triage } from '../src/domain/triage';
+import {
+  TIERS,
+  countByTier,
+  describeFigures,
+  describeMix,
+  promiseFor,
+  triagePdf,
+  type Tier,
+  type Triage,
+} from '../src/domain/triage';
 import { NotAPdfError, readPdf } from '../src/server/pdf';
 
 const LABEL: Record<Tier, string> = {
@@ -69,8 +78,8 @@ const results: Triage[] = [];
 const failures: Array<{ name: string; why: string }> = [];
 
 console.log('');
-console.log(`${pad('File', 46)} ${pad('Tier', 11)} ${right('Pg', 4)} ${right('Fig', 4)} ${right('NoAlt', 6)} ${right('Para', 5)} ${right('Head', 5)} ${right('Tbl', 4)} ${right('Issues', 7)}`);
-console.log('-'.repeat(100));
+console.log(`${pad('File', 42)} ${pad('Tier', 11)} ${right('Pg', 4)} ${right('Fig', 4)} ${right('Img', 4)} ${right('NoAlt', 6)} ${right('Para', 5)} ${right('Head', 5)} ${right('Tbl', 4)} ${right('Issues', 7)}`);
+console.log('-'.repeat(101));
 
 for (const file of files) {
   const name = path.relative(target, file);
@@ -80,14 +89,14 @@ for (const file of files) {
     const t = triagePdf(facts, detectPdf(doc));
     results.push(t);
     console.log(
-      `${pad(name, 46)} ${pad(LABEL[t.tier], 11)} ${right(t.pages, 4)} ${right(t.figures, 4)} ${right(t.figuresWithoutAlt, 6)} ${right(t.paragraphs, 5)} ${right(t.headings, 5)} ${right(t.tables, 4)} ${right(t.findings, 7)}`,
+      `${pad(name, 42)} ${pad(LABEL[t.tier], 11)} ${right(t.pages, 4)} ${right(t.figures, 4)} ${right(t.rasterImages, 4)} ${right(t.figuresWithoutAlt, 6)} ${right(t.paragraphs, 5)} ${right(t.headings, 5)} ${right(t.tables, 4)} ${right(t.findings, 7)}`,
     );
   } catch (error) {
     // An unreadable file is a finding about the sample, not a crash: a
     // folder of real documents will contain an encrypted one.
     const why = error instanceof NotAPdfError || error instanceof Error ? error.message : String(error);
     failures.push({ name, why });
-    console.log(`${pad(name, 46)} ${pad('unreadable', 11)}`);
+    console.log(`${pad(name, 42)} ${pad('unreadable', 11)}`);
   }
 }
 
@@ -105,4 +114,6 @@ if (failures.length > 0) {
 
 console.log('');
 console.log(describeMix(counts));
+console.log('');
+console.log(describeFigures(results));
 console.log('');

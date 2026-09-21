@@ -49,6 +49,18 @@ export interface PdfFacts {
   pagesWithoutText: number[];
   /** Pages that paint something other than text. */
   pagesWithGraphics: number[];
+  /**
+   * How many raster images the file actually contains – image XObjects
+   * anywhere in it, plus inline images painted into a page.
+   *
+   * This is the number that says whether a figure can be *described* by a
+   * model. A model needs pixels, and a PDF figure is only sometimes made of
+   * them: artwork out of Illustrator or InDesign is vector, drawn with path
+   * operators, and there is no image in the file to send. A document with
+   * four figures and no raster images has nothing a vision pass could look
+   * at without rendering the page first, which is a different product.
+   */
+  rasterImages: number;
   elements: StructElement[];
 }
 
@@ -109,10 +121,12 @@ export function readPdfFacts(doc: PdfDocument): PdfFacts {
 
   const pagesWithoutText: number[] = [];
   const pagesWithGraphics: number[] = [];
+  let inlineImages = 0;
   doc.pages.forEach((page, i) => {
     const content = contentOf(doc, page);
     if (!/(?:^|[\s\]>)])(Tj|TJ|'|")(?=[\s(\[<]|$)/m.test(content)) pagesWithoutText.push(i + 1);
     if (/(?:^|[\s\]>)])(f\*?|S|s|B\*?|b\*?|Do|sh)(?=[\s(\[<]|$)/m.test(content)) pagesWithGraphics.push(i + 1);
+    inlineImages += (content.match(/(?:^|\s)BI(?=\s)/g) ?? []).length;
   });
 
   return {
@@ -123,11 +137,35 @@ export function readPdfFacts(doc: PdfDocument): PdfFacts {
     pages: doc.pages.length,
     pagesWithoutText,
     pagesWithGraphics,
+    rasterImages: countRasterImages(doc) + inlineImages,
     elements,
   };
 }
 
 /** A page's content streams, decoded, as text for operator matching. */
+/**
+ * Image XObjects anywhere in the file. Every object is resolved rather than
+ * only the ones a page's resources name, because resources are inheritable
+ * and an image can be reached through a form XObject, an annotation
+ * appearance or a pattern – and the question being asked is "does this file
+ * contain pixels at all", not "which page draws them".
+ */
+function countRasterImages(doc: PdfDocument): number {
+  let n = 0;
+  for (let num = 1; num < doc.size; num++) {
+    let value: PdfValue;
+    try {
+      value = doc.get(num);
+    } catch {
+      continue; // A broken object says nothing about images.
+    }
+    if (!(value instanceof PdfStream)) continue;
+    const subtype = value.dict.get('Subtype');
+    if (subtype instanceof PdfName && subtype.name === 'Image') n += 1;
+  }
+  return n;
+}
+
 function contentOf(doc: PdfDocument, page: PdfDict): string {
   const contents = doc.resolve(page.get('Contents'));
   const streams = Array.isArray(contents) ? contents.map((c) => doc.resolve(c)) : [contents];

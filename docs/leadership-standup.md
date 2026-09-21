@@ -8,6 +8,63 @@ for. Where an entry has since been overtaken, `docs/build-state.md` says so.
 
 ---
 
+## 2026-09-21, later — the vision pass met the file
+
+### What happened
+
+Retention was decided this morning and drafted alternative text was the
+first thing it unblocked. Work started and stopped within the hour, on a
+question nobody had asked: **a vision model needs pixels, and a PDF figure
+is only sometimes made of them.**
+
+The Chairman's infographic has four figures and **not one raster image in
+the entire file** – no image XObjects, no inline images, and three quarters
+of a megabyte of content stream holding 9,450 curve operators. The artwork is
+vector. There is nothing to send. Across both real files: five undescribed
+figures, zero images.
+
+Nobody was wrong to plan the feature; the planning assumption was simply
+never checked against a file, and a day of building would have produced
+something that worked on a synthetic test and did nothing for the only two
+real documents the company has.
+
+### Decision needed from the Chairman
+
+**Does 508This take a PDF rendering dependency?** It costs an invariant
+either way, which is why it is not an engineering call.
+
+1. **Take the dependency.** A renderer turns any figure into pixels, which
+   makes drafted alternative text work on vector artwork – the case that
+   actually turned up. It breaks the rule `src/server/` has held since the
+   first commit: Node's own modules and nothing from npm. That rule is what
+   makes `npm test` run in a sandbox with no npm access, and is worth
+   something real.
+2. **Raster only.** Draft descriptions for figures that are already images,
+   and leave vector artwork to the reviewer. No new dependency, no new
+   supply chain, and the feature does nothing for either file in hand.
+3. **Neither, for now.** Descriptions stay a reviewer's job, and engineering
+   spends the time on the heading structure work instead.
+
+Engineering's read, offered and not acted on: **(2) first, because it is a
+week and it is honest, and the triage will say how many real documents it
+reaches once it runs over a contractor's folder rather than a personal
+one.** (1) is a large commitment to make on a sample of two.
+
+### Also worth the team's attention
+
+This is the second time in four days that measuring a real file changed the
+plan – the first was "mostly PDF", this is "mostly vector". Both were
+cheap to measure and expensive to assume. The standing instruction from the
+18th (a screen gets looked at with a real customer file before it is called
+done) is extended: **a feature gets checked against a real customer file
+before it is scheduled, not only before it is shipped.**
+
+### Still with the Chairman
+
+Pricing per tier, unchanged.
+
+---
+
 ## 2026-09-21 — Retention, decided
 
 The Chairman settled the decision that has gated production storage since
