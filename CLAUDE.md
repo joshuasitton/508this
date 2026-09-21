@@ -47,10 +47,15 @@ npm run triage -- DIR # classify a folder of PDFs; prints no document content
   imports the Anthropic SDK, because it is the one module that talks to
   something outside this service and writing an HTTP client by hand to
   preserve a slogan would be worse than the slogan is worth. No test imports
-  it, and **CI proves the guarantee rather than the wording** – it runs the
-  tests before it installs anything. Add a second such module only with the
-  same two properties: no test reaches it, and CI still passes before
-  `npm install`.
+  it – `src/server/jobs.ts` reaches it through `await import('./vision')`
+  inside `propose`, precisely so the SDK stays out of the test suite's
+  import graph. A static import there was the first attempt and **CI caught
+  it on the first push**, which is the guarantee working and the reason it
+  is stated as a property of the import graph rather than as a claim about
+  one file. Add a second such module only with the same two properties: no
+  test reaches it, and `npm test` still passes with `node_modules` absent –
+  which is worth checking by actually moving the folder aside, since that is
+  what CI does.
 - **One source of truth per concept, pinned by a test.** `domain/criteria.ts`
   is the list of what "508 conformant" means – WCAG 2.0 A and AA, 38 criteria,
   plus the E205.4 exception for non-web documents. `domain/findings.ts` owns

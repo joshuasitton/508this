@@ -27,7 +27,6 @@ import type { PdfValue } from '@/domain/pdf';
 import { findingKey, isOpen, summarise, type Decision, type Finding } from '@/domain/findings';
 import type { NoImage } from '@/domain/alt';
 import { imageForFinding } from './figures';
-import { draftAltText, VisionUnavailableError, visionConfigured } from './vision';
 import { reviewerName, type Format, type Job } from '@/domain/job';
 import { applyDecisions, remediateDocx } from '@/domain/remediate';
 import { readDocxParts, writeDocx } from './docx';
@@ -230,6 +229,16 @@ export async function propose(id: string, findingKeyValue: string): Promise<Prop
   const job = await getJob(id);
   if (!job) return { ok: false, reason: 'not-found' };
   if (job.cui) return { ok: false, reason: 'cui' };
+
+  // Loaded here rather than at the top of the file, and that is not a
+  // style choice: `vision.ts` is the one module in `src/server/` that takes
+  // an npm dependency, this store is imported by the test suite, and
+  // `npm test` has to run with nothing installed. A static import put the
+  // SDK in the test suite's import graph and CI caught it on the first
+  // push – which is the guarantee working, and the reason it is stated as
+  // "no file any test imports may take a dependency" rather than as a
+  // claim about one file.
+  const { draftAltText, VisionUnavailableError, visionConfigured } = await import('./vision');
   if (!visionConfigured()) return { ok: false, reason: 'unavailable' };
 
   const target = job.findings.find((f) => findingKey(f) === findingKeyValue);

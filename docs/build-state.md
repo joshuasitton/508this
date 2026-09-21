@@ -34,6 +34,16 @@ nothing installed. The rule is now stated as the guarantee: no file any test
 imports may take a dependency, and CI proves it by running the tests before
 it installs anything.
 
+**And it proved it immediately.** The first push asserted in these very
+docs that no test imported `vision.ts`, which was false: the job store
+imported it at the top of the file, and the job store is in the test
+suite's import graph. CI went red on a file that would not load, seven
+tests never ran, and the claim was wrong in writing before it was wrong in
+code. The store now reaches it through `await import('./vision')` inside
+`propose`, and the fix was verified the way CI verifies it – by moving
+`node_modules` aside and running the suite, which passes 188 with nothing
+installed. A guarantee asserted is not a guarantee checked.
+
 **Two bugs found by writing the tests**, both in the cleaning of a draft.
 The first regex missed a leading article, so “A picture of a bar chart” kept
 its opener. Broadening it then over-stripped “A chart of enrolment”, which is
