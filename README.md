@@ -377,6 +377,44 @@ document's contents**. It runs on the customer's own machine over their own
 folder; the output is the sort of thing somebody pastes into a chat, and
 these are federal records.
 
+### What a figure is made of, and why the vision pass stopped
+
+Retention was decided on 21 September and drafted alternative text was
+unblocked. It did not get built, and the reason is worth more than the
+feature would have been.
+
+A vision model needs pixels. **A PDF figure is only sometimes made of
+them.** Artwork out of Illustrator or InDesign is vector – path operators in
+a content stream – and there is no image anywhere in the file to send. The
+Chairman's infographic is the case in point, measured rather than assumed:
+
+```
+page 1 resources:   ExtGState Font ProcSet Properties Shading   (no XObject)
+image XObjects:     0 in the entire file
+inline images:      0
+content stream:     753,687 bytes – 9,450 curves, 1,651 fills and strokes
+figures:            4, none of them described
+```
+
+Four figures, nothing to send for any of them. Getting pixels would mean
+rendering the page: graphics state, path construction and painting, Bézier
+flattening, clipping, colour spaces, the shadings this file uses,
+transparency from `ExtGState`, and fonts for text inside the artwork. That is
+a PDF renderer. It is a product, not a feature, and writing one to draft a
+sentence about a chart is the wrong trade.
+
+So the triage now reports it. `rasterImages` in `PdfFacts` counts image
+XObjects anywhere in the file plus inline images painted into a page, and
+`canDraftAltText` asks the only question that matters for this feature: does
+this document have a figure nobody has described **and** pixels to send for
+it? Both real files answer no.
+
+The choice that follows belongs to the Chairman, because it costs an
+invariant either way: take a rendering dependency, which `src/server/` has
+refused from the first commit, or accept that vector figures are described
+by hand and build the vision pass only for documents that carry raster
+images. Nothing was built on a guess about which.
+
 ### What is not here yet
 
 Writing fixes back into a PDF. The job page says so plainly rather than

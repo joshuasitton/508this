@@ -4,6 +4,47 @@ The running project-level record. Sections are dated and kept in order rather
 than rewritten, so the reasoning stays readable. Decisions live in
 `docs/leadership-standup.md`; this file says where the code stands.
 
+## 2026-09-21, later — the vision pass, stopped by what a figure is made of
+
+Retention was decided and drafted alternative text was unblocked, so the
+vision pass was started. It stopped on the first question: **what exactly do
+we send?**
+
+Measured on the Chairman's infographic rather than assumed:
+
+```
+page 1 resources:   ExtGState Font ProcSet Properties Shading   (no XObject)
+image XObjects:     0 in the entire file
+inline images:      0
+content stream:     753,687 bytes – 9,450 curves, 1,651 fills and strokes
+figures:            4, none described
+```
+
+The figures are vector artwork. There is no image in the file to send a
+model. Both real files together: **5 undescribed figures, 0 raster images.**
+
+Getting pixels means rendering the page – graphics state, path painting,
+Bézier flattening, clipping, colour spaces, the shadings this file uses,
+`ExtGState` transparency, and fonts for text inside the artwork. A PDF
+renderer is a product, not a feature.
+
+**What was built instead:** the measurement. `rasterImages` on `PdfFacts`
+counts image XObjects anywhere in the file plus inline images on a page;
+`canDraftAltText` asks whether a document has an undescribed figure *and*
+pixels for it; the triage prints an `Img` column and a sentence separating
+"needs a description" from "has anything to send". 167 tests.
+
+**Not built:** the endpoint, the prompt, the reviewer's "draft it" button.
+Building them for a case that does not occur in either real file would have
+demonstrated nothing. The decision that unblocks them is the Chairman's and
+is recorded in the standup log.
+
+**Note for whoever builds it:** a Word document is the easy case and was not
+the blocker. An image in a `.docx` is a real part in the archive
+(`word/media/image1.png`), extractable with the unzip already in the repo.
+If the answer is "raster only, no renderer", Word works the day the
+endpoint exists.
+
 ## 2026-09-21 — Retention decided; what it obliges the code to do
 
 The Chairman settled retention (`docs/leadership-standup.md`). Nothing is
