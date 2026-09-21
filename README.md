@@ -726,17 +726,40 @@ should be able to find the focus ring and the contrast pairs in one file.
 
 ## Customer documents
 
-Documents sent to 508This are federal records – often sensitive, sometimes
-Controlled Unclassified Information. Two things follow now, and one waits.
+Documents sent to 508This are federal records – often sensitive, and **as of
+21 September 2026 the service accepts Controlled Unclassified Information**.
+The Chairman decided retention that day; what follows is settled, and the
+reasoning for each part is in `docs/leadership-standup.md`.
 
-Now: nothing about a document's *contents* goes into a log, an analytics
-event or an error report, ever. And `/documents/` is gitignored as a whole
-folder, so no real agency PDF can become a "test fixture" with a commit hash.
+**Nothing about a document's contents goes into a log, an analytics event or
+an error report, ever.** `/documents/` is gitignored as a whole folder, so no
+real agency PDF can become a "test fixture" with a commit hash.
 
-Waiting on the Chairman: where documents are stored, for how long after
-delivery, and whether any part of one is ever sent to a third-party model. The
-intake form can be built before that is answered; the handler that stores a
-file cannot be merged.
+**Documents are deleted seven days after the customer downloads their
+package.** A deliverable that is downloaded once does not need a month at
+rest, and the seven days exist only so a customer who loses the file does not
+have to be re-reviewed from scratch.
+
+**The job record is scrubbed at delivery.** This is the part that is easy to
+miss: the record is *not* free of document content. The Word detector writes
+a quotation into every finding by design – `paragraph 4 (“Outcomes by site”)`
+– because a reviewer has to find the place by eye. PDF findings carry page
+numbers and are already clean. Deleting the documents and keeping a record
+full of the customer's sentences would be a retention policy with a hole in
+it, so the quotations go when the files go.
+
+**One figure at a time may go to a vision model, and nothing else ever
+leaves.** Never the whole document, never its text, never a Word file's XML –
+the cropped image of a single figure, to draft alternative text a reviewer
+then edits or rejects. It runs under a zero-data-retention configuration, and
+the customer-facing policy says so in plain words. The argument is one real
+file: a 12-page submission with 76 undescribed figures is a day of a
+reviewer's time and well under a dollar of model time.
+
+**Not for a document the customer marks CUI.** Zero data retention is a
+vendor's commitment about storage; it is not a FedRAMP authorisation, and the
+two are not substitutes. A CUI document is reviewed entirely by hand, and the
+intake form asks which it is.
 
 ---
 

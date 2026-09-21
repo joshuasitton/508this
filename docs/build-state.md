@@ -4,6 +4,31 @@ The running project-level record. Sections are dated and kept in order rather
 than rewritten, so the reasoning stays readable. Decisions live in
 `docs/leadership-standup.md`; this file says where the code stands.
 
+## 2026-09-21 — Retention decided; what it obliges the code to do
+
+The Chairman settled retention (`docs/leadership-standup.md`). Nothing is
+built yet; this records what the code now owes, so the next commits are
+measured against it rather than against a memory of a conversation.
+
+| Decided | What the code owes |
+|---|---|
+| Deletion seven days after download | A sweep in the job store, and a delivery timestamp to count from |
+| The record scrubbed at delivery | Findings keep their `location` – the quotation inside it does not. The Word detector's `where()` is the only place that writes one |
+| One figure to a vision model, ZDR | A pass-through endpoint, the key server-side only, a cropped image in and a draft out, nothing stored or logged |
+| Never for a CUI document | A flag on the job, set at intake, that the vision path checks before it runs |
+| v1 accepts CUI | Accounts and audit logging, which 800-171 requires and which were previously deferred to v1.1 |
+
+**The one that is easy to miss:** the job record is not free of document
+content. `where()` in `src/domain/docx.ts` writes the customer's own sentence
+into every Word finding, because a reviewer finds the place by eye. PDF
+findings are page numbers and are already clean. Deleting documents while
+keeping a record of their sentences would be a policy with a hole in it.
+
+**The one that reorders the sprint:** accepting CUI makes a reviewer an
+account rather than a typed name. Yesterday's change, which moved that name
+out of fifteen form fields and onto the job record, is the seam it goes
+through — which is luck rather than foresight, and worth saying so.
+
 ## 2026-09-18, late — PDF triage, before building any more
 
 The Chairman said the documents will mostly be PDFs. That changes the

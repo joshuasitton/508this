@@ -85,14 +85,24 @@ npm run triage -- DIR # classify a folder of PDFs; prints no document content
   real headings, a skip link, visible focus, `lang` on the document, contrast
   checked. `npm run lint` carries the jsx-a11y rules and they are not to be
   disabled. A remediation service with an inaccessible website is over.
-- **Customer documents are the customer's.** They are federal, often
-  sensitive, sometimes Controlled Unclassified Information. Nothing about a
-  document's contents goes into a log, an analytics event or an error report.
-  Where they are stored, for how long, and whether any of it leaves the
-  service is a decision that waits on the Chairman (see the standup log) – do
-  not make it in code by accident. `src/server/jobs.ts` is the local-disk
-  store for development and hand-run jobs; it is the one file to replace,
-  and nothing that stores a document in production merges before the decision.
+- **Customer documents are the customer's, and retention is now decided.**
+  Nothing about a document's contents goes into a log, an analytics event or
+  an error report. The Chairman settled the rest on 21 September 2026
+  (`docs/leadership-standup.md`), and these are the lines code must hold:
+  documents are deleted seven days after the customer downloads the package;
+  **the job record is scrubbed of its quotations at delivery**, because the
+  Word detector puts the customer's own sentences in every finding and a
+  record full of them is retention by another name; a single figure's image
+  may go to a vision model under zero data retention and **nothing else ever
+  leaves** – never the whole document, never its text; and **never anything
+  at all for a document the customer marks CUI**, because zero data retention
+  is a storage commitment and not a FedRAMP authorisation.
+- **v1 accepts CUI, so a reviewer is an account and not a typed name.** The
+  Chairman's decision brings NIST SP 800-171 into scope, and identification
+  and authentication is one of its controls. `setReviewer` taking a name a
+  person types is right for a service run by one person and is not
+  authentication; it is the seam where real accounts go. Nothing that stores
+  a CUI document in production merges before that exists.
 - **A remediated file is the original with changes appended or overlaid,
   never a rebuild.** `writeDocx` writes changed parts over the original
   archive; `incrementalUpdate` appends changed objects and a new cross
