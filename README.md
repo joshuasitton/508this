@@ -1043,9 +1043,75 @@ a stranger that a document exists but is somebody else's tells them that a
 document with that id is here and that whoever sent them the link is a
 customer.
 
-### What is deliberately not here yet
+### Mail, and the lie it lets the service stop telling
 
-**No email.** `createAccount` returns `taken` to its caller and that must
+Two answers in this service are deliberately uninformative, and both of them
+cost somebody something. A sign-up against an address that already has an
+account is answered exactly as a successful one; a reset request is answered
+the same way whether or not the address has an account. Both are right — a
+form that answers differently is a tool for finding out who 508This's
+customers are, and they are federal contractors — and both leave a person
+who has genuinely forgotten stuck on a page with nowhere to go.
+
+**The address itself is the only channel where the truth is safe to say**,
+so that is where it gets said. `/account/forgot` sends a link;
+`/account/reset` spends it.
+
+#### A letter is a fixed template plus at most one link, and the link must be ours
+
+`letterFor` in `src/domain/mail.ts` takes a closed `Letter` union and
+**throws** if the URL it is handed is not on 508This's own origin. That is
+the same move the audit record makes and it is not paranoia about typos:
+
+- A reset link is a credential. A template that renders whatever link it was
+  given is a phishing page with our return address on it.
+- There is no free-text field, so the day somebody threads a "reason" or a
+  filename through to a mail body, they will have to widen the type to do it
+  — rather than doing it by accident and posting a customer's document out
+  of the building.
+
+A test tries seven wrong links, including `https://508this.example.evil.test`
+(the prefix trick a naive `startsWith` falls for), with a negative control so
+the check cannot pass by refusing everything.
+
+#### The origin is configuration, never a request header
+
+`src/server/origin.ts` reads `PUBLIC_BASE_URL` and refuses to guess in
+production. A reset link built from the request's own `Host` header is a
+credential mailed to the right person pointing at somebody else's server,
+and the person who clicks it hands over their account without seeing
+anything wrong. It is an old bug and it is still the commonest way this
+feature is broken.
+
+#### Thirty minutes, once, and everything signs out
+
+The token is 32 random bytes and only its SHA-256 is stored, exactly as with
+a session. A completed reset ends **every** session the account has: people
+reset a passphrase because they think somebody else has it, and leaving that
+somebody signed in makes the reset theatre.
+
+The link is marked used *before* the new passphrase is checked, so a
+passphrase that fails the policy still burns it. That is inconvenient and it
+is the right way round — the alternative is a live link somebody can sit and
+try passphrases against.
+
+#### No SMTP, and no package either
+
+Mail goes out as one HTTPS `POST` with a bearer token, which `fetch` does
+without a dependency. SMTP by hand is a week of work and a security surface;
+a package would be a supply-chain risk in the code path that carries
+credentials. The shape in `post()` is Resend's; naming a provider in six
+lines of code is not a commitment.
+
+With no token configured, letters are written to `accounts/outbox/` instead
+of being sent — which is how the reset flow is developed and tested without
+mailing anybody. **That is refused outright in production**: a service that
+silently writes password-reset links to local disk because somebody forgot
+an environment variable is worse than one that cannot send mail at all,
+because it looks like it is working. Both the forgot page and the
+check-your-mail page say which of the three is happening on this build.
+
+### What is deliberately not here yet `createAccount` returns `taken` to its caller and that must
 never reach a form — "that address already has an account" tells a stranger
 who the customers are. The screen, when it exists, has to say the same thing
 it would say on success and send mail to the address, which is the only

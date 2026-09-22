@@ -27,7 +27,7 @@
  * is refused by the server, which is a confusing way to sign somebody out.
  */
 
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import path from 'node:path';
 
@@ -111,6 +111,40 @@ export async function touchSession(token: string, now = Date.now()): Promise<voi
     // A session that vanished between resolving and touching is a session
     // that ended. The next request will be told so properly.
   }
+}
+
+/**
+ * End every session an account has.
+ *
+ * The reason somebody resets a passphrase is that they think another person
+ * has it. Leaving that person's session alive makes the reset theatre, so
+ * this runs on every completed reset. It reads each session file to find
+ * the account rather than keeping an index, which is linear and is fine at
+ * this size; when the store moves off local disk, the index comes with it.
+ */
+export async function endAllSessions(account: string): Promise<number> {
+  let names: string[];
+  try {
+    names = await readdir(SESSIONS);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return 0;
+    throw error;
+  }
+
+  let ended = 0;
+  for (const name of names) {
+    const file = path.join(SESSIONS, name);
+    try {
+      const session = JSON.parse(await readFile(file, 'utf8')) as Session;
+      if (session.account !== account) continue;
+      await rm(file, { force: true });
+      ended += 1;
+    } catch {
+      // An unreadable session file is not one to keep somebody signed in on
+      // either, but removing it is not this function's business.
+    }
+  }
+  return ended;
 }
 
 /** End a session on purpose. */

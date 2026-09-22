@@ -4,6 +4,60 @@ The running project-level record. Sections are dated and kept in order rather
 than rewritten, so the reasoning stays readable. Decisions live in
 `docs/leadership-standup.md`; this file says where the code stands.
 
+## 2026-09-22, night — mail, and the two lies it lets the service stop telling
+
+`/account/forgot` sends a link, `/account/reset` spends it. Thirty minutes,
+once, and a completed reset ends every session the account has. The token is
+32 random bytes with only its SHA-256 stored, like a session. 263 tests,
+still green with `node_modules` moved aside.
+
+Mail goes out as one HTTPS `POST` with a bearer token — `fetch` does that
+with no package, and a package in the code path that carries credentials is
+a supply-chain risk this repository does not have to take. Unconfigured, a
+letter is written to `accounts/outbox/` instead, and that is **refused in
+production**: a service silently writing reset links to local disk because
+somebody forgot a variable looks like it is working, which is worse than not
+working.
+
+**The decision worth reading twice** is that `letterFor` takes a closed
+`Letter` union and throws if the link it is handed is not on our own origin.
+A reset link is a credential; a template that renders whatever link it is
+given is a phishing page with our return address on it. Seven wrong links in
+the test, including `https://508this.example.evil.test` — the prefix trick a
+naive `startsWith` falls for — with a negative control.
+
+`src/server/origin.ts` reads `PUBLIC_BASE_URL` and refuses to guess in
+production, because a link built from the request's own `Host` header is a
+credential mailed to the right person pointing at the wrong server.
+
+**Verified in the browser, six steps.** Two browsers signed in as one
+account; a third asks for a reset and is answered identically to an address
+with no account (whose letter says so and carries no link); the letter
+carries no passphrase and points at our own origin; the link sets a new
+passphrase; **both other sessions are signed out**; the old passphrase
+fails, the new one works, and reopening the link says it has already been
+used. No page errors.
+
+**The harness cried wolf a fourth time** — `[role=alert]` matched Next's own
+route announcer as well as the page's message. The product was right and the
+selector was wrong, which is now the fourth in this class and worth saying
+out loud every time.
+
+## 2026-09-22, night — the Hermes figures are vector
+
+The Chairman ran the triage. **All 76 are vector**, which answers the
+question standing since the 21st and answers it the unwelcome way: drafted
+alternative text does not touch the document that motivated it, and does not
+touch either of the other two real PDFs either.
+
+Nothing is wrong with the feature — it works, it is cheap, and it reaches
+Word documents, which are the format the service takes furthest. What is
+now established rather than suspected is that **the PDFs this business
+receives are drawn, not photographed**, and every figure in them is a
+reviewer's to describe by hand until somebody writes a renderer. That is the
+third time in five days that measuring a real file changed what the roadmap
+means; it is recorded here and the decision it reopens is the Chairman's.
+
 ## 2026-09-22, evening — every job has an owner
 
 The other half. Sign-in, sign-up and sign-out pages; a job owned by an
