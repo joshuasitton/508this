@@ -8,6 +8,70 @@ for. Where an entry has since been overtaken, `docs/build-state.md` says so.
 
 ---
 
+## 2026-09-22, night — the rendering dependency, taken
+
+### What the Chairman said
+
+Merge it and take the rendering dependency.
+
+### What it cost, and what it bought
+
+**Bought:** the drafting feature now works on the documents this business
+actually receives. The CHERP infographic went from four figures a reviewer
+had to describe from scratch to four figures drawn and ready to be
+described. On the Hermes submission that is 76 figures moving from
+composing to reviewing — the difference between an afternoon and an hour.
+
+**Cost:** two npm packages in `src/server/`, where there was one. The rule
+they bend is the same one `vision.ts` bent and it is bent the same way:
+loaded through `await import` from a file no test imports, and `npm test`
+still passes with nothing installed.
+
+### The decision inside the decision
+
+**It renders one figure and never a page.** A rendered page is a picture of
+the page's text, and the retention decision says the whole document and its
+text never leave. Rendering the page and sending it would have broken that
+while looking like the feature working — so the bounding box is not a
+refinement, it is the thing that makes the dependency permissible.
+
+Where a document does not say where its figure sits, nothing is drawn and
+the reviewer is told. That is the untagged logo sheet, and it is the honest
+answer rather than a fallback to the page.
+
+### Measuring first paid again
+
+Engineering expected to write a content-stream interpreter — tracking the
+transformation matrix and every path operator inside a marked-content span —
+to work out where a figure was. Opening the real file first showed every
+figure already carries `/A << /O /Layout /BBox >>`, which PDF/UA requires.
+Four lines reading a dictionary instead of a week of work.
+
+Fourth time in five days: "mostly PDF", "mostly vector", "entirely vector",
+and now "the boxes were already there". The standing instruction is earning
+its keep.
+
+### Recorded, for the record
+
+**The renderer was chosen on licence, not on quality.** MuPDF is the better
+engine and it is AGPL — linking it into a commercial service means
+publishing the service, and Artifex's commercial licence is a decision
+several sizes larger than this feature. pdfjs-dist (Apache-2.0) and
+@napi-rs/canvas (MIT) are what shipped.
+
+### Still with the Chairman
+
+The first live drafted description, on his own machine — and it matters more
+now than it did this morning, because the feature finally reaches the files
+he sends. The four prices. And what happens to a document nobody downloads.
+
+### Next
+
+The object store. It is the last piece of production storage and the one
+that cannot be tested from a cloud container.
+
+---
+
 ## 2026-09-22, night — production storage, and one decision that is now overdue
 
 ### What the Chairman said

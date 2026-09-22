@@ -415,6 +415,69 @@ refused from the first commit, or accept that vector figures are described
 by hand and build the vision pass only for documents that carry raster
 images. Nothing was built on a guess about which.
 
+### Drawing a figure that is not a picture
+
+The Chairman took the rendering dependency on 22 September, on evidence he
+produced himself: **three real PDFs, eighty-odd figures, not one raster
+image among them.** The artwork in the documents this business receives
+comes out of Illustrator and InDesign, which means it is paths, which meant
+the drafting feature reached none of it. `src/server/render.ts` turns those
+paths into pixels.
+
+#### The crop is the whole safety argument
+
+This renders **one figure, never a page**. That is not a nicety. The
+standing rule is that one figure's image is all that ever leaves — never
+the whole document, never its text — and a rendered page is a picture of
+the page's text. Rendering a page and sending it would break the retention
+decision while appearing to honour it.
+
+So the figure's bounding box is what makes the dependency acceptable at
+all, and the box comes from the document: a `/Figure` element carries
+`/A << /O /Layout /BBox [x0 y0 x1 y1] >>`, which PDF/UA requires for a
+figure that is not inline. Every figure in the Chairman's infographic has
+one. `figureBox` reads it; **no box means no render**, and the reviewer is
+told, exactly as they were before a renderer existed.
+
+The page is drawn shifted so the box lands at the origin of a canvas cut to
+the box's size. Everything outside falls off the edge and is never
+composited. Text *inside* the box is drawn, and that is correct — a chart's
+own axis labels are part of the chart.
+
+#### Two packages, and the one that was refused
+
+`pdfjs-dist` (Apache-2.0) and `@napi-rs/canvas` (MIT). **MuPDF is the better
+renderer and it is AGPL**: linking it into a commercial service means
+publishing the service, and Artifex's commercial licence is a decision
+several sizes larger than this feature. The licence, not the quality, is why
+it is not here.
+
+Both load through `await import` from a file no test imports — the same
+arrangement `vision.ts` has, for the same reason — so `npm test` still runs
+with nothing installed. Both are in `serverExternalPackages`, because
+`@napi-rs/canvas` loads a platform `.node` binary and a bundler that traced
+it would produce a build that works on one machine and not the next.
+
+Nothing is fetched while rendering: no font files, no character maps, no
+system fonts, no annotations. A renderer that reaches the network on a
+server holding federal records is a renderer that tells somebody it has
+them.
+
+#### Where the drawing happens, and why not sooner
+
+On demand, one figure at a time, in the figure route — not in the batch the
+review page uses. A submission with 76 vector figures would otherwise
+render all 76 before the page painted a pixel. This way the page draws
+immediately and the browser fetches the images as it fetches any other, in
+parallel.
+
+#### What it does to the two real files
+
+| | Before | After |
+|---|---|---|
+| CHERP infographic (tagged) | 4 figures, 0 drawable | **4 of 4 drawn**, 0 "describe it yourself" |
+| Hokua logo sheet (untagged) | nothing | nothing, and it says why — no tag tree, so no box |
+
 ### Drafted descriptions
 
 A reviewer describing 76 figures by hand is the reason this exists. The

@@ -4,7 +4,7 @@ import { inflateSync } from 'node:zlib';
 
 import { PdfDocument } from '../src/domain/pdf';
 import { docPrId, imagePartFor, targetOfIn } from '../src/domain/docxImages';
-import { figureImage, structNum } from '../src/domain/pdfImages';
+import { figureBox, figureImage, structNum } from '../src/domain/pdfImages';
 import { sendableImage } from '../src/server/images';
 import { imagesForFindings } from '../src/server/figures';
 import type { Finding } from '../src/domain/findings';
@@ -84,10 +84,14 @@ function pdfWithFigures(): Uint8Array {
     `<< /Type /Pages /Kids [3 0 R] /Count 1 >>`,
     `<< /Type /Page /Parent 2 0 R /Contents 4 0 R /Resources << /XObject << /Im1 7 0 R >> >> >>`,
     `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
-    `<< /Type /StructTreeRoot /K [6 0 R 8 0 R] >>`,
+    `<< /Type /StructTreeRoot /K [6 0 R 8 0 R 9 0 R] >>`,
     `<< /S /Figure /Pg 3 0 R /K 0 >>`,
     `<< /Type /XObject /Subtype /Image /Width 2 /Height 2 /ColorSpace /DeviceGray /BitsPerComponent 8 /Length 4 >>\nstream\nABCD\nendstream`,
     `<< /S /Figure /Pg 3 0 R /K 1 >>`,
+    // Vector artwork that says where it sits, the way a PDF produced to be
+    // accessible does — PDF/UA requires the layout box on a figure that is
+    // not inline, and every figure in the Chairman's infographic has one.
+    `<< /S /Figure /Pg 3 0 R /K 1 /A << /O /Layout /BBox [10 10 50 50] >> >>`,
   ];
   return buildPdf(objects, { info: '<< /Title (Figures) >>' });
 }
@@ -191,14 +195,31 @@ test('every figure is answered from one opening of the document', () => {
   // with 76 figures would otherwise reopen and reparse the file 76 times,
   // and the real one in hand has 76.
   const pdf = pdfWithFigures();
-  const findings = [figureFinding('struct:6', 'figure 1, page 1'), figureFinding('struct:8', 'figure 2, page 1')];
+  const findings = [
+    figureFinding('struct:6', 'figure 1, page 1'),
+    figureFinding('struct:8', 'figure 2, page 1'),
+    figureFinding('struct:9', 'figure 3, page 1'),
+  ];
   const out = imagesForFindings(pdf, 'pdf', findings);
 
-  assert.equal(out.size, 2);
+  assert.equal(out.size, 3);
   const withImage = out.get('image-alt|figure 1, page 1')!;
-  const vector = out.get('image-alt|figure 2, page 1')!;
+  const noBox = out.get('image-alt|figure 2, page 1')!;
+  const drawable = out.get('image-alt|figure 3, page 1')!;
+
   assert.equal(withImage.ok, true);
-  assert.deepEqual(vector, { ok: false, reason: 'vector' });
+
+  // Vector artwork the document does not place: still nothing anybody can
+  // send, and now said more precisely than "there is no picture" — the
+  // renderer could draw it if the file said where it was.
+  assert.deepEqual(noBox, { ok: false, reason: 'no-box' });
+
+  // Vector artwork the document does place: drawable. The box travels with
+  // the answer so the route can render it without reopening the file to
+  // ask again.
+  assert.equal(drawable.ok, false);
+  assert.ok(!drawable.ok && drawable.render, 'the box came back with it');
+  assert.deepEqual(!drawable.ok && drawable.render, { page: 1, box: [10, 10, 50, 50] });
 });
 
 test('findings that are not figures are not asked about at all', () => {
@@ -219,4 +240,41 @@ test('a document with no figures needs no opening, so a broken one cannot break 
   // The bytes here are not a PDF at all. Nothing throws, because nothing is
   // asked of them.
   assert.equal(imagesForFindings(new Uint8Array([1, 2, 3]), 'pdf', []).size, 0);
+});
+
+
+/**
+ * The box is what makes rendering allowed at all. Without it the only way
+ * to draw a vector figure is to draw the page it sits on, and a rendered
+ * page is a picture of the page's text — which the retention decision
+ * forbids leaving the building. So: no box, no render, and the reviewer is
+ * told, exactly as they were before a renderer existed.
+ */
+test('a figure’s box is read from the tag tree, and its absence is not guessed at', () => {
+  const doc = PdfDocument.parse(pdfWithFigures(), inflate);
+
+  assert.deepEqual(figureBox(doc, 'struct:9'), { page: 1, box: [10, 10, 50, 50] });
+
+  // No layout attributes at all.
+  assert.equal(figureBox(doc, 'struct:8'), null);
+  // Not a figure, not a structure element, not an anchor.
+  assert.equal(figureBox(doc, 'struct:999'), null);
+  assert.equal(figureBox(doc, 'docPr:3'), null);
+  assert.equal(figureBox(doc, undefined), null);
+});
+
+test('a box with no area is treated as no box at all', () => {
+  // A zero-area box says nothing about where the figure is, and rendering
+  // it would produce a one-pixel image of nothing that a model would
+  // cheerfully describe.
+  const objects: Obj[] = [
+    `<< /Type /Catalog /Pages 2 0 R /MarkInfo << /Marked true >> /StructTreeRoot 5 0 R >>`,
+    `<< /Type /Pages /Kids [3 0 R] /Count 1 >>`,
+    `<< /Type /Page /Parent 2 0 R /Contents 4 0 R >>`,
+    `<< /Length 2 >>\nstream\n  \nendstream`,
+    `<< /Type /StructTreeRoot /K [6 0 R] >>`,
+    `<< /S /Figure /Pg 3 0 R /K 0 /A << /O /Layout /BBox [10 10 10 10] >> >>`,
+  ];
+  const doc = PdfDocument.parse(buildPdf(objects), inflate);
+  assert.equal(figureBox(doc, 'struct:6'), null);
 });

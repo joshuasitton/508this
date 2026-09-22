@@ -4,6 +4,41 @@ The running project-level record. Sections are dated and kept in order rather
 than rewritten, so the reasoning stays readable. Decisions live in
 `docs/leadership-standup.md`; this file says where the code stands.
 
+## 2026-09-22, night — the renderer, and the crop that makes it allowed
+
+The Chairman took the dependency. `src/server/render.ts`: pdf.js and a
+native canvas, both loaded through `await import` from a file no test
+imports, so `npm test` still passes with `node_modules` moved aside. 287
+tests.
+
+**The crop is the point.** This draws one figure and never a page, because
+a rendered page is a picture of the page's text and that may not leave the
+building. The box comes from the tag tree — `/A << /O /Layout /BBox >>`,
+which PDF/UA requires on a figure — and **no box means no render**.
+
+That was worth measuring before building, and measuring changed the work
+again: every figure in the Chairman's infographic already carries its box.
+What could have been a content-stream interpreter tracking transformation
+matrices and path operators turned out to be four lines reading a
+dictionary. Fourth time this week that opening the real file was cheaper
+than reasoning about it.
+
+**Licence, not quality, picked the renderer.** MuPDF is better and it is
+AGPL, which means publishing this service. pdfjs-dist is Apache-2.0 and
+@napi-rs/canvas is MIT.
+
+**Verified in the browser on both real PDFs.** The CHERP infographic: four
+figures, **four drawn**, zero "describe it yourself" where there used to be
+four. The served PNG is 396×166 — a whole page at that scale would be about
+1400×1812, which is the crop working rather than being claimed. The Hokua
+logo sheet, untagged and therefore boxless, renders nothing and says why. No
+page errors.
+
+**Two build details worth remembering.** `serverExternalPackages` is
+required: a native `.node` binding cannot be traced into a bundle, and
+Turbopack was right to refuse. And `npm install --save` removed the
+`--no-save` playwright-core again, which is the second time this week.
+
 ## 2026-09-22, night — the three things a production store has to do
 
 Encryption at rest, deletion, and the scrub. 285 tests, still green with
