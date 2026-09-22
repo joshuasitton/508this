@@ -32,8 +32,8 @@ npm run triage -- DIR # classify a folder of PDFs; prints no document content
 | Path | What lives there |
 |---|---|
 | `src/app/` | App Router pages and layouts, one folder per route; `jobs/[id]/review` is the queue |
-| `src/domain/` | pure functions: the criteria catalogue and coverage, findings, the Word and PDF detectors, the Word remediator, the PDF reader, the job model, the conformance report, the triage and the prices |
-| `src/server/` | Node-only code: the zip reader and writer, the .docx part reader, the PDF reader's inflate, the job store, the report packer |
+| `src/domain/` | pure functions: the criteria catalogue and coverage, findings, the Word and PDF detectors, the Word remediator, the PDF reader, the job model, the conformance report, the triage, the prices, and the identity, session and audit policy |
+| `src/server/` | Node-only code: the zip reader and writer, the .docx part reader, the PDF reader's inflate, the job store, the report packer, and the account, session, password and audit stores |
 | `__tests__/` | tests, against the domain layer and the server layer's pure parts |
 | `scripts/ts-resolve.mjs` | lets Node run the TypeScript domain with no bundler |
 | `docs/` | project-level state and the leadership standup log |
@@ -114,7 +114,28 @@ npm run triage -- DIR # classify a folder of PDFs; prints no document content
   and authentication is one of its controls. `setReviewer` taking a name a
   person types is right for a service run by one person and is not
   authentication; it is the seam where real accounts go. Nothing that stores
-  a CUI document in production merges before that exists.
+  a CUI document in production merges before that exists. The identity layer
+  is built — `src/domain/account.ts`, `session.ts`, `audit.ts` and their
+  three server modules — but **nothing is gated by it yet**: no sign-in
+  page, no owner on a job, and `/jobs/<id>` still answers to anyone holding
+  the link.
+- **An audit record has no free-text field, and `auditEvent` throws on a
+  subject that is not a UUID.** 800-171 wants records sufficient to trace a
+  user's actions; this file's oldest rule says no document content reaches a
+  log. The two pull apart the moment somebody adds a `detail` field and a
+  dismissal note — which quotes the customer — lands in it. There is nowhere
+  for prose to go, a test proves it by trying, and adding a field that takes
+  text breaks the guarantee rather than extending it.
+- **A failed sign-in answers one way and costs one price.** Wrong
+  passphrase, unknown address and disabled account all return `'no'` and all
+  spend the same scrypt work (`spendTime`), because a fast answer is an
+  answer: it says there is no such account, and the customer list is worth
+  something. What really happened goes to the audit log. The email index is
+  keyed by SHA-256 for the same reason.
+- **A session token is never stored, only its SHA-256.** A leaked session
+  file is then not a set of live sessions. Fast hash here, scrypt for
+  passphrases: a token is 256 bits of randomness and cannot be guessed, so
+  the cost would buy nothing and be paid on every request.
 - **A remediated file is the original with changes appended or overlaid,
   never a rebuild.** `writeDocx` writes changed parts over the original
   archive; `incrementalUpdate` appends changed objects and a new cross
