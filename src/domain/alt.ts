@@ -142,6 +142,8 @@ export interface FigureImage {
  */
 export type NoImage =
   | 'vector'
+  | 'no-box'
+  | 'render-failed'
   | 'not-found'
   | 'unsupported-filter'
   | 'unsupported-colour'
@@ -151,7 +153,11 @@ export type NoImage =
 export function describeNoImage(reason: NoImage): string {
   switch (reason) {
     case 'vector':
-      return 'This figure is drawn as vector artwork, so there is no picture in the file to send. Describe it yourself.';
+      return 'This figure is drawn as vector artwork rather than stored as a picture. Where the document says where it sits on the page, 508This draws it; this one could not be. Describe it yourself.';
+    case 'no-box':
+      return 'This figure is vector artwork and the document does not say where on the page it sits, so there is nothing that can be drawn without sending the whole page. Describe it yourself.';
+    case 'render-failed':
+      return 'This figure could not be drawn. Describe it yourself.';
     case 'not-found':
       return 'The figure could not be found in the document. Describe it yourself.';
     case 'unsupported-filter':

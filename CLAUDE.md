@@ -222,11 +222,19 @@ npm run sweep         # delete the documents whose retention window has run out
   rather than rubber-stamped, and it is not optional garnish: without it the
   screen asks a person to vouch for a sentence about something they cannot
   see. When there is no picture, the same place says why.
-- **A figure has no image more often than it has one.** PDF artwork out of
-  Illustrator or InDesign is vector: path operators, no picture in the file.
-  `figureImage` reports `vector`, which is an answer and not a failure, and
-  the reviewer is told to describe it themselves rather than to try again at
-  something that cannot work.
+- **A figure has no stored image more often than it has one, and is now
+  drawn instead.** PDF artwork out of Illustrator or InDesign is vector —
+  three real files, eighty-odd figures, not one raster image. `src/server/
+  render.ts` draws it with pdf.js, and **the crop is the whole safety
+  argument**: it renders one figure, never a page, because a rendered page
+  is a picture of the page's text and that may not leave. The box comes from
+  the tag tree (`figureBox`), PDF/UA requires it on a figure, and **no box
+  means no render** — the reviewer is told, exactly as before.
+- **The renderer is Apache-2.0 and MIT, not AGPL.** `pdfjs-dist` and
+  `@napi-rs/canvas`. MuPDF renders better and linking it into a commercial
+  service means publishing the service. Both load through `await import`
+  from a file no test imports, and both are in `serverExternalPackages`
+  because a native binding cannot be bundled.
 - **A price is never returned without the promise it buys.** `quoteFor` in
   `src/domain/pricing.ts` hands back the number and the sentence together,
   and nothing in the repository returns the number alone. `PRICES` is one

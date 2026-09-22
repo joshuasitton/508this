@@ -25,6 +25,69 @@ export type FigureImageSource =
   | { ok: true; stream: PdfStream }
   | { ok: false; reason: NoImage };
 
+/**
+ * Where a figure is on the page, when the document says so.
+ *
+ * A `/Figure` element may carry layout attributes — `/A << /O /Layout /BBox
+ * [x0 y0 x1 y1] >>` — and PDF/UA requires them for a figure that is not
+ * inline, so a document produced to be accessible usually has one. Every
+ * figure in the Chairman's infographic does. That box is what makes
+ * rendering *safe*: it is the difference between sending a model one figure
+ * and sending it a picture of the whole page, text and all, which the
+ * retention decision forbids.
+ *
+ * `page` is a one-based page number, matching everything else the detectors
+ * report.
+ */
+export interface FigureBox {
+  page: number;
+  /** PDF user space: x0, y0, x1, y1, origin bottom left. */
+  box: [number, number, number, number];
+}
+
+function numbers(value: PdfValue, doc: PdfDocument): number[] | null {
+  const v = doc.resolve(value);
+  if (!Array.isArray(v) || v.length !== 4) return null;
+  const out = v.map((n) => Number(doc.resolve(n)));
+  return out.every((n) => Number.isFinite(n)) ? out : null;
+}
+
+/**
+ * The figure's box and page, or null if the document does not say.
+ *
+ * `/A` is a single attribute dictionary or an array of them, optionally
+ * interleaved with revision numbers, so every entry is examined rather than
+ * the first. No box means no render: the fallback is to tell the reviewer,
+ * never to send the page instead.
+ */
+export function figureBox(doc: PdfDocument, anchor: string | undefined): FigureBox | null {
+  const num = structNum(anchor);
+  if (num === null) return null;
+
+  const element = doc.get(num);
+  if (!(element instanceof Map)) return null;
+
+  const page = doc.resolve(element.get('Pg'));
+  if (!(page instanceof Map)) return null;
+  const index = doc.pages.indexOf(page);
+  if (index < 0) return null;
+
+  const attributes = doc.resolve(element.get('A'));
+  const candidates = Array.isArray(attributes) ? attributes : [attributes];
+  for (const candidate of candidates) {
+    const dict = doc.resolve(candidate);
+    if (!(dict instanceof Map)) continue;
+    const box = numbers(dict.get('BBox') ?? null, doc);
+    if (!box) continue;
+    const [x0, y0, x1, y1] = box as [number, number, number, number];
+    // A zero-area box is a box that says nothing; treat it as absent
+    // rather than rendering a one-pixel image of it.
+    if (Math.abs(x1 - x0) < 1 || Math.abs(y1 - y0) < 1) continue;
+    return { page: index + 1, box: [x0, y0, x1, y1] };
+  }
+  return null;
+}
+
 /** The structure element object number in an anchor like `struct:25`. */
 export function structNum(anchor: string | undefined): number | null {
   if (!anchor) return null;

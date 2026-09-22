@@ -337,9 +337,30 @@ export async function figureImages(id: string): Promise<Map<string, FigureResult
   }
 }
 
-/** One figure's bytes, for the route that shows it. */
+/**
+ * One figure's bytes, for the route that shows it — drawing it first if the
+ * document holds paths rather than a picture.
+ *
+ * The drawing happens here, one figure at a time, rather than in
+ * `figureImages`. A submission with 76 vector figures would otherwise
+ * render all 76 before the review page painted a single pixel; this way the
+ * page draws immediately and the browser fetches the images the way it
+ * fetches any other, in parallel and as they are needed.
+ */
 export async function figureImage(id: string, findingKeyValue: string): Promise<FigureResult> {
-  return (await figureImages(id)).get(findingKeyValue) ?? { ok: false, reason: 'not-found' };
+  const found = (await figureImages(id)).get(findingKeyValue) ?? { ok: false, reason: 'not-found' as const };
+  if (found.ok || !found.render) return found;
+
+  const job = await getJob(id);
+  if (!job) return { ok: false, reason: 'not-found' };
+
+  // Loaded through `await import` for the same reason `vision.ts` is: the
+  // renderer takes npm dependencies, this store is in the test suite's
+  // import graph, and `npm test` runs with nothing installed.
+  const { renderFigure } = await import('./render');
+  const original = await readBlob(job.id, `original.${job.format}`);
+  if (!original) return { ok: false, reason: 'not-found' };
+  return renderFigure(original, found.render);
 }
 
 export type ProposeResult =
@@ -378,11 +399,24 @@ export async function propose(id: string, findingKeyValue: string): Promise<Prop
 
   const original = (await readBlob(job.id, `original.${job.format}`)) ?? new Uint8Array();
   const found = imageForFinding(original, job.format, target);
-  if (!found.ok) return { ok: false, reason: found.reason };
+
+  // Vector artwork is drawn before it is described. The crop is what makes
+  // that allowed: one figure leaves, never the page it sits on.
+  let image;
+  if (found.ok) {
+    image = found.image;
+  } else if (found.render) {
+    const { renderFigure } = await import('./render');
+    const drawn = await renderFigure(original, found.render);
+    if (!drawn.ok) return { ok: false, reason: drawn.reason };
+    image = drawn.image;
+  } else {
+    return { ok: false, reason: found.reason };
+  }
 
   let draft;
   try {
-    draft = await draftAltText(found.image);
+    draft = await draftAltText(image);
   } catch (error) {
     // Nothing about the document goes into this path: the shape of the
     // failure is all that is kept.

@@ -282,7 +282,10 @@ function ReviewItem({
   jobId: string;
   canDecide: boolean;
   canDraft: boolean;
-  picture?: { ok: true } | { ok: false; reason: NoImage };
+  // `render` present means the figure is vector artwork the service can
+  // draw. For this page that is the same as having a picture — the drawing
+  // happens when the browser asks the figure route for it.
+  picture?: { ok: true } | { ok: false; reason: NoImage; render?: unknown };
 }) {
   const info = KINDS[f.kind];
   const input = REVIEW_INPUT[f.kind];
@@ -303,7 +306,7 @@ function ReviewItem({
       </p>
       <p className={styles.why}>{info.why}</p>
 
-      {input === 'alt' && picture?.ok === true && (
+      {input === 'alt' && (picture?.ok === true || (picture?.ok === false && Boolean(picture.render))) && (
         <figure className={styles.figure}>
           {/* eslint-disable-next-line @next/next/no-img-element -- the bytes
               come from the customer's own document through a private route,
@@ -315,7 +318,7 @@ function ReviewItem({
           />
         </figure>
       )}
-      {input === 'alt' && picture?.ok === false && (
+      {input === 'alt' && picture?.ok === false && !picture.render && (
         <p className={styles.noFigure}>{describeNoImage(picture.reason)}</p>
       )}
 
