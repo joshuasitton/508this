@@ -4,6 +4,52 @@ The running project-level record. Sections are dated and kept in order rather
 than rewritten, so the reasoning stays readable. Decisions live in
 `docs/leadership-standup.md`; this file says where the code stands.
 
+## 2026-09-22, night — the credentials, and the end of local disk
+
+`accounts.ts`, `sessions.ts` and `resets.ts` are on the blob seam. **Nothing
+the service persists is on local disk any more**, which is the sentence that
+makes Vercel's ephemeral filesystem survivable. 311 tests, still green with
+`node_modules` moved aside.
+
+Each record is sealed with its own key as associated data, and the binding
+matters more here than the secrecy does. A passphrase is already a scrypt
+hash; what the seal protects is *where a record sits*. A session record is
+what the server accepts instead of a passphrase, so one that could be copied
+onto the digest of a token an attacker holds is a sign-in as somebody else
+without a credential. A reset record names the account its link resets.
+Tests move all three and watch them stop opening.
+
+**`endAllSessions` needed an index.** It read every session record in the
+service to find one account's — linear and fine on a disk, and against a
+bucket a listing of everything plus a fetch each, on the path that runs when
+somebody thinks their account is compromised. Now it is an empty object at
+`sessions/by-account/<account>/<digest>.json` whose name carries what is
+needed. **The entry is written before the record**: an entry with no record
+is a no-op to delete, a record with no entry is a session that survives the
+reset meant to end it. Every path that ends a session removes both, or the
+index becomes a permanent list of every session ever issued — tested.
+
+**A broken seal throws in `accounts.ts` and returns null in `sessions.ts`
+and `resets.ts`.** An account is fetched by an id the server resolved, so a
+failed check is a real problem and should be loud. A session or reset key
+comes from a cookie or a URL, so throwing would turn any forged token into a
+500 — a way to knock the service over and a way to tell a stranger their
+guess landed on something.
+
+**The development mail outbox stays on disk**, and `ACCOUNTS_DIR` now names
+only that. It holds letters carrying live reset links, and in production no
+letter is written at all. Moving credentials somewhere more exposed to tidy
+a folder would be the wrong trade.
+
+Verified live on both servers. On the production build: sign-up, sign-out,
+sign-in, a second session, and the sealed account record reading back with
+the audit sequence to match — including `mail.failed`, because production
+with no mail token deliberately sends nothing. On the dev server, where the
+outbox exists, the whole reset cycle: link minted, followed, passphrase
+changed, **the other browser context signed out by the reset** — that is
+`endAllSessions` through the new index — old passphrase refused, new one
+accepted. Records and index entries matched one for one afterwards.
+
 ## 2026-09-22, night — the audit log, one object per event
 
 `src/server/audit.ts` is on the blob seam. It was `appendFile` to one file
@@ -52,7 +98,8 @@ stays on disk and stops being read; nothing deletes it.
 
 **Still on local disk:** accounts, sessions and reset tokens. Those are
 credentials rather than records, and none of them has a design question in
-the way — they are a port.
+the way — they are a port. *(Overtaken the same night: ported, and the one
+thing that was not a straight port was the session index.)*
 
 ## 2026-09-22, night — the object store
 

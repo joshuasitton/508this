@@ -21,6 +21,13 @@
  * local disk because somebody forgot an environment variable is worse than
  * one that cannot send mail at all, because it looks like it is working.
  *
+ * This is the last thing in the service still written to a local path, and
+ * it stays there on purpose. `ACCOUNTS_DIR` names the outbox and nothing
+ * else now — accounts, sessions and reset tokens are all on the store.
+ * These files hold **live reset links**, and they exist only in
+ * development; putting credentials on the shared store to tidy a folder
+ * would be moving them somewhere more exposed for no reason.
+ *
  * ## What is never recorded
  *
  * No message body reaches a log, an error or an audit record — a reset mail

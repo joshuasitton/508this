@@ -123,11 +123,26 @@ npm run sweep         # delete the documents whose retention window has run out
   key, so a record cannot be re-filed under another account or renamed to
   back-date it. `history` reports how many records would not open; a log that
   shrinks silently cannot say the one thing it exists to say.
-- **The retention sweep must never be able to reach the `audit/` prefix.**
-  It sees only keys whose first segment is a job id. Documents and evidence
-  share one store, so this is what keeps a retention policy from becoming an
-  evidence shredder — and it would do it quietly. There is a test. No
-  lifecycle rule on that prefix when the bucket is made.
+- **Nothing the service persists is on local disk any more.** Jobs under
+  `<id>/`, and `accounts/`, `sessions/`, `resets/`, `audit/` beside them,
+  all through `blobs.ts`. The one exception is the development mail outbox
+  under `ACCOUNTS_DIR`, which holds live reset links and is never written in
+  production — leave it where it is.
+- **`sessions/by-account/<account>/<digest>.json` is an index, and the entry
+  is written before the record.** An entry with no record is a no-op to
+  delete; a record with no entry is a session that survives the passphrase
+  reset meant to end it. Every path that ends a session removes both.
+- **A broken seal throws in `accounts.ts` and returns null in `sessions.ts`
+  and `resets.ts`.** That asymmetry is deliberate: an account is fetched by
+  an id the server resolved, so a failure is a real problem; a session or
+  reset key comes from a cookie or a URL, so throwing would turn any forged
+  token into a 500 and a signal.
+- **The retention sweep must never be able to reach the `audit/` prefix**,
+  or `accounts/`, `sessions/` or `resets/`.
+  It sees only keys whose first segment is a job id. Documents, evidence and
+  credentials share one store, so this is what keeps a retention policy from
+  becoming an evidence shredder — and it would do it quietly. There are
+  tests. No lifecycle rule on those prefixes when the bucket is made.
 - **Everything stored is sealed with AES-256-GCM, with the job id as
   associated data.** A blob moved into another job's directory will not
   open. The authentication matters as much as the secrecy: a job record
