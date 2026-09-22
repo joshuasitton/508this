@@ -8,6 +8,67 @@ for. Where an entry has since been overtaken, `docs/build-state.md` says so.
 
 ---
 
+## 2026-09-22, evening — the door is shut, and the front door is still open
+
+### What the Chairman said
+
+Merge it and keep the anonymous upload.
+
+### What that settled
+
+It settled the collision, and the resolution is better than either half
+would have been alone. A job now belongs to an **account** or to a
+**visitor** — one browser, one cookie, no name:
+
+| | A visitor | An account |
+|---|---|---|
+| Upload, and read the assessment | yes | yes |
+| Mark it CUI | no | yes |
+| Decide, name a reviewer, draft, remediate, download | no | yes |
+
+The second column is the paid column. That is not a coincidence and it was
+not designed twice: pricing already said the assessment is free and
+everything producing a deliverable is bought, and 800-171 already said a
+name on a conformance statement belongs to somebody the service
+authenticated. They turned out to be the same line.
+
+### What is now true that was not this morning
+
+**A link no longer opens a document.** The same URL in a second browser is a
+404 that does not leak the filename or the fact that the job exists — "not
+yours" and "no such job" are the same page, because telling a stranger a
+document exists tells them who our customer is.
+
+**A CUI document cannot be uploaded by a stranger.** It is refused at the
+form, before anything is stored, because by the time it is on disk it is on
+disk under a promise the service cannot keep.
+
+### The engineering decision worth recording
+
+**One door, and a test that counts the doors.** Every page, route and action
+reaches a job through `src/server/access.ts` and nothing else; a test walks
+`src/app/`, reads every import of the job store, and fails on anything
+outside a three-name allowlist. A check written at nine call sites is a
+check missing from the tenth, and on this product the thing behind the door
+is a federal contractor's document.
+
+### Still with the Chairman
+
+The first live drafted description, on his own machine — the vision path is
+exercised and has never been proven. Whether the Hermes submission's 76
+figures are raster or vector. And the four prices, whenever he wants to move
+them.
+
+### Next, and it is short
+
+**Mail.** Password reset needs it, and so does the honest answer to a
+sign-up against an address that already has an account — that page currently
+tells the person plainly that no message is coming, which is true and is not
+a state to leave running. After that, production storage with deletion,
+scrubbing and encryption built in from the first commit.
+
+---
+
 ## 2026-09-22, later — accounts, and the question the free assessment asks of them
 
 ### What the Chairman said

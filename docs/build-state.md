@@ -4,6 +4,43 @@ The running project-level record. Sections are dated and kept in order rather
 than rewritten, so the reasoning stays readable. Decisions live in
 `docs/leadership-standup.md`; this file says where the code stands.
 
+## 2026-09-22, evening — every job has an owner
+
+The other half. Sign-in, sign-up and sign-out pages; a job owned by an
+account or by a visitor and never by neither; and `src/server/access.ts` as
+the one door, with a test that walks `src/app/` and fails on any import of
+the job store outside a three-name allowlist. 249 tests.
+
+The Chairman kept the anonymous upload, which is what the two-way owner is
+for. A visitor uploads and reads their assessment; marking CUI, deciding a
+finding, remediating and downloading all need an account. That is the same
+line `pricing.ts` draws, and it falls out of the two decisions rather than
+being invented: the assessment is free so it cannot need a sign-up, and a
+deliverable carries a name so it cannot be signed by a cookie.
+
+`claimJobs` runs at sign-in and moves that browser's jobs to the account.
+`mayOpen` already lets a signed-in person read a job their own browser
+uploaded, so nothing breaks if the claim never happens — but the cookie
+expires in thirty days and the account does not.
+
+**Verified in the browser, six steps, all passing.** An anonymous upload
+works and shows the assessment with no fix button and the sign-in sentence
+in its place. **The same URL in a second browser is a 404 that leaks
+neither the filename nor the fact that a job exists.** A CUI upload while
+signed out is refused before anything is stored. Signing up in the first
+browser claims the job — it still opens, and the fix button appears. CUI
+while signed in is accepted. Signing out shuts the door on the now-claimed
+job. The only console errors are the two deliberate 404s.
+
+`src/app/not-found.tsx` replaced Next's stock page, because a 404 stopped
+meaning "typo" and started meaning "not yours", which is a routine and
+correct outcome somebody will meet holding a link a colleague sent them.
+
+**Found and not fixed:** `src/app/start/page.tsx` sets `encType` on a form
+whose action is a server function, and React logs a warning saying it
+overrides it. Pre-existing, unrelated to ownership, and one attribute to
+delete — left out of this change rather than widening it.
+
 ## 2026-09-22, later — the identity layer, with nothing gated by it
 
 Seven files and 35 new tests: `src/domain/account.ts` (what an address and

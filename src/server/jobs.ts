@@ -16,7 +16,7 @@
  * document content, so whatever logs it cannot leak it.
  */
 
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 
@@ -29,6 +29,7 @@ import { findingKey, isOpen, summarise, type Decision, type Finding } from '@/do
 import type { NoImage } from '@/domain/alt';
 import { imageForFinding, imagesForFindings, type FigureResult } from './figures';
 import { reviewerName, type Format, type Job } from '@/domain/job';
+import type { Owner } from '@/domain/viewer';
 import { applyDecisions, remediateDocx } from '@/domain/remediate';
 import { readDocxParts, writeDocx } from './docx';
 import { readPdf, writePdf } from './pdf';
@@ -55,11 +56,16 @@ function detect(format: Format, bytes: Uint8Array): { findings: Finding[]; tier?
   return { findings, tier: triagePdf(readPdfFacts(doc), findings).tier };
 }
 
+/**
+ * Store a document. The owner is required rather than optional: a job with
+ * nobody's name on it is the bearer-URL this whole change exists to end,
+ * and the type is the only thing that reliably stops one being written.
+ */
 export async function createJob(
   filename: string,
   format: Format,
   bytes: Uint8Array,
-  options: { cui?: boolean } = {},
+  options: { cui?: boolean; owner: Owner },
 ): Promise<Job> {
   // Detect before writing anything, so a document the reader rejects is
   // never stored.
@@ -74,6 +80,8 @@ export async function createJob(
   };
   if (tier) job.tier = tier;
   if (options.cui) job.cui = true;
+  if ('account' in options.owner) job.account = options.owner.account;
+  else job.visitor = options.owner.visitor;
   const dir = dirFor(job.id);
   await mkdir(dir, { recursive: true });
   await writeFile(path.join(dir, `original.${format}`), bytes);
@@ -118,6 +126,48 @@ async function redetect(job: Job): Promise<Job> {
   if (tier) repaired.tier = tier;
   await writeFile(path.join(dirFor(job.id), 'job.json'), JSON.stringify(repaired, null, 2));
   return repaired;
+}
+
+/**
+ * Hand a browser's jobs to the account that browser just signed in to.
+ *
+ * Somebody uploads, reads the free assessment, decides to keep the work and
+ * makes an account. Without this their document is stranded behind a cookie
+ * that no longer decides anything. Claiming is a deliberate write and not a
+ * side effect of reading: `mayOpen` already lets a signed-in person *see* a
+ * job their own browser uploaded, so nothing is urgent about the transfer
+ * and nothing is lost if it never happens.
+ *
+ * Only a job still owned by that visitor moves. A job already owned by an
+ * account is never reassigned by this path — a cookie is not evidence about
+ * who an account is.
+ */
+export async function claimJobs(visitor: string, account: string): Promise<number> {
+  let ids: string[];
+  try {
+    ids = await readdir(ROOT);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return 0;
+    throw error;
+  }
+
+  let claimed = 0;
+  for (const id of ids) {
+    if (!ID.test(id)) continue;
+    let job: Job;
+    try {
+      job = JSON.parse(await readFile(path.join(dirFor(id), 'job.json'), 'utf8')) as Job;
+    } catch {
+      // A directory without a readable record is not a job to claim.
+      continue;
+    }
+    if (job.account || job.visitor !== visitor) continue;
+    delete job.visitor;
+    job.account = account;
+    await writeFile(path.join(dirFor(id), 'job.json'), JSON.stringify(job, null, 2));
+    claimed += 1;
+  }
+  return claimed;
 }
 
 export type JobFile = 'original' | 'remediated';

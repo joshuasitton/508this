@@ -10,9 +10,26 @@ import { zip } from './helpers/zip';
 // module is loaded and the module is loaded dynamically.
 const root = mkdtempSync(path.join(tmpdir(), '508this-jobs-'));
 process.env.DOCUMENTS_DIR = root;
-const { confirm, createJob, decide, getJob, getJobFile, remediateJob, setReviewer, unconfirm, undecide } =
-  await import('../src/server/jobs');
+const {
+  claimJobs,
+  confirm,
+  createJob,
+  decide,
+  getJob,
+  getJobFile,
+  remediateJob,
+  setReviewer,
+  unconfirm,
+  undecide,
+} = await import('../src/server/jobs');
 const { unzip } = await import('../src/server/unzip');
+
+/**
+ * Every job needs an owner now. The store takes it as a required argument
+ * rather than an optional one precisely so that a test cannot quietly write
+ * the bearer-URL job this change exists to end.
+ */
+const OWNER = { account: '11111111-2222-4333-8444-555555555555' } as const;
 
 const W = 'xmlns:w="w"';
 const docx = zip({
@@ -20,7 +37,7 @@ const docx = zip({
 });
 
 test('a job is created with findings that carry a kind, and read back the same', async () => {
-  const job = await createJob('hello.docx', 'docx', docx);
+  const job = await createJob('hello.docx', 'docx', docx, { owner: OWNER });
   assert.match(job.id, /^[0-9a-f-]{36}$/);
   assert.ok(job.findings.length >= 2, 'no title and no language, at least');
   for (const f of job.findings) assert.equal(typeof f.kind, 'string');
@@ -72,7 +89,7 @@ test('remediation stores a fixed document, marks only what re-detection no longe
     'word/styles.xml': `<w:styles ${W2}><w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/><w:pPr><w:outlineLvl w:val="0"/></w:pPr></w:style></w:styles>`,
     'word/media/image1.png': new Uint8Array([137, 80, 78, 71]),
   });
-  const job = await createJob('grant narrative.docx', 'docx', withIssues);
+  const job = await createJob('grant narrative.docx', 'docx', withIssues, { owner: OWNER });
   assert.deepEqual([...new Set(job.findings.map((f) => f.kind))].sort(), ['link-text', 'no-language', 'no-title', 'table-header']);
   assert.equal(await getJobFile(job.id, 'remediated'), null, 'nothing to download before remediation');
 
@@ -105,7 +122,7 @@ test('a reviewer’s decisions and confirmations take a job from remediated to d
     'word/styles.xml': `<w:styles ${W3}><w:docDefaults><w:rPrDefault><w:rPr><w:lang w:val="en-US"/></w:rPr></w:rPrDefault></w:docDefaults><w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/><w:pPr><w:outlineLvl w:val="0"/></w:pPr></w:style></w:styles>`,
     'docProps/core.xml': '<cp:coreProperties xmlns:cp="c" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Title</dc:title></cp:coreProperties>',
   });
-  const job = await createJob('memo.docx', 'docx', file);
+  const job = await createJob('memo.docx', 'docx', file, { owner: OWNER });
   assert.deepEqual(job.findings.map((f) => f.kind), ['image-alt', 'link-text']);
   const [alt, link] = job.findings.map((f) => `${f.kind}|${f.location}`);
   const by = 'Josh Sitton';
@@ -138,7 +155,7 @@ test('the reviewer is named once, and the name is the job\u2019s rather than a f
   // decision form \u2013 fifteen of them on a PDF with four undescribed figures.
   // The name now lives here, so there is one field on the page and one copy
   // of the fact.
-  const job = await createJob('named.docx', 'docx', docx);
+  const job = await createJob('named.docx', 'docx', docx, { owner: OWNER });
   assert.equal(job.reviewer, undefined);
   const named = (await setReviewer(job.id, '  J.\tSitton  '))!;
   assert.equal(named.reviewer, 'J. Sitton', 'normalised on the way in');
@@ -146,7 +163,7 @@ test('the reviewer is named once, and the name is the job\u2019s rather than a f
 });
 
 test('a blank name is refused rather than stored as a nameless signature', async () => {
-  const job = await createJob('blank.docx', 'docx', docx);
+  const job = await createJob('blank.docx', 'docx', docx, { owner: OWNER });
   assert.equal(await setReviewer(job.id, '   '), null);
   assert.equal((await getJob(job.id))!.reviewer, undefined);
   assert.equal(await setReviewer('00000000-0000-4000-8000-00000000dead', 'Nobody'), null);
@@ -155,7 +172,7 @@ test('a blank name is refused rather than stored as a nameless signature', async
 test('handing over does not rewrite the decisions the last reviewer made', async () => {
   // A second reviewer taking the job over is normal; re-attributing what the
   // first one already vouched for would be forging a signature.
-  const job = await remediateJob((await createJob('handover.docx', 'docx', docx)).id);
+  const job = await remediateJob((await createJob('handover.docx', 'docx', docx, { owner: OWNER })).id);
   const first = job!.findings.find((f) => !f.remediated);
   await setReviewer(job!.id, 'First Reviewer');
   await decide(job!.id, `${first!.kind}|${first!.location}`, {
@@ -168,4 +185,36 @@ test('handing over does not rewrite the decisions the last reviewer made', async
   assert.equal(after.reviewer, 'Second Reviewer');
   const decided = after.findings.find((f) => f.decision)!;
   assert.equal(decided.decision!.by, 'First Reviewer');
+});
+
+
+/**
+ * Upload first, sign up second — the sequence the Chairman's decision to
+ * keep the anonymous assessment makes the common one. Without this the
+ * document somebody has just decided to pay for is stranded behind a cookie
+ * that stopped deciding anything the moment they made an account.
+ */
+test('a browser\u2019s jobs move to the account that browser signs in to, and nobody else\u2019s do', async () => {
+  const browser = 'c'.repeat(64);
+  const someoneElse = 'd'.repeat(64);
+  const account = '11111111-2222-4333-8444-999999999999';
+
+  const mine = await createJob('mine.docx', 'docx', docx, { owner: { visitor: browser } });
+  const theirs = await createJob('theirs.docx', 'docx', docx, { owner: { visitor: someoneElse } });
+  const already = await createJob('already.docx', 'docx', docx, { owner: { account: OWNER.account } });
+
+  assert.equal(await claimJobs(browser, account), 1);
+
+  const claimed = await getJob(mine.id);
+  assert.equal(claimed?.account, account);
+  assert.equal(claimed?.visitor, undefined, 'the cookie no longer has a claim on it');
+
+  assert.equal((await getJob(theirs.id))?.visitor, someoneElse, 'another browser keeps its own');
+  assert.equal(
+    (await getJob(already.id))?.account,
+    OWNER.account,
+    'a job already owned by an account is never reassigned by a cookie',
+  );
+
+  assert.equal(await claimJobs(browser, account), 0, 'claiming twice claims nothing the second time');
 });

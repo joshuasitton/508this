@@ -995,11 +995,55 @@ passphrase is chosen by a person and must be expensive to guess, a token is
 256 bits of randomness and cannot be guessed at any price, so scrypt would
 buy nothing and be paid on every request.
 
-### What is deliberately not here yet
+### Every job has an owner, and a link is not one
 
-**No sign-in, sign-up or sign-out page.** Nothing is gated, no job has an
-owner, and `/jobs/<id>` is still readable by anyone with the link. That is
-the next change and it is the one that actually closes the hole.
+A job now belongs either to an **account** or to a **visitor** — one
+browser, one cookie, no name. That two-way split is what lets both of the
+Chairman's decisions stand at once. Pricing says a customer should find out
+whether the service can help them *before* they pay, so a sign-up wall in
+front of the first upload is out. CUI says an identified, authenticated user
+has to be on the other end, so "anyone holding the link is the reviewer" is
+also out.
+
+| | A visitor may | An account may |
+|---|---|---|
+| Upload a document | yes | yes |
+| Read the assessment | yes | yes |
+| Mark it CUI | **no** | yes |
+| Decide findings, name a reviewer, draft a description | **no** | yes |
+| Run automatic remediation | **no** | yes |
+| Download the document or the statement | **no** | yes |
+
+The second column is the paid column, and that is not a coincidence — it is
+the same line `src/domain/pricing.ts` draws. A visitor gets the free
+assessment and nothing that produces a deliverable, because a deliverable
+carries a name and a cookie is not a name.
+
+**Upload first, sign up second** is the sequence this creates, so it is
+built for: `mayOpen` lets a signed-in person read a job their *own browser*
+uploaded before they had an account, and `claimJobs` transfers it at
+sign-in. A job already owned by an account is never reassigned by a cookie.
+
+**A record with no owner belongs to nobody.** Jobs written before this
+existed fail closed. That costs a developer a re-upload; failing open would
+have left every one of them readable by anyone who ever had its link, which
+is the thing being fixed.
+
+### One door, and a test that counts the doors
+
+`src/server/access.ts` is the only thing in the codebase that hands a job to
+a page. Nothing under `src/app/` calls the store for one — a test walks the
+directory, reads every import of `@/server/jobs`, and fails on anything
+outside a three-name allowlist (`createJob`, `claimJobs`, and the `JobFile`
+type). A check written at nine call sites is a check missing from the tenth,
+and the tenth is the one that ships.
+
+"Not yours" and "no such job" are the same 404, with the same page. Telling
+a stranger that a document exists but is somebody else's tells them that a
+document with that id is here and that whoever sent them the link is a
+customer.
+
+### What is deliberately not here yet
 
 **No email.** `createAccount` returns `taken` to its caller and that must
 never reach a form — "that address already has an account" tells a stranger
@@ -1010,6 +1054,13 @@ channel that can safely tell the truth.
 **No password reset, no second factor, no rate limit by address across
 accounts.** Reset needs the mail channel. A second factor is a real 800-171
 question for privileged access and is not one to answer by guessing.
+
+**A visitor cookie is a bearer token, and the code says so rather than
+pretending otherwise.** Whoever holds it is the visitor. What it buys over
+the URL it replaces is concrete and limited: it is `httpOnly`, it is not in
+the address bar, it is not pasted into a ticket, and it is not in anybody's
+history. That is why a visitor's reach stops at their own free assessment,
+and why CUI does not go anywhere near it.
 
 **The log is append-only by construction, not by permission.** No code path
 in this repository edits or deletes a record because none is written. That

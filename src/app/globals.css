@@ -81,6 +81,39 @@ main {
 .site-header {
   padding-block: 1rem;
   border-bottom: 1px solid var(--rule);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.site-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  align-items: baseline;
+  font-size: 0.95rem;
+}
+
+.site-who {
+  color: var(--muted);
+}
+
+/*
+ * Signing out changes something on the server, so it is a button in a form
+ * and not a link. It is styled as a link because that is what it looks like
+ * it should be — but a link that logs you out is a link any prefetch, any
+ * crawler and any "open all in tabs" can fire.
+ */
+.site-link {
+  font: inherit;
+  color: var(--accent);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
 }
 
 .wordmark {

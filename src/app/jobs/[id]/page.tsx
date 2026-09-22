@@ -6,10 +6,11 @@ import { DOCUMENT_EXEMPT, labelFor } from '@/domain/criteria';
 import { assessAll, describeRemarks, describeSummary, isOpen, stateOf, summarise } from '@/domain/findings';
 import { describeStatus } from '@/domain/job';
 import { groupByKind } from '@/domain/kinds';
+import { describeSignInNeeded, mayReview } from '@/domain/viewer';
 import { bestOffer, describeOffer, labelFor as offerLabel, money, quoteAll, workFor } from '@/domain/pricing';
 import { FIXABLE_KINDS } from '@/domain/remediate';
 import { PDF_FIXABLE_KINDS } from '@/domain/pdfRemediate';
-import { getJob } from '@/server/jobs';
+import { openJobFor } from '@/server/access';
 import { remediateAction } from './actions';
 import styles from './page.module.css';
 
@@ -33,7 +34,7 @@ export const metadata: Metadata = { title: 'Report' };
  */
 export default async function JobPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const job = await getJob(id);
+  const { job, who } = await openJobFor(id);
   if (!job) notFound();
 
   const confirmed = new Set(Object.keys(job.confirmations ?? {}));
@@ -50,6 +51,7 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
   const automatic = true;
   const canFix = job.format === 'pdf' ? PDF_FIXABLE_KINDS : (FIXABLE_KINDS as ReadonlySet<string>);
   const fixable = job.findings.filter((f) => !f.remediated && canFix.has(f.kind)).length;
+  const signedIn = mayReview(who);
   const work = workFor(job);
   const quotes = quoteAll(work);
   const best = bestOffer(work);
@@ -104,9 +106,27 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
 
       <section className={styles.actions} aria-labelledby="actions-title">
         <h2 id="actions-title" className={styles.actionsTitle}>
-          {job.remediatedAt ? 'Your documents' : 'Fix it'}
+          {/* "Fix it" labels a button. With no button under it, it labels nothing. */}
+          {!signedIn ? 'To fix it' : job.remediatedAt ? 'Your documents' : 'Fix it'}
         </h2>
-        {!job.remediatedAt && automatic && (
+        {/*
+          A visitor gets the assessment and stops there. Everything below
+          this line changes the document or produces a deliverable, which is
+          the line pricing already draws and the line 800-171 needs drawn:
+          a name on a conformance statement has to belong to somebody the
+          service authenticated.
+        */}
+        {!signedIn && (
+          <>
+            <p className={styles.actionNote}>{describeSignInNeeded('review')}</p>
+            <p className={styles.actionNote}>
+              <Link href="/account/sign-in">Sign in</Link> or{' '}
+              <Link href="/account/sign-up">create an account</Link> — this document comes with you, and nothing
+              about it is sent anywhere by signing up.
+            </p>
+          </>
+        )}
+        {signedIn && !job.remediatedAt && automatic && (
           <form action={remediateAction} className={styles.actionForm}>
             <input type="hidden" name="id" value={job.id} />
             <button type="submit" className={styles.button} disabled={fixable === 0}>
@@ -119,7 +139,7 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
             </p>
           </form>
         )}
-        {job.remediatedAt && (
+        {signedIn && job.remediatedAt && (
           <ul className={styles.downloads}>
             <li>
               <a href={`/jobs/${job.id}/download`} className={styles.button}>

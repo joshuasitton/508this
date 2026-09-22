@@ -114,11 +114,9 @@ npm run triage -- DIR # classify a folder of PDFs; prints no document content
   and authentication is one of its controls. `setReviewer` taking a name a
   person types is right for a service run by one person and is not
   authentication; it is the seam where real accounts go. Nothing that stores
-  a CUI document in production merges before that exists. The identity layer
-  is built — `src/domain/account.ts`, `session.ts`, `audit.ts` and their
-  three server modules — but **nothing is gated by it yet**: no sign-in
-  page, no owner on a job, and `/jobs/<id>` still answers to anyone holding
-  the link.
+  a CUI document in production merges before that exists. It exists:
+  `src/domain/account.ts`, `session.ts`, `audit.ts`, `viewer.ts` and their
+  server modules.
 - **An audit record has no free-text field, and `auditEvent` throws on a
   subject that is not a UUID.** 800-171 wants records sufficient to trace a
   user's actions; this file's oldest rule says no document content reaches a
@@ -132,6 +130,18 @@ npm run triage -- DIR # classify a folder of PDFs; prints no document content
   answer: it says there is no such account, and the customer list is worth
   something. What really happened goes to the audit log. The email index is
   keyed by SHA-256 for the same reason.
+- **Every job has an owner, and `createJob` requires one.** An account or a
+  visitor — one browser, one cookie, no name — and never neither. A record
+  with no owner fails closed. A visitor may upload and read their own
+  assessment; marking CUI, deciding anything, remediating and downloading
+  all need an account, which is the same line `pricing.ts` draws between
+  the free assessment and everything bought.
+- **`src/server/access.ts` is the only door onto a job, and a test counts
+  the doors.** Nothing under `src/app/` calls the job store to reach one; a
+  test walks the directory and fails on any import of `@/server/jobs`
+  outside a three-name allowlist. "Not yours" and "no such job" are the same
+  404 with the same page, because telling a stranger a document exists tells
+  them who the customer is.
 - **A session token is never stored, only its SHA-256.** A leaked session
   file is then not a set of live sessions. Fast hash here, scrypt for
   passphrases: a token is 256 bits of randomness and cannot be guessed, so

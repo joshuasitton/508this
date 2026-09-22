@@ -1,6 +1,10 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+
+import { getAccount } from '@/server/accounts';
+import { viewer } from '@/server/access';
+import { signOutAction } from './account/actions';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -18,7 +22,13 @@ export const metadata: Metadata = {
  * documents it remediates do not (E205.4). A remediation service that fails
  * its own first criterion has nothing to sell.
  */
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  // Who is signed in, for the header. A visitor is not named here: there is
+  // nothing to name, and "signed in as a cookie" would be a claim about
+  // identity that a cookie cannot support.
+  const who = await viewer();
+  const account = who.kind === 'account' ? await getAccount(who.account) : null;
+
   return (
     <html lang="en">
       <body>
@@ -29,6 +39,23 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <Link className="wordmark" href="/" aria-label="508This home">
             508This
           </Link>
+          <nav className="site-nav" aria-label="Account">
+            {account ? (
+              <>
+                <span className="site-who">{account.email}</span>
+                <form action={signOutAction}>
+                  <button type="submit" className="site-link">
+                    Sign out
+                  </button>
+                </form>
+              </>
+            ) : (
+              <>
+                <Link href="/account/sign-in">Sign in</Link>
+                <Link href="/account/sign-up">Create an account</Link>
+              </>
+            )}
+          </nav>
         </header>
         <main id="main" tabIndex={-1}>
           {children}

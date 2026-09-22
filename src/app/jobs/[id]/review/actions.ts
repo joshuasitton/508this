@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 
 import type { Decision } from '@/domain/findings';
-import { confirm, decide, getJob, propose, setReviewer, unconfirm, undecide } from '@/server/jobs';
+import { confirm, decide, openJob, propose, setReviewer, unconfirm, undecide } from '@/server/access';
 
 /**
  * The reviewer's hands.
@@ -39,7 +39,7 @@ export async function identifyAction(formData: FormData): Promise<void> {
 }
 
 async function reviewerOf(id: string): Promise<string> {
-  return (await getJob(id))?.reviewer ?? '';
+  return (await openJob(id))?.reviewer ?? '';
 }
 
 export async function decideAction(formData: FormData): Promise<void> {
