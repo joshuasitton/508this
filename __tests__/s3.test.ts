@@ -232,6 +232,39 @@ test('the job store works against an object store, and what it stores is still s
   assert.ok((await getJob(job.id))?.deletedAt);
 });
 
+/**
+ * The audit log against the store it will actually run on.
+ *
+ * Its whole shape — one object per event, ordering in the key, nothing ever
+ * rewritten — exists because of this store rather than the disk one, so
+ * proving it on disk alone would be proving it in the wrong place.
+ */
+test('the audit log records and reads back through the object store', async () => {
+  process.env.STORAGE_KEY = createHash('sha256').update('a test key').digest('base64');
+  const { history, record } = await import('../src/server/audit');
+
+  const account = '77777777-6666-4555-8444-333333333333';
+  const job = '22222222-3333-4444-8555-666666666666';
+  await record('account.created', account);
+  await record('job.created', account, job);
+  await record('job.downloaded', account, job);
+
+  const log = await history(account);
+  assert.equal(log.unreadable, 0);
+  assert.deepEqual(
+    log.events.map((event) => event.action),
+    ['account.created', 'job.created', 'job.downloaded'],
+  );
+
+  // One object per event in the bucket, under the audit prefix, and what is
+  // in them is the sealed form rather than the account id.
+  const keys = [...objects.keys()].filter((key) => key.startsWith(`audit/${account}/`));
+  assert.equal(keys.length, 3, 'three events, three objects');
+  for (const key of keys) {
+    assert.ok(!objects.get(key)?.toString('utf8').includes(account), 'the record in the bucket is unreadable');
+  }
+});
+
 test('a key that is not plain segments is refused before it becomes a request', async () => {
   const { BadKeyError, getBlob, putBlob } = await import('../src/server/blobs');
   for (const bad of ['../escape', 'a//b', '/leading', 'trailing/', 'has space', '', 'a/../b']) {

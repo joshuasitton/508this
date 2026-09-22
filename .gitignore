@@ -40,10 +40,12 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Customer documents never enter the repository. They are federal records,
-# often sensitive, and a test fixture that "just happened" to be a real agency
-# PDF is a data breach with a commit hash. The whole folder, so no extension
-# list can miss one.
+# The store: customer documents, and now the audit log beside them. Documents
+# are federal records, often sensitive, and a test fixture that "just happened"
+# to be a real agency PDF is a data breach with a commit hash. The audit log is
+# evidence, which is a second reason not to keep a copy somewhere it can be
+# rewritten. The whole folder each time, so no extension list can miss one.
+/store/
 /documents/
 
 # Accounts, credentials and audit logs. Password hashes, session records and

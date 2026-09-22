@@ -963,7 +963,7 @@ look like anything, because no page mentions it.
 | `src/server/passwords.ts` | scrypt, from `node:crypto`, with the parameters written into every hash |
 | `src/server/accounts.ts` | the store, sign-in, and the single answer a failure gets |
 | `src/server/sessions.ts` | tokens the server never stores, and the cookie that carries them |
-| `src/server/audit.ts` | one append-only file per account, plus one for the events that belong to nobody |
+| `src/server/audit.ts` | one object per event, sealed to its own key, under a prefix per account and one for the events that belong to nobody |
 
 ### An audit record has no free-text field, and that is the design
 
@@ -1192,9 +1192,16 @@ history. That is why a visitor's reach stops at their own free assessment,
 and why CUI does not go anywhere near it.
 
 **The log is append-only by construction, not by permission.** No code path
-in this repository edits or deletes a record because none is written. That
-is honest and it is not tamper-proofing, and it moves with the store when
-the store moves off local disk.
+in this repository edits or deletes a record because none is written. On
+local disk that was the whole of it, and it was honest rather than
+tamper-proof: anybody who could reach `audit.log` could edit a line in it.
+
+On an object store it is more than a promise about our own source code. See
+[One object per event](#one-object-per-event-because-a-bucket-cannot-append),
+below: each record is sealed to the key it sits under, so a record cannot be
+re-filed under another account or renamed to a different time and still
+open, and object versioning with an object-lock policy on the prefix is
+available from outside the application in a way no local file ever was.
 
 ---
 
@@ -1349,14 +1356,61 @@ before anything needs it is how four verbs become a library.
 
 ### What is deliberately not here
 
-**Accounts, sessions, the audit log and reset tokens are still on local
-disk.** Documents were moved first because they are the federal records and
-the thing retention and encryption are about. The rest is the next change,
-and one part of it is a design question rather than a port: **the audit log
-is `appendFile` to one file per account, and an object store has no
-append.** Every event becomes its own object, or the log gets a real
-database. Porting it without deciding that is how an append-only log
-quietly becomes a read-modify-write race.
+**Accounts, sessions and reset tokens are still on local disk.** Documents
+were moved first because they are the federal records that retention and
+encryption are about; the audit log followed, because it was the part that
+needed a decision rather than a port. Credentials are what is left.
+
+### One object per event, because a bucket cannot append
+
+The audit log was `appendFile` to one file per account. That does not port.
+**An object store has no append** — the nearest thing is read the log, add a
+line, write the whole log back, which is a read-modify-write race that loses
+records under exactly the concurrency an audit log exists to capture, and
+which hands whoever holds the bucket one object to rewrite. The single
+property the log is there to have would have been the first casualty of
+keeping its old shape.
+
+So each event is its own object. `record` only ever writes a key that did
+not exist and `history` only ever reads; nothing is rewritten, ever.
+
+**The key carries the order**, because a bucket does not:
+`audit/<account>/<time>-<within>-<nonce>.json`.
+
+| Part | Why it is there |
+|---|---|
+| the time | the event's own `at` with the punctuation removed, so it is fixed width and sorts lexicographically — a listing comes back chronological on both stores, and a date range filters from the key before a single object is fetched |
+| `within` | events sharing a millisecond, counted in this process, so two records written back to back keep the order they were written in. Four events inside one millisecond is ordinary, and a file being appended to gave that ordering away free |
+| the nonce | two processes writing in the same millisecond must not overwrite each other. A lost record is worse than an ambiguous ordering between two genuinely concurrent events, for which there is no true order to lose |
+
+**Each record is sealed with its own key as associated data.** An audit
+event carries no free text by construction, but it does carry who acted, on
+what and when, and that timeline is worth protecting once the bytes sit in
+somebody else's bucket. Binding it to the key buys the part that matters
+more: **a record cannot be moved.** Re-file it under another account's
+prefix, or rename it to an earlier timestamp to back-date it, and the
+associated data changes and the record no longer opens. There are tests both
+ways.
+
+`history` returns a count of records that were listed and did not come back
+as events. The old file skipped a corrupt line silently, which meant the one
+thing an audit log exists to reveal — that something has been got at — was
+the one thing it could not say. A count carries no content, so it cannot
+become somewhere for text to hide.
+
+What this costs is a round trip per record, which is the honest price of the
+shape and is fine while a few thousand events is a large log. The escape
+hatch is already in the key: the time is in it, so a date range narrows the
+listing before anything is fetched.
+
+**Documents and the audit log now share one store**, which is why the folder
+on disk is `store/` rather than `documents/` and `STORE_DIR` is the variable
+that moves it — `DOCUMENTS_DIR` is still honoured, because renaming a
+variable is not worth a broken deployment. The retention sweep only ever
+looks at keys whose first segment is a job id, so it cannot see the audit
+prefix. **If that ever stops being true, a retention policy becomes an
+evidence shredder, and it would do it quietly** — so it is a test rather
+than a comment.
 
 **No key rotation.** Every sealed blob carries a version byte so that adding
 it later does not strand what is written; that is the whole of the provision
@@ -1368,8 +1422,8 @@ made.
 
 ## Storage, and why it is one file
 
-`src/server/jobs.ts` writes each job under `documents/<id>/` on local disk,
-or under `DOCUMENTS_DIR`. It is right for development and for the first jobs
+`src/server/jobs.ts` writes each job under `<id>/` in the store — `store/`
+on local disk, or wherever `STORE_DIR` points. It is right for development and for the first jobs
 run by hand on one machine, and wrong for Vercel, whose filesystem does not
 persist. Retention is decided and built, so what is left is the backend
 itself: four functions in this file — `readRecord`, `writeRecord`,
@@ -1413,7 +1467,7 @@ The Chairman decided retention that day; what follows is settled, and the
 reasoning for each part is in `docs/leadership-standup.md`.
 
 **Nothing about a document's contents goes into a log, an analytics event or
-an error report, ever.** `/documents/` is gitignored as a whole folder, so no
+an error report, ever.** `/store/` is gitignored as a whole folder, so no
 real agency PDF can become a "test fixture" with a commit hash.
 
 **Documents are deleted seven days after the customer downloads their

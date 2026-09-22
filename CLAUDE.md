@@ -106,7 +106,9 @@ npm run sweep         # delete the documents whose retention window has run out
 - **Disk or object store is decided by whether the credentials are there**,
   never by a switch: `S3_BUCKET` + `S3_ACCESS_KEY_ID` +
   `S3_SECRET_ACCESS_KEY`. A switch set without credentials is a service that
-  starts and cannot read anything. The job page says which store answered
+  starts and cannot read anything. On disk the root is `store/`, or
+  `STORE_DIR`; `DOCUMENTS_DIR` is still honoured and is the older name for
+  the same thing. The job page says which store answered
   and whether it is encrypting, rather than implying either.
 - **SigV4 is written by hand and is tested against AWS's published vector.**
   `sign()` in `src/server/s3.ts` takes the service as a parameter so that
@@ -114,6 +116,18 @@ npm run sweep         # delete the documents whose retention window has run out
   real code path. The AWS SDK is 400-odd transitive dependencies to do four
   verbs on a service holding federal records. Do not swap the encoder for
   `encodeURIComponent`: it leaves `!'()*` alone and AWS does not.
+- **The audit log is one object per event, never a file appended to.** An
+  object store has no append, and faking one is a read-modify-write race
+  that loses records. The key — `audit/<account>/<time>-<within>-<nonce>.json`
+  — carries the ordering a bucket does not, and each record is sealed to that
+  key, so a record cannot be re-filed under another account or renamed to
+  back-date it. `history` reports how many records would not open; a log that
+  shrinks silently cannot say the one thing it exists to say.
+- **The retention sweep must never be able to reach the `audit/` prefix.**
+  It sees only keys whose first segment is a job id. Documents and evidence
+  share one store, so this is what keeps a retention policy from becoming an
+  evidence shredder — and it would do it quietly. There is a test. No
+  lifecycle rule on that prefix when the bucket is made.
 - **Everything stored is sealed with AES-256-GCM, with the job id as
   associated data.** A blob moved into another job's directory will not
   open. The authentication matters as much as the secrecy: a job record

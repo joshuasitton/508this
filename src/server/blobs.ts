@@ -12,6 +12,21 @@
  * unchanged by the move, and the tests that cover them run against disk
  * exactly as before.
  *
+ * ## One store, several prefixes
+ *
+ * Documents were here first and for a day this was only theirs. The audit
+ * log followed, and it does not live under a job id — so the folder on disk
+ * is `store/` rather than `documents/`, and `STORE_DIR` is the variable
+ * that moves it. `DOCUMENTS_DIR` is still honoured, because it is what the
+ * deployment and the older tests already say and renaming a variable is not
+ * worth a broken environment.
+ *
+ * Keys under a job id belong to that job and are swept when it expires.
+ * Everything else is somebody else's prefix and the sweep cannot see it:
+ * `jobIds()` keeps only the keys whose first segment is a UUID, which the
+ * word `audit` is not. A test holds that, because it is the difference
+ * between a retention policy and losing the evidence.
+ *
  * ## Which one, and how it is decided
  *
  * `S3_BUCKET`, `S3_ACCESS_KEY_ID` and `S3_SECRET_ACCESS_KEY` together mean
@@ -31,7 +46,7 @@ import path from 'node:path';
 
 import { s3Config, s3Delete, s3Get, s3List, s3Put } from './s3';
 
-const ROOT = process.env.DOCUMENTS_DIR ?? path.join(process.cwd(), 'documents');
+const ROOT = process.env.STORE_DIR ?? process.env.DOCUMENTS_DIR ?? path.join(process.cwd(), 'store');
 
 /**
  * A key is one or more segments of hex, hyphens, dots and underscores. That
@@ -96,6 +111,12 @@ export async function removeBlob(key: string): Promise<void> {
  * full keys rather than directory entries, because an object store has no
  * directories and pretending otherwise is how a caller ends up written
  * against one store and broken on the other.
+ *
+ * The walk descends only where the prefix could still match. S3 has always
+ * filtered server-side; the disk path used to walk the whole store and
+ * throw away what did not match, which was invisible while the only caller
+ * wanted every key and would have become a full scan per read the moment
+ * one account's audit log was asked for.
  */
 export async function listBlobs(prefix: string): Promise<string[]> {
   const config = s3Config();
@@ -112,8 +133,14 @@ export async function listBlobs(prefix: string): Promise<string[]> {
     }
     for (const entry of entries) {
       const key = relative ? `${relative}/${entry.name}` : entry.name;
-      if (entry.isDirectory()) await walk(key);
-      else if (key.startsWith(prefix)) out.push(key);
+      if (entry.isDirectory()) {
+        // Descend if the prefix leads into this directory, or if this
+        // directory is already inside the prefix. Anything else cannot
+        // contain a matching key.
+        if (prefix.startsWith(`${key}/`) || `${key}/`.startsWith(prefix)) await walk(key);
+      } else if (key.startsWith(prefix)) {
+        out.push(key);
+      }
     }
   };
   await walk('');

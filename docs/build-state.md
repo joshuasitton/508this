@@ -4,6 +4,56 @@ The running project-level record. Sections are dated and kept in order rather
 than rewritten, so the reasoning stays readable. Decisions live in
 `docs/leadership-standup.md`; this file says where the code stands.
 
+## 2026-09-22, night — the audit log, one object per event
+
+`src/server/audit.ts` is on the blob seam. It was `appendFile` to one file
+per account and that shape does not port: **an object store has no append**,
+and the nearest thing — read the log, add a line, write it back — is a
+read-modify-write race that loses records under exactly the concurrency an
+audit log exists to capture. 302 tests, still green with `node_modules`
+moved aside.
+
+**The key carries the order**, because a bucket does not:
+`audit/<account>/<time>-<within>-<nonce>.json`. The time is the event's own
+`at` with the punctuation stripped, so it is fixed width and sorts
+chronologically on both stores and a date range can filter before a single
+object is fetched. `within` counts events sharing a millisecond in this
+process, so back-to-back records keep the order they were written in — a
+file being appended to gave that away free. The nonce is against two
+processes writing in the same millisecond: they must not overwrite each
+other, and a lost record is worse than an ambiguous ordering between two
+genuinely concurrent events, for which there is no true order to lose. The
+test that covers this asserts that some of its fifty records really did
+share a millisecond, so it cannot pass vacuously on a faster machine.
+
+**Each record is sealed to its own key.** That is the part local disk could
+never have: re-file a record under another account's prefix, or rename it
+to an earlier time to back-date it, and the associated data changes and it
+no longer opens. Tests both ways.
+
+**`history` now returns a count of records that would not open.** The old
+file skipped a corrupt line silently, which meant the one thing an audit
+log exists to reveal — that something has been got at — was the one thing
+it could not say.
+
+**The store root is `store/`, not `documents/`.** Documents and the audit
+log share it now, so the folder name had to stop lying; `STORE_DIR` moves
+it and `DOCUMENTS_DIR` is still honoured. The retention sweep only ever
+looks at keys whose first segment is a job id, so it cannot reach the audit
+prefix — if that ever stopped being true a retention policy would become an
+evidence shredder, quietly, so there is a test rather than a comment. The
+disk listing now prunes by prefix as well; it used to walk the whole store
+and throw away what did not match, which was invisible with one caller
+wanting every key and would have become a full scan per log read.
+
+**No migration.** There are no audit records anywhere — the service has
+never been deployed. A local `accounts/<id>/audit.log` from development
+stays on disk and stops being read; nothing deletes it.
+
+**Still on local disk:** accounts, sessions and reset tokens. Those are
+credentials rather than records, and none of them has a design question in
+the way — they are a port.
+
 ## 2026-09-22, night — the object store
 
 `src/server/blobs.ts` and `src/server/s3.ts`. Documents now live in an
@@ -48,6 +98,7 @@ test` runs. `S3Error` was written with them and is now written out.
 tokens. Documents went first because they are the federal records. One part
 of the rest is a design question rather than a port — the audit log is
 `appendFile` to one file per account, and an object store has no append.
+*(Overtaken the same night: the audit log moved, one object per event.)*
 
 ## 2026-09-22, night — the renderer, and the crop that makes it allowed
 
@@ -668,7 +719,8 @@ On the `intake/word-detection` branch, stacked on the founding PR.
 - `src/server/unzip.ts` and `src/server/docx.ts`: bytes to parts, on
   `node:zlib`, refusing what Word never writes.
 - `src/server/jobs.ts`: the local-disk job store under `documents/` or
-  `DOCUMENTS_DIR`. One file to replace when storage is decided. `next build`
+  `DOCUMENTS_DIR`. One file to replace when storage is decided. *(Since
+  replaced: `blobs.ts` is the seam, and the root is `store/`/`STORE_DIR`.)* `next build`
   warns that its dynamic path causes whole-project tracing; that is the cost
   of a filesystem store and goes away with it.
 - `/start` and `/jobs/[id]`. No client JavaScript on either.
