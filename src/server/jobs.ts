@@ -26,7 +26,7 @@ import { applyPdfDecisions, remediatePdf } from '@/domain/pdfRemediate';
 import type { PdfValue } from '@/domain/pdf';
 import { findingKey, isOpen, summarise, type Decision, type Finding } from '@/domain/findings';
 import type { NoImage } from '@/domain/alt';
-import { imageForFinding } from './figures';
+import { imageForFinding, imagesForFindings, type FigureResult } from './figures';
 import { reviewerName, type Format, type Job } from '@/domain/job';
 import { applyDecisions, remediateDocx } from '@/domain/remediate';
 import { readDocxParts, writeDocx } from './docx';
@@ -208,6 +208,32 @@ export async function setReviewer(id: string, name: string): Promise<Job | null>
   job.reviewer = clean;
   await writeFile(path.join(dirFor(id), 'job.json'), JSON.stringify(job, null, 2));
   return job;
+}
+
+/**
+ * Which of a job's figures the reviewer can actually be shown, answered for
+ * all of them from one opening of the document.
+ *
+ * The review page needs this before it draws anything: a reviewer cannot
+ * check a description against a figure they cannot see, and an `img` that
+ * 404s is worse than an honest sentence saying the artwork is vector.
+ */
+export async function figureImages(id: string): Promise<Map<string, FigureResult>> {
+  const job = await getJob(id);
+  if (!job) return new Map();
+  try {
+    const original = new Uint8Array(await readFile(path.join(dirFor(job.id), `original.${job.format}`)));
+    return imagesForFindings(original, job.format, job.findings);
+  } catch {
+    // A document that cannot be reopened is a broken job, not a broken
+    // page: the queue still lists the findings and the reviewer still works.
+    return new Map();
+  }
+}
+
+/** One figure's bytes, for the route that shows it. */
+export async function figureImage(id: string, findingKeyValue: string): Promise<FigureResult> {
+  return (await figureImages(id)).get(findingKeyValue) ?? { ok: false, reason: 'not-found' };
 }
 
 export type ProposeResult =

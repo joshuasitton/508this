@@ -6,6 +6,8 @@ import { PdfDocument } from '../src/domain/pdf';
 import { docPrId, imagePartFor, targetOfIn } from '../src/domain/docxImages';
 import { figureImage, structNum } from '../src/domain/pdfImages';
 import { sendableImage } from '../src/server/images';
+import { imagesForFindings } from '../src/server/figures';
+import type { Finding } from '../src/domain/findings';
 import { buildPdf, type Obj } from './helpers/pdf';
 
 const inflate = (d: Uint8Array) => new Uint8Array(inflateSync(d));
@@ -170,4 +172,51 @@ test('a filter or colour space this service cannot decode is refused by name', (
     const out = sendableImage(doc, doc.get(5) as never);
     assert.deepEqual(out, { ok: false, reason }, dict);
   }
+});
+
+function figureFinding(anchor: string, location: string): Finding {
+  return {
+    kind: 'image-alt',
+    criterion: '1.1.1',
+    location,
+    description: 'No alternative text.',
+    severity: 'partial',
+    remediated: false,
+    anchor,
+  };
+}
+
+test('every figure is answered from one opening of the document', () => {
+  // The review page asks about all of them to draw one screen. A submission
+  // with 76 figures would otherwise reopen and reparse the file 76 times,
+  // and the real one in hand has 76.
+  const pdf = pdfWithFigures();
+  const findings = [figureFinding('struct:6', 'figure 1, page 1'), figureFinding('struct:8', 'figure 2, page 1')];
+  const out = imagesForFindings(pdf, 'pdf', findings);
+
+  assert.equal(out.size, 2);
+  const withImage = out.get('image-alt|figure 1, page 1')!;
+  const vector = out.get('image-alt|figure 2, page 1')!;
+  assert.equal(withImage.ok, true);
+  assert.deepEqual(vector, { ok: false, reason: 'vector' });
+});
+
+test('findings that are not figures are not asked about at all', () => {
+  // A link with bad wording has no picture and no business causing a parse.
+  const notAFigure: Finding = {
+    kind: 'link-text',
+    criterion: '2.4.4',
+    location: 'page 1',
+    description: 'Says "click here".',
+    severity: 'partial',
+    remediated: false,
+    anchor: 'hyperlink:0',
+  };
+  assert.equal(imagesForFindings(pdfWithFigures(), 'pdf', [notAFigure]).size, 0);
+});
+
+test('a document with no figures needs no opening, so a broken one cannot break the page', () => {
+  // The bytes here are not a PDF at all. Nothing throws, because nothing is
+  // asked of them.
+  assert.equal(imagesForFindings(new Uint8Array([1, 2, 3]), 'pdf', []).size, 0);
 });

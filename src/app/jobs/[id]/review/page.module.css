@@ -235,3 +235,31 @@
   color: var(--muted);
   font-size: 0.9rem;
 }
+
+/*
+ * The figure itself, so a reviewer can check a description against the thing
+ * it describes. Bounded in height because a document figure can be a whole
+ * page, and a reviewer scrolling past the box they are meant to type in is a
+ * screen that fights them.
+ */
+.figure {
+  margin: 0 0 1rem;
+}
+
+.figureImage {
+  display: block;
+  max-width: 100%;
+  max-height: 20rem;
+  width: auto;
+  height: auto;
+  border: 1px solid var(--rule);
+  background: #fff;
+}
+
+.noFigure {
+  margin: 0 0 1rem;
+  padding: 0.4rem 0.75rem;
+  border-left: 4px solid var(--rule);
+  color: var(--muted);
+  font-size: 0.9rem;
+}
