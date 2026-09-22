@@ -1293,13 +1293,70 @@ button: taking the remediated file starts the countdown and takes the
 quotations out of the report, so take the conformance statement first if you
 want it with them.
 
+### The object store
+
+`src/server/blobs.ts` is the seam the four job-store functions were written
+for, and `src/server/s3.ts` is what sits behind it. Set `S3_BUCKET`,
+`S3_ACCESS_KEY_ID` and `S3_SECRET_ACCESS_KEY` and documents live in an
+object store; leave any of them unset and they live on disk. There is no
+`STORAGE=s3` switch, because a switch set without credentials is a service
+that starts and then cannot read anything.
+
+Above the seam a job is a record and two documents; below it, a key and some
+bytes. **Encryption, retention, scrubbing and the ownership check are
+untouched by the move** — they happen above the line, which is what the line
+was for.
+
+#### Signature Version 4, by hand, and why that is defensible
+
+The AWS SDK is four hundred-odd transitive dependencies to do four verbs,
+and this service holds federal records: every package in that path is a
+package that can read a customer's document on the way past. SigV4 is an
+HMAC chain and a canonical string — about eighty lines.
+
+Hand-rolled crypto is usually indefensible because it cannot be checked.
+This can. **AWS publishes a worked example** with a fixed key, a fixed
+timestamp and the exact signature the algorithm must produce, and a test
+reproduces `get-vanilla` from that suite byte for byte. The service name is
+a parameter rather than a constant *specifically* so that vector — which
+uses a service called `service` — can be run against the real code path
+rather than a copy of it. A second implementation, written independently
+from the specification in another language, agrees on every S3 case as well.
+
+The encoding is the other trap: `encodeURIComponent` leaves `!'()*` alone
+and AWS does not, so a path with an apostrophe in it signs one way and is
+sent another, and the 403 that comes back says nothing about why. There is a
+test.
+
+#### What the fake server proves, and what it cannot
+
+`__tests__/s3.test.ts` stands up a real HTTP server that speaks enough S3 —
+PUT, GET, DELETE, ListObjectsV2 with pagination — and runs the client and
+**the whole job store** against it: upload, read back, deliver, sweep. It
+checks that `x-amz-content-sha256` is the hash of the body actually sent,
+and that what lands in the bucket is the sealed form rather than the
+customer's archive or their filename.
+
+What it cannot prove is that AWS agrees. That is what the signature vector
+is for, and between the two the untested surface is small and named: AWS's
+own error behaviour, and nothing else.
+
+#### What is not in the client
+
+No multipart upload, no retries, no presigned URLs. A job's document is
+under 25 MB by the upload limit, which is a single PUT. Adding the rest
+before anything needs it is how four verbs become a library.
+
 ### What is deliberately not here
 
-**It is still local disk.** The object-store implementation is not written,
-because it cannot be tested from here and an untested storage backend is
-worse than an honest local one. What exists is the seam: four functions in
-`src/server/jobs.ts` are the only code in the repository that reads or
-writes a customer's bytes, and every one of them already seals and opens.
+**Accounts, sessions, the audit log and reset tokens are still on local
+disk.** Documents were moved first because they are the federal records and
+the thing retention and encryption are about. The rest is the next change,
+and one part of it is a design question rather than a port: **the audit log
+is `appendFile` to one file per account, and an object store has no
+append.** Every event becomes its own object, or the log gets a real
+database. Porting it without deciding that is how an append-only log
+quietly becomes a read-modify-write race.
 
 **No key rotation.** Every sealed blob carries a version byte so that adding
 it later does not strand what is written; that is the whole of the provision

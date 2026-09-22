@@ -16,9 +16,7 @@
  * document content, so whatever logs it cannot leak it.
  */
 
-import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
-import path from 'node:path';
 
 import { detectDocx } from '@/domain/docx';
 import { detectPdf, readPdfFacts } from '@/domain/pdfDetect';
@@ -30,6 +28,7 @@ import type { NoImage } from '@/domain/alt';
 import { imageForFinding, imagesForFindings, type FigureResult } from './figures';
 import { reviewerName, type Format, type Job } from '@/domain/job';
 import { open as unseal, openText, seal, sealText } from './crypto';
+import { getBlob, listBlobs, putBlob, removeBlob } from './blobs';
 import { deleteAfter as deleteAfterFor, expired } from '@/domain/retention';
 import { scrubJob } from '@/domain/scrub';
 import type { Owner } from '@/domain/viewer';
@@ -37,12 +36,18 @@ import { applyDecisions, remediateDocx } from '@/domain/remediate';
 import { readDocxParts, writeDocx } from './docx';
 import { readPdf, writePdf } from './pdf';
 
-const ROOT = process.env.DOCUMENTS_DIR ?? path.join(process.cwd(), 'documents');
+// Where the bytes live is `blobs.ts`'s business now, not this file's.
 const ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
-function dirFor(id: string): string {
+/**
+ * The key a job's bytes live under. The id is checked before it becomes
+ * part of one, which is the same rule `dirFor` held when this was a path:
+ * the id is the only thing a caller supplies, so it is the only thing that
+ * can be made to mean something else.
+ */
+function keyFor(id: string, name: string): string {
   if (!ID.test(id)) throw new Error('Invalid job id');
-  return path.join(ROOT, id);
+  return `${id}/${name}`;
 }
 
 /**
@@ -85,8 +90,6 @@ export async function createJob(
   if (options.cui) job.cui = true;
   if ('account' in options.owner) job.account = options.owner.account;
   else job.visitor = options.owner.visitor;
-  const dir = dirFor(job.id);
-  await mkdir(dir, { recursive: true });
   await writeBlob(job.id, `original.${format}`, bytes);
   await writeRecord(job);
   return job;
@@ -141,24 +144,15 @@ async function redetect(job: Job): Promise<Job> {
  * who an account is.
  */
 export async function claimJobs(visitor: string, account: string): Promise<number> {
-  let ids: string[];
-  try {
-    ids = await readdir(ROOT);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return 0;
-    throw error;
-  }
-
   let claimed = 0;
-  for (const id of ids) {
-    if (!ID.test(id)) continue;
+  for (const id of await jobIds()) {
     let job: Job;
     try {
       const found = await readRecord(id);
       if (!found) continue;
       job = found;
     } catch {
-      // A directory without a readable record is not a job to claim.
+      // A key without a readable record is not a job to claim.
       continue;
     }
     if (job.account || job.visitor !== visitor) continue;
@@ -183,30 +177,32 @@ export async function claimJobs(visitor: string, account: string): Promise<numbe
  * around is a way to read somebody else's document.
  */
 async function writeRecord(job: Job): Promise<void> {
-  await writeFile(path.join(dirFor(job.id), 'job.json'), sealText(JSON.stringify(job, null, 2), job.id));
+  await putBlob(keyFor(job.id, 'job.json'), sealText(JSON.stringify(job, null, 2), job.id));
 }
 
 async function readRecord(id: string): Promise<Job | null> {
-  try {
-    const stored = new Uint8Array(await readFile(path.join(dirFor(id), 'job.json')));
-    return JSON.parse(openText(stored, id)) as Job;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
-    throw error;
-  }
+  const stored = await getBlob(keyFor(id, 'job.json'));
+  if (!stored) return null;
+  return JSON.parse(openText(stored, id)) as Job;
 }
 
 async function writeBlob(id: string, name: string, bytes: Uint8Array): Promise<void> {
-  await writeFile(path.join(dirFor(id), name), seal(bytes, id));
+  await putBlob(keyFor(id, name), seal(bytes, id));
 }
 
 async function readBlob(id: string, name: string): Promise<Uint8Array | null> {
-  try {
-    return unseal(new Uint8Array(await readFile(path.join(dirFor(id), name))), id);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
-    throw error;
+  const stored = await getBlob(keyFor(id, name));
+  return stored ? unseal(stored, id) : null;
+}
+
+/** Every job id the store holds, from the keys rather than from directories. */
+async function jobIds(): Promise<string[]> {
+  const ids = new Set<string>();
+  for (const key of await listBlobs('')) {
+    const id = key.split('/')[0];
+    if (id && ID.test(id)) ids.add(id);
   }
+  return [...ids];
 }
 
 export type JobFile = 'original' | 'remediated';
@@ -550,22 +546,13 @@ export async function markDelivered(id: string): Promise<Job | null> {
  * up calling it — a cron, a queue, a request — calls the same one.
  */
 export async function sweepExpired(now = Date.now()): Promise<string[]> {
-  let ids: string[];
-  try {
-    ids = await readdir(ROOT);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
-    throw error;
-  }
-
   const swept: string[] = [];
-  for (const id of ids) {
-    if (!ID.test(id)) continue;
+  for (const id of await jobIds()) {
     const job = await readRecord(id);
     if (!job || job.deletedAt || !expired(job, now)) continue;
 
     for (const name of [`original.${job.format}`, `remediated.${job.format}`]) {
-      await rm(path.join(dirFor(id), name), { force: true });
+      await removeBlob(keyFor(id, name));
     }
     await writeRecord({ ...job, deletedAt: new Date(now).toISOString() });
     swept.push(id);

@@ -99,10 +99,21 @@ npm run sweep         # delete the documents whose retention window has run out
   checked. `npm run lint` carries the jsx-a11y rules and they are not to be
   disabled. A remediation service with an inaccessible website is over.
 - **Four functions in `src/server/jobs.ts` touch a customer's bytes, and
-  nothing else does.** `readRecord`, `writeRecord`, `readBlob`, `writeBlob`.
-  That is what makes encryption at rest a property of the store rather than
-  something nine call sites remember, and it is the seam an object store
-  replaces.
+  nothing else does.** `readRecord`, `writeRecord`, `readBlob`, `writeBlob`,
+  all through `src/server/blobs.ts`. Encryption, retention and scrubbing
+  happen *above* that line, which is why moving to an object store changed
+  none of them.
+- **Disk or object store is decided by whether the credentials are there**,
+  never by a switch: `S3_BUCKET` + `S3_ACCESS_KEY_ID` +
+  `S3_SECRET_ACCESS_KEY`. A switch set without credentials is a service that
+  starts and cannot read anything. The job page says which store answered
+  and whether it is encrypting, rather than implying either.
+- **SigV4 is written by hand and is tested against AWS's published vector.**
+  `sign()` in `src/server/s3.ts` takes the service as a parameter so that
+  `get-vanilla` — which uses a service named `service` — runs against the
+  real code path. The AWS SDK is 400-odd transitive dependencies to do four
+  verbs on a service holding federal records. Do not swap the encoder for
+  `encodeURIComponent`: it leaves `!'()*` alone and AWS does not.
 - **Everything stored is sealed with AES-256-GCM, with the job id as
   associated data.** A blob moved into another job's directory will not
   open. The authentication matters as much as the secrecy: a job record
