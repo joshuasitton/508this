@@ -4,6 +4,29 @@ The running project-level record. Sections are dated and kept in order rather
 than rewritten, so the reasoning stays readable. Decisions live in
 `docs/leadership-standup.md`; this file says where the code stands.
 
+## 2026-09-22 — the reviewer can see the figure
+
+Drafting without this was half a feature. A description cannot be checked
+against a picture nobody can see, and a drafted one least of all: the
+failure mode named in yesterday's own notes is a confident invention that
+reads well and gets accepted, and a reviewer with nothing to compare it to
+is exactly the person who accepts it.
+
+`/jobs/<id>/figure?key=` serves one figure from the customer's own document,
+`private, no-store`, `nosniff`, in the reviewer's browser. It renders
+directly above the box they type in. Where there is no picture the same
+place carries the sentence saying why, because a broken image icon is worse
+than an honest explanation.
+
+`imagesForFindings` answers for every figure from one opening of the
+document. Asked one at a time, the submission in hand – 76 figures – would
+have reopened and reparsed the file 76 times to draw one screen. 191 tests.
+
+**Verified in the browser.** The Word fixture renders its chart at its real
+120×80 (`naturalWidth` non-zero, so it genuinely loaded rather than
+404ing); the CHERP infographic renders no images and four explanations, one
+per vector figure. No page errors.
+
 ## 2026-09-21, night — drafted descriptions, raster only
 
 The Chairman chose raster-only over a rendering dependency, and it is built.

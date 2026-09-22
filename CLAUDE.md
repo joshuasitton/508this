@@ -148,6 +148,12 @@ npm run triage -- DIR # classify a folder of PDFs; prints no document content
   commitment and not a FedRAMP authorisation. The review page also hides the
   button for such a job, but the page is a thing a person can navigate
   around and the store is not.
+- **A reviewer is shown the figure they are describing.** `/jobs/<id>/figure`
+  serves it from the customer's own document, private and no-store, above
+  the box they type in. This is what makes a drafted description reviewable
+  rather than rubber-stamped, and it is not optional garnish: without it the
+  screen asks a person to vouch for a sentence about something they cannot
+  see. When there is no picture, the same place says why.
 - **A figure has no image more often than it has one.** PDF artwork out of
   Illustrator or InDesign is vector: path operators, no picture in the file.
   `figureImage` reports `vector`, which is an answer and not a failure, and

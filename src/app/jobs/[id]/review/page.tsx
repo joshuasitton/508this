@@ -7,7 +7,7 @@ import { assessAll, describeSummary, findingKey, isOpen, summarise, type Finding
 import { describeNoImage, type NoImage } from '@/domain/alt';
 import { MAX_REVIEWER } from '@/domain/job';
 import { KINDS, REVIEW_INPUT } from '@/domain/kinds';
-import { getJob } from '@/server/jobs';
+import { figureImages, getJob } from '@/server/jobs';
 import { visionConfigured } from '@/server/vision';
 import { confirmAction, decideAction, identifyAction, proposeAction, unconfirmAction, undoAction } from './actions';
 import styles from './page.module.css';
@@ -74,6 +74,10 @@ export default async function ReviewPage({
   // A document the customer marked CUI never has any part of it sent
   // anywhere, so the button is not offered rather than offered and refused.
   const canDraft = !job.cui && visionConfigured();
+  // Asked once for the whole document rather than once per figure: a
+  // submission with 76 of them would otherwise reopen and reparse the file
+  // 76 times to draw one screen.
+  const pictures = await figureImages(job.id);
 
   return (
     <>
@@ -141,7 +145,14 @@ export default async function ReviewPage({
           </p>
         )}
         {toDecide.map((f) => (
-          <ReviewItem key={findingKey(f)} f={f} jobId={job.id} canDecide={!!reviewer} canDraft={canDraft} />
+          <ReviewItem
+            key={findingKey(f)}
+            f={f}
+            jobId={job.id}
+            canDecide={!!reviewer}
+            canDraft={canDraft}
+            picture={pictures.get(findingKey(f))}
+          />
         ))}
       </section>
 
@@ -252,11 +263,13 @@ function ReviewItem({
   jobId,
   canDecide,
   canDraft,
+  picture,
 }: {
   f: Finding;
   jobId: string;
   canDecide: boolean;
   canDraft: boolean;
+  picture?: { ok: true } | { ok: false; reason: NoImage };
 }) {
   const info = KINDS[f.kind];
   const input = REVIEW_INPUT[f.kind];
@@ -276,6 +289,22 @@ function ReviewItem({
         <strong>{capitalise(f.location)}.</strong> {f.description}
       </p>
       <p className={styles.why}>{info.why}</p>
+
+      {input === 'alt' && picture?.ok === true && (
+        <figure className={styles.figure}>
+          {/* eslint-disable-next-line @next/next/no-img-element -- the bytes
+              come from the customer's own document through a private route,
+              not from a URL Next can optimise. */}
+          <img
+            src={`/jobs/${jobId}/figure?key=${encodeURIComponent(key)}`}
+            alt="The figure as it appears in the document. It has no description yet; writing one is what this screen is for."
+            className={styles.figureImage}
+          />
+        </figure>
+      )}
+      {input === 'alt' && picture?.ok === false && (
+        <p className={styles.noFigure}>{describeNoImage(picture.reason)}</p>
+      )}
 
       {canDecide && input === 'alt' && (
         <div className={styles.forms}>

@@ -461,6 +461,21 @@ and a decline is shown as one. A confident invention is the worst thing this
 product can generate: it reads well, a reviewer accepts it, and the document
 ships with a lie where a description belongs.
 
+**The reviewer sees the figure.** This is the half that makes the other half
+honest. A description cannot be checked against a picture nobody can see,
+and a drafted one least of all: a confident invention reads well, and a
+reviewer with nothing to compare it to accepts it. `/jobs/<id>/figure` serves
+the image from the customer's own document, in the reviewer's own browser,
+`private, no-store`, and it appears directly above the box they type in.
+When there is no picture – vector artwork, an unsupported filter – the same
+place carries the sentence saying so, because a broken image icon is worse
+than an honest explanation.
+
+The page asks about every figure at once: `imagesForFindings` opens the
+document once and answers for all of them. Asked one at a time, a submission
+with 76 figures would reopen and reparse the file 76 times to draw one
+screen, and the real submission in hand has 76.
+
 **A misconfigured server is not a model declining.** An authentication,
 permission or rate-limit error becomes "drafting is not configured", not "the
 model could not describe this figure" – they are different problems and only
