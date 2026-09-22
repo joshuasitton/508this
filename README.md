@@ -874,6 +874,150 @@ building it twice.
 
 ---
 
+## Accounts, because a name in a box is not authentication
+
+`setReviewer` takes a name a person types and writes it beside every
+decision on a federal conformance statement. For a service one person runs
+that is right. It is not authentication, and the Chairman's decision to
+accept Controlled Unclassified Information is what makes the difference
+matter: NIST SP 800-171 requires that users are identified and that the
+identity is *authenticated* before they reach the system. A job id in a URL
+identifies nobody — anyone holding the link is the reviewer.
+
+This is the identity layer that goes under that. **It is the foundation and
+not yet the enforcement**: there is no sign-in screen in this change and
+nothing is gated by it. That is deliberate. Half-built authentication is
+worse than none, because it looks like protection; what ships here cannot
+look like anything, because no page mentions it.
+
+### What is here
+
+| File | What it decides |
+|---|---|
+| `src/domain/account.ts` | what an address and a passphrase have to be, and the sentence shown when they are not |
+| `src/domain/session.ts` | the two session clocks and the lockout rule, as pure functions over a time you pass in |
+| `src/domain/audit.ts` | the shape of an audit record — and, structurally, what cannot go in one |
+| `src/server/passwords.ts` | scrypt, from `node:crypto`, with the parameters written into every hash |
+| `src/server/accounts.ts` | the store, sign-in, and the single answer a failure gets |
+| `src/server/sessions.ts` | tokens the server never stores, and the cookie that carries them |
+| `src/server/audit.ts` | one append-only file per account, plus one for the events that belong to nobody |
+
+### An audit record has no free-text field, and that is the design
+
+800-171 wants records sufficient to trace a user's actions. This
+repository's oldest rule says nothing about a document's contents goes into
+a log. Those pull against each other the moment somebody adds a `detail`
+field "just for debugging" and a reviewer's dismissal note — which quotes
+the customer's own sentence — lands in it. That is not hypothetical: the
+Word detector puts the customer's sentences into every finding, which is why
+delivery scrubs them from the job record.
+
+So the resolution is structural. An `AuditEvent` carries a time, an account
+id, an action from a closed list, and at most one subject — and `auditEvent`
+**throws** if the subject is not a UUID. There is nowhere for a quotation to
+go, and a test proves it by trying to put one there, with a negative control
+so the check cannot pass by refusing everything.
+
+What is lost is context: an event says a finding was decided, not which way.
+That is the right trade. The decision is on the job record where it belongs;
+the log says who touched what and when. A log that held the content too
+would be a second copy of every customer document under a retention policy
+nobody wrote.
+
+### Length, not punctuation
+
+The passphrase rules are a 12-character minimum, a 128 ceiling, no
+composition requirements, and no scheduled rotation. That follows SP 800-63B,
+which is where 800-171's identification and authentication requirements
+point: mandatory mixed case, digits and symbols push people towards
+`Summer2026!` and a sticky note, and none of it survives an offline attack
+any longer than a longer phrase does. Twelve rather than the floor of eight
+because of what this service stores.
+
+The blocklist is sixteen strings and the code says so. A real one is a
+corpus of breached passwords, which is a data set 508This does not have and
+should not invent; what is here catches what people type when they are not
+really choosing a passphrase. **It is a floor, not a screen**, and when a
+breach corpus is available this is where it goes.
+
+### scrypt, and why not Argon2id
+
+Argon2id would be the modern first choice and it is not in the standard
+library. `scrypt` is in `node:crypto`, it is memory-hard, and it is what
+lets the hashing code exist with no dependency — which matters more than
+usual here, because a password hash is the wrong place to take a
+supply-chain risk. N=32768, r=8, p=1: about 32 MB and a fraction of a second
+per attempt, unnoticeable at a sign-in and ruinous at scale against a stolen
+table.
+
+The parameters are written into every stored hash (`scrypt$N$r$p$salt$key`),
+so raising them later does not invalidate what is already on disk — an old
+hash still says how to verify itself, and the account is re-hashed at its
+next successful sign-in, which is the only moment the passphrase is in hand.
+A stored record asking for *more* memory than the current parameters is
+refused rather than attempted: an absurd N in a tampered file is a way to
+make one sign-in exhaust the machine.
+
+### One answer for every failure
+
+A wrong passphrase, an address with no account, and a disabled account all
+return the same thing and all spend the same scrypt work — `spendTime`
+exists so that the failure with nothing to check still costs what a real
+check costs. Without it the single honest sentence would be undone by a
+stopwatch: a fast answer means no such account, and on a service holding
+federal documents the customer list is itself worth something. The same
+reasoning keeps the address out of the index's file names, which are
+SHA-256 digests: a directory listing is a thing that gets backed up, synced
+and screenshotted.
+
+The one failure told apart is a lock, and only after the passphrase has been
+checked. It leaks nothing a person could not learn by guessing five times,
+and the alternative is somebody who mistyped their own passphrase being told
+"those do not match" for fifteen minutes while typing it correctly.
+
+Lockout is fifteen minutes, not forever. Permanent lockout means anyone who
+knows a customer's address can take them offline by typing rubbish at a
+form, which turns a control into a denial of service.
+
+### Two clocks on a session
+
+Thirty minutes idle, eight hours absolute, and it needs both. Idle timeout
+protects the reviewer who walked away from a terminal with a customer's
+document open — the common case, and what 3.1.10/3.1.11 are about. The
+absolute ceiling bounds a *stolen* token: refreshing on activity means an
+attacker holding the cookie can keep it alive forever, so there is a limit
+no amount of activity moves.
+
+The token is 32 random bytes and the server stores only its SHA-256. Anyone
+reading the session files learns which sessions exist and nothing that lets
+them become one. A fast hash is right here and wrong for a passphrase: a
+passphrase is chosen by a person and must be expensive to guess, a token is
+256 bits of randomness and cannot be guessed at any price, so scrypt would
+buy nothing and be paid on every request.
+
+### What is deliberately not here yet
+
+**No sign-in, sign-up or sign-out page.** Nothing is gated, no job has an
+owner, and `/jobs/<id>` is still readable by anyone with the link. That is
+the next change and it is the one that actually closes the hole.
+
+**No email.** `createAccount` returns `taken` to its caller and that must
+never reach a form — "that address already has an account" tells a stranger
+who the customers are. The screen, when it exists, has to say the same thing
+it would say on success and send mail to the address, which is the only
+channel that can safely tell the truth.
+
+**No password reset, no second factor, no rate limit by address across
+accounts.** Reset needs the mail channel. A second factor is a real 800-171
+question for privileged access and is not one to answer by guessing.
+
+**The log is append-only by construction, not by permission.** No code path
+in this repository edits or deletes a record because none is written. That
+is honest and it is not tamper-proofing, and it moves with the store when
+the store moves off local disk.
+
+---
+
 ## Storage, and why it is one file
 
 `src/server/jobs.ts` writes each job under `documents/<id>/` on local disk,

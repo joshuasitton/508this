@@ -45,3 +45,9 @@ next-env.d.ts
 # PDF is a data breach with a commit hash. The whole folder, so no extension
 # list can miss one.
 /documents/
+
+# Accounts, credentials and audit logs. Password hashes, session records and
+# a list of who the customers are, none of which belongs in version control
+# — and the audit log is evidence, which is a second reason not to keep a
+# copy of it somewhere it can be rewritten. The whole folder, as above.
+/accounts/

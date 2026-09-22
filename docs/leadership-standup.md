@@ -8,6 +8,83 @@ for. Where an entry has since been overtaken, `docs/build-state.md` says so.
 
 ---
 
+## 2026-09-22, later — accounts, and the question the free assessment asks of them
+
+### What the Chairman said
+
+Start on accounts.
+
+### What was built, and what deliberately was not
+
+The identity layer: credential policy, session policy, the audit record,
+and the four server modules that store them. All of it with Node's own
+crypto and nothing from npm, so `npm test` still runs with nothing
+installed.
+
+**No sign-in page, and nothing gated.** A job still has no owner and
+`/jobs/<id>` still answers to anyone with the link. Engineering's view is
+that this is the right first half: half-built authentication is worse than
+none because it looks like protection, and nothing here can look like
+anything, because no page mentions it. The second half is what closes the
+hole, and it is the larger of the two.
+
+### Decided by engineering, for the Chairman to overturn
+
+**A stranger can still upload a document without an account.**
+
+This is the one place accounts and pricing collide, and it was settled on
+the reasoning the Chairman merged this morning: the assessment is free
+because *a customer should find out whether the service can help them
+before they pay*. Requiring a sign-up before the first upload takes that
+back. But leaving a job reachable by anyone holding its URL is the hole
+CUI makes unacceptable, and a UUID identifies nobody.
+
+The proposal is the resolution both constraints allow:
+
+1. An anonymous upload stays possible, and the job is bound to **that
+   browser's session** rather than to the link.
+2. Keeping the work — the review queue, the statement, the download —
+   requires an account, and the anonymous job is claimed by it.
+3. **Marking a document CUI requires an account**, full stop, because that
+   is what 800-171 asks for and a browser cookie is not an identified user.
+
+The alternative is an account before the first upload, which is cleaner to
+build and costs the free assessment the thing that makes it worth having.
+
+### Also decided, and smaller
+
+**A failed sign-in answers one way.** Wrong passphrase, unknown address and
+disabled account are the same sentence and the same amount of work.
+508This's customers are federal contractors; the list of who they are is
+worth something, and a sign-in form that answers faster for an address with
+no account hands it over.
+
+**Lockout is fifteen minutes, not permanent.** Permanent means anyone who
+knows a customer's address can take them offline by typing rubbish at a
+form. A control that is also a denial of service is not a control.
+
+**Passphrases are length, not punctuation** — twelve characters, no
+composition rules, no rotation, following SP 800-63B. The blocklist is
+sixteen strings and the code says so: a real one is a corpus of breached
+passwords, which is a data set this company does not have and should not
+invent.
+
+### What this does not solve, and should not be believed to
+
+No password reset, no second factor, no email. The audit log is
+append-only *by construction* — nothing in the repository writes an edit or
+a delete — which is honest and is not tamper-proofing. Reset needs a mail
+channel; a second factor for privileged access is a real 800-171 question
+and not one to answer by guessing.
+
+### Still with the Chairman
+
+The first live drafted description, on his own machine. Whether the Hermes
+submission's 76 figures are raster or vector. And now: whether an anonymous
+first upload survives.
+
+---
+
 ## 2026-09-22 — pricing, and what a price is allowed to promise
 
 ### What the Chairman said

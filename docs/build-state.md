@@ -4,6 +4,43 @@ The running project-level record. Sections are dated and kept in order rather
 than rewritten, so the reasoning stays readable. Decisions live in
 `docs/leadership-standup.md`; this file says where the code stands.
 
+## 2026-09-22, later — the identity layer, with nothing gated by it
+
+Seven files and 35 new tests: `src/domain/account.ts` (what an address and
+a passphrase have to be), `session.ts` (two clocks and a lockout, as pure
+functions over a time you pass in), `audit.ts` (the record's shape),
+`src/server/passwords.ts` (scrypt from `node:crypto`),
+`src/server/accounts.ts`, `sessions.ts` and `audit.ts` (the stores). 240
+tests, and they still run with `node_modules` moved aside — scrypt, session
+tokens and the append-only log are all Node's own modules.
+
+**Nothing is gated.** There is no sign-in page, no owner on a job, and
+`/jobs/<id>` still answers to anyone holding the link. That is deliberate:
+half-built authentication is worse than none because it looks like
+protection, and what shipped here cannot look like anything, because no page
+mentions it. The next change is the one that closes the hole.
+
+**The decision worth reading twice** is that an audit record has no
+free-text field and `auditEvent` throws on a subject that is not a UUID.
+800-171 wants records sufficient to trace a user's actions; the oldest rule
+in this repository says no document content reaches a log. Those pull apart
+the moment somebody adds a `detail` field and a dismissal note — which
+quotes the customer's own sentence — lands in it. There is nowhere for prose
+to go, and a test tries six kinds of prose in both the account and the subject position, with a negative control so the
+check cannot pass by refusing everything.
+
+The rest, briefly: passphrases are 12 to 128 characters with no composition
+rules and no rotation, counted in code points so a passphrase of emoji is
+measured the way its author counts it; scrypt at N=32768 with the parameters
+in the stored string, so raising them later does not strand the hashes
+already on disk; a failed sign-in answers one way and spends the same work
+whether or not the account exists; the email index is keyed by SHA-256
+because a directory listing gets backed up and screenshotted; sessions store
+only the token's hash and die at thirty minutes idle or eight hours
+absolute, and it needs both — the first protects the reviewer who walked
+away from a terminal, the second bounds a stolen token that activity would
+otherwise keep alive forever.
+
 ## 2026-09-22 — prices, and the thing they are attached to
 
 `src/domain/pricing.ts`. Three offers — assessment free, conformance
