@@ -8,6 +8,98 @@ for. Where an entry has since been overtaken, `docs/build-state.md` says so.
 
 ---
 
+## 2026-09-22 — pricing, and what a price is allowed to promise
+
+### What the Chairman said
+
+Work on pricing.
+
+### What was built
+
+Three offers, each one mapped onto something the code can actually do.
+
+| Offer | Price | Sold for |
+|---|---|---|
+| Assessment | free | every document, always |
+| Conformance statement | $49 | anything with a text layer |
+| Remediation | $149 | Word, and a PDF with tags and headings |
+| Remediation | $99 | a tagged PDF with no headings — **cannot be certified** |
+| Each figure past the first ten | $3 | |
+
+`src/domain/pricing.ts` holds all of it, beside `promiseFor`, and the
+central decision is structural rather than numerical: **a quote returns the
+price and the promise together, and nothing returns the price alone.** The
+moment those two can be separated, a pricing page separates them, and the
+company is selling "508This makes your document conformant" to the majority
+of customers for whom it is false.
+
+### The arguments, since the numbers will be argued with
+
+**The assessment is free and should stay free.** It costs pennies and it is
+the only honest way to sell this: the customer learns whether the service
+can help before they pay. For a scan it is the whole relationship. Charging
+for "we cannot help you" is how a compliance vendor earns a reputation it
+does not get back.
+
+**Untagged PDFs are refused remediation, not discounted.** Setting a
+language and a title is a real improvement and it is not $149 of work.
+Selling it as though it were is the single most available way for this
+company to become dishonest, and the triage says untagged is 48 of the 114
+files the Chairman ran it over.
+
+**Tagged PDFs cost less because they deliver less.** The figures get
+described and the file still cannot be certified. The price is the only
+place that difference is legible to somebody who is not reading the ACR.
+
+**The unit is the figure, not the page.** The remediation market quotes per
+page; per page is wrong here. The work scales with figures, because each one
+is a judgement a machine cannot make. The Hermes submission's 76 figures
+price at $347, or $297 if it turns out to have no headings; per-page it
+would bill like a pamphlet, and it is an afternoon of somebody's life.
+
+### What engineering got wrong and has corrected
+
+A comment claimed a drafted description costs "a fraction of a cent". At
+current rates it is one to three cents — the output tokens, thinking
+included, are priced five times the input. Nothing about the raster-only
+decision changes; the arithmetic is now in the README, because a pricing
+argument built on a wrong unit cost is a pricing argument that collapses in
+front of a customer.
+
+### Decision needed from the Chairman
+
+**The four numbers.** $0, $49, $149/$99, $3. They are one table in one file
+and changing them is a diff that fits on a screen. Engineering's confidence
+is high on the *shape* and moderate on the *levels*: the anchor is that a
+specialist spends two to four hours on a tagged PDF that 508This takes to
+forty minutes, at $75–$150 an hour loaded, and $149 captures roughly a third
+of what it saves. Nobody has tested a price against a customer yet.
+
+**Volume.** A contractor sends fifty documents at once and fifty separate
+charges is not the shape that relationship wants. Nothing is built, and
+nothing should be until somebody asks.
+
+### Recorded, not decided
+
+**CUI carries no surcharge.** 800-171 is a fixed cost of being this company,
+not a variable cost of one document. The consequence is not a higher price;
+it is that a CUI document belongs on an account with real authentication,
+which makes CUI a plan rather than a line item — and puts accounts, again,
+in front of everything.
+
+**Nothing takes payment.** The job page quotes and stops. Billing before the
+numbers settle is billing built twice.
+
+### Still with the Chairman
+
+The first live drafted description, on his own machine — no API key has ever
+existed in the cloud container, so the vision path is exercised and not
+proven. And whether the Hermes submission's 76 figures are raster or vector,
+which the triage's `Img` column answers and which decides whether drafted
+descriptions touch the document that motivated them.
+
+---
+
 ## 2026-09-21, night — drafted descriptions, and the invariant that paid for them
 
 ### Done

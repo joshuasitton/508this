@@ -32,7 +32,7 @@ npm run triage -- DIR # classify a folder of PDFs; prints no document content
 | Path | What lives there |
 |---|---|
 | `src/app/` | App Router pages and layouts, one folder per route; `jobs/[id]/review` is the queue |
-| `src/domain/` | pure functions: the criteria catalogue and coverage, findings, the Word and PDF detectors, the Word remediator, the PDF reader, the job model, the conformance report |
+| `src/domain/` | pure functions: the criteria catalogue and coverage, findings, the Word and PDF detectors, the Word remediator, the PDF reader, the job model, the conformance report, the triage and the prices |
 | `src/server/` | Node-only code: the zip reader and writer, the .docx part reader, the PDF reader's inflate, the job store, the report packer |
 | `__tests__/` | tests, against the domain layer and the server layer's pure parts |
 | `scripts/ts-resolve.mjs` | lets Node run the TypeScript domain with no bundler |
@@ -159,6 +159,14 @@ npm run triage -- DIR # classify a folder of PDFs; prints no document content
   `figureImage` reports `vector`, which is an answer and not a failure, and
   the reviewer is told to describe it themselves rather than to try again at
   something that cannot work.
+- **A price is never returned without the promise it buys.** `quoteFor` in
+  `src/domain/pricing.ts` hands back the number and the sentence together,
+  and nothing in the repository returns the number alone. `PRICES` is one
+  table; a price written into prose — a refusal, a page, a caveat — is a
+  price nothing keeps in step with it, and a test asserts the refusals carry
+  no price literal. The invariant underneath: **no tier the service cannot
+  certify is charged the certifiable price**, with a negative control so the
+  test cannot pass by refusing everything.
 - **Never put a secret in a `NEXT_PUBLIC_` variable** — they are bundled into
   the browser in plaintext.
 

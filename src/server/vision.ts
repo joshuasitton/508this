@@ -30,9 +30,17 @@ export class VisionUnavailableError extends Error {}
 /**
  * Opus 5 with thinking on and effort low. Thinking is left on deliberately:
  * disabling it on this model can leak reasoning tags into the visible
- * answer, and the answer here *is* the product. Low effort is what makes it
- * cheap — a figure costs a fraction of a cent, which is the whole argument
- * for drafting descriptions rather than typing 76 of them by hand.
+ * answer, and the answer here *is* the product. Low effort is what keeps it
+ * cheap.
+ *
+ * Cheap, and not free: at $5 per million input tokens and $25 per million
+ * output, a document figure costs one to three cents — the image is on the
+ * order of a thousand tokens and the output, thinking included, is priced
+ * five times higher than the input. This comment said "a fraction of a
+ * cent" until pricing was worked out and somebody did the arithmetic. It
+ * changes nothing about the decision to draft rather than type 76
+ * descriptions by hand, and `src/domain/pricing.ts` is where the
+ * consequence is now argued properly.
  */
 const MODEL = 'claude-opus-5';
 const MAX_TOKENS = 300;

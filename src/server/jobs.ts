@@ -21,7 +21,8 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 
 import { detectDocx } from '@/domain/docx';
-import { detectPdf } from '@/domain/pdfDetect';
+import { detectPdf, readPdfFacts } from '@/domain/pdfDetect';
+import { triagePdf, type Tier } from '@/domain/triage';
 import { applyPdfDecisions, remediatePdf } from '@/domain/pdfRemediate';
 import type { PdfValue } from '@/domain/pdf';
 import { findingKey, isOpen, summarise, type Decision, type Finding } from '@/domain/findings';
@@ -40,9 +41,18 @@ function dirFor(id: string): string {
   return path.join(ROOT, id);
 }
 
-/** Detection for whichever format the job is. The one place the two paths meet. */
-function detect(format: Format, bytes: Uint8Array): Finding[] {
-  return format === 'pdf' ? detectPdf(readPdf(bytes)) : detectDocx(readDocxParts(bytes));
+/**
+ * Detection for whichever format the job is. The one place the two paths
+ * meet, and now also where a PDF's tier is established — the tier decides
+ * what the service may promise and therefore what it may charge, so it is
+ * settled once, at intake, and stored on the record rather than recomputed
+ * by whoever needs it next.
+ */
+function detect(format: Format, bytes: Uint8Array): { findings: Finding[]; tier?: Tier } {
+  if (format !== 'pdf') return { findings: detectDocx(readDocxParts(bytes)) };
+  const doc = readPdf(bytes);
+  const findings = detectPdf(doc);
+  return { findings, tier: triagePdf(readPdfFacts(doc), findings).tier };
 }
 
 export async function createJob(
@@ -53,7 +63,7 @@ export async function createJob(
 ): Promise<Job> {
   // Detect before writing anything, so a document the reader rejects is
   // never stored.
-  const findings = detect(format, bytes);
+  const { findings, tier } = detect(format, bytes);
   const job: Job = {
     id: randomUUID(),
     createdAt: new Date().toISOString(),
@@ -62,6 +72,7 @@ export async function createJob(
     status: 'detected',
     findings,
   };
+  if (tier) job.tier = tier;
   if (options.cui) job.cui = true;
   const dir = dirFor(job.id);
   await mkdir(dir, { recursive: true });
@@ -93,13 +104,18 @@ export async function getJob(id: string): Promise<Job | null> {
  * yet; when one does, this check grows to carry it across.
  */
 function isCurrent(job: Job): boolean {
+  if (job.format === 'pdf' && !job.tier) return false;
   return job.findings.every((f) => typeof f.kind === 'string');
 }
 
 async function redetect(job: Job): Promise<Job> {
   const bytes = await readFile(path.join(dirFor(job.id), `original.${job.format}`));
-  const findings = detectDocx(readDocxParts(new Uint8Array(bytes)));
+  // Whichever format the job is. This read the Word parts unconditionally
+  // until the tier made PDFs repairable too, which would have thrown on the
+  // first PDF record an older build had written.
+  const { findings, tier } = detect(job.format, new Uint8Array(bytes));
   const repaired: Job = { ...job, findings };
+  if (tier) repaired.tier = tier;
   await writeFile(path.join(dirFor(job.id), 'job.json'), JSON.stringify(repaired, null, 2));
   return repaired;
 }
@@ -158,7 +174,7 @@ async function rebuild(job: Job): Promise<Job> {
   const auto = remediateDocx(parts, { fallbackTitle: stem(job.filename) });
   const reviewed = applyDecisions(auto.parts, job.findings);
   const remediated = writeDocx(original, reviewed.parts);
-  const after = detect(job.format, remediated);
+  const after = detect(job.format, remediated).findings;
 
   const still = new Set(after.map(key));
   const findings: Finding[] = job.findings.map((f) => ({ ...f, remediated: !still.has(key(f)) }));

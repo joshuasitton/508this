@@ -4,6 +4,45 @@ The running project-level record. Sections are dated and kept in order rather
 than rewritten, so the reasoning stays readable. Decisions live in
 `docs/leadership-standup.md`; this file says where the code stands.
 
+## 2026-09-22 — prices, and the thing they are attached to
+
+`src/domain/pricing.ts`. Three offers — assessment free, conformance
+statement $49, remediation $149 or $99 where the service cannot certify —
+with $3 for each figure past the first ten. The job page quotes them above
+the fix button; nothing takes payment, because building billing before the
+numbers are settled would be building it twice.
+
+The shape matters more than the numbers, and the numbers are one table a
+person can change in one screen. `quoteFor` returns the price and the
+promise in one object and nothing returns the price alone, which is the same
+move `promiseFor` made for the sentence and for the same reason. A test
+holds the invariant — no tier the service cannot certify is charged the
+certifiable price — with a negative control, since the test would pass
+happily if remediation were refused on all four tiers. A second test asserts
+that no refusal contains a price literal, because a `$149` typed into prose
+is a number nothing keeps in step with `PRICES`.
+
+An untagged PDF is refused remediation outright and told why, in the
+customer's words, on the page. Setting a language and a title is real and it
+is not a hundred and fifty dollars of work.
+
+The tier is now established at intake and stored on the job record, since
+the price depends on it. `redetect` had been reading Word parts
+unconditionally, which would have thrown on the first PDF record an older
+build wrote; it now re-runs whichever detector the job's format calls for.
+205 tests.
+
+**Verified in the browser, on all three real documents.** The Word fixture
+quotes $149 with no caveat; the CHERP infographic (tagged, no headings)
+quotes $99 with the sentence saying it will still not conform; the Hokua
+logo sheet (untagged) is refused remediation and offered the $49 statement.
+No page errors.
+
+**A correction.** `src/server/vision.ts` said a drafted description costs "a
+fraction of a cent". At $5 per million input tokens and $25 per million
+output, a document figure costs one to three cents — an order of magnitude
+more. It changes no decision and the comment is fixed.
+
 ## 2026-09-22 — the reviewer can see the figure
 
 Drafting without this was half a feature. A description cannot be checked

@@ -791,6 +791,89 @@ has read yet.
 
 ---
 
+## What it costs, and why a price is a claim about capability
+
+`src/domain/pricing.ts` decides what 508This charges. It is here in the
+domain, next to `promiseFor`, for the same reason `promiseFor` is: **a price
+is a claim about what the software will do, and a claim kept somewhere other
+than the code drifts away from the code.** The function that produces a
+quote returns the number and the promise in one object, and there is no
+function anywhere in the repository that returns the number on its own. That
+is not stylistic. A remediation service whose price is separable from its
+promise will separate them the first time somebody builds a pricing page.
+
+### Three offers, each one a capability the code has
+
+| Offer | Price | What it is |
+|---|---|---|
+| **Assessment** | free | every finding, the tier, the promise. The whole of this page's report |
+| **Conformance statement** | $49 | the reviewer-attested ACR, as a page and as the Word file a contracting officer files |
+| **Remediation** | $149, or **$99** where the service cannot certify | the statement, the review queue, drafted descriptions, and the changed file |
+
+The assessment is free and should stay free. It costs pennies to run, and it
+is the only honest way to sell this: **the customer finds out whether the
+service can help them before they pay.** For a scan it is the entire
+relationship, because a scan is pictures of words and 508This does not do
+OCR — charging for "we cannot help you" is how a compliance vendor earns a
+reputation it does not get back.
+
+### Why remediation is cheaper on a tagged PDF
+
+Because it delivers less, and the price is where that has to show. A tagged
+PDF with no headings gets its figures described and **still cannot be
+certified**; that is worth real money and it is not worth the same money as a
+document the service can carry to conformance. So `PRICES.remediation` has
+two entries, and a test holds the invariant: *no tier the service cannot
+certify is charged the certifiable price*, with a negative control asserting
+that at least one tier is certifiable, since the first test would pass
+happily if remediation were refused on all four.
+
+An untagged PDF is refused remediation outright. Setting a language and a
+title is a real improvement and it is not a hundred and fifty dollars of
+work, and selling it as though it were is the single most available way for
+this company to become dishonest. The refusal says so in the customer's
+words, on the job page, above the button.
+
+### Why figures and not pages
+
+The remediation market quotes per page. Per page is wrong for this product:
+the work does not scale with pages — a 200-page untagged report is one
+language fix — it scales with **figures**, because each figure is a judgement
+a machine cannot make. A six-page infographic with 76 figures is an
+afternoon, and per-page pricing would charge it like a pamphlet. So the flat
+price covers the first ten figures and each one after that is $3, about what
+two minutes of a reviewer's time costs. The Hermes submission — 76 figures —
+prices at $347 if its tags carry headings and $297 if they do not, against
+the CHERP infographic's four figures and nothing extra.
+
+The drafted description is not what that $3 buys. One draft costs **one to
+three cents** of model time: a document figure is on the order of a thousand
+input tokens at $5 per million, and the answer, thinking included, is priced
+five times higher again. The surcharge is two orders of magnitude above the
+compute because it is buying the reviewer's attention, which is the scarce
+thing. (The comment in `src/server/vision.ts` said "a fraction of a cent"
+until somebody did that arithmetic. It is corrected.)
+
+### What is not priced yet
+
+**CUI carries no surcharge, and should not.** Accepting Controlled
+Unclassified Information brings NIST SP 800-171 into scope, and that is a
+fixed cost of being this company rather than a variable cost of one
+document. The consequence is not a higher price, it is that a CUI document
+belongs on an account with real authentication — a reviewer typing their
+name into a box is not authentication — so CUI is a plan and not a line item.
+
+**Volume is undecided.** A contractor with a deliverable run sends fifty
+documents at once, and fifty separate $149 charges is not the shape that
+relationship wants. Nothing is built for it because nothing should be built
+for it before a customer has asked.
+
+**Nothing takes payment.** The job page quotes; there is no checkout, no
+Stripe, no invoice. Building billing before the numbers are settled would be
+building it twice.
+
+---
+
 ## Storage, and why it is one file
 
 `src/server/jobs.ts` writes each job under `documents/<id>/` on local disk,
