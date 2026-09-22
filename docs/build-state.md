@@ -4,6 +4,63 @@ The running project-level record. Sections are dated and kept in order rather
 than rewritten, so the reasoning stays readable. Decisions live in
 `docs/leadership-standup.md`; this file says where the code stands.
 
+## 2026-09-21, night — drafted descriptions, raster only
+
+The Chairman chose raster-only over a rendering dependency, and it is built.
+`src/domain/alt.ts` (the instruction and the cleaning of what comes back),
+`src/domain/docxImages.ts` and `src/domain/pdfImages.ts` (finding the
+picture), `src/server/images.ts` (JPEG passed through untouched, Flate
+samples wrapped in a PNG), `src/server/vision.ts` (the one module that talks
+to anything outside this service), `propose` in the job store, a CUI
+checkbox at intake, and a button in the review queue. 188 tests.
+
+**Verified in the browser, on three documents:**
+
+| | | |
+|---|---|---|
+| Word with a real embedded PNG | button offered | reaches the API; with a deliberately bad key, “drafting is not configured” |
+| The CHERP infographic | button offered on all four figures | “drafted as vector artwork, so there is no picture in the file to send” |
+| Word marked CUI at intake | **no button at all** | and `propose` refuses independently, since a page can be navigated around |
+
+The Word fixture is a real `.docx` built for the purpose and opened with
+python-docx; the PDF raster path is verified against a constructed file,
+because neither contractor PDF contains a raster image and LibreOffice is
+installed in the cloud container but cannot load any file at all.
+
+**The invariant that changed, and honestly.** `src/server/` took its first
+npm dependency. The rule as written – “Node's own modules and nothing from
+npm” – was protecting a guarantee, which is that `npm test` runs with
+nothing installed. The rule is now stated as the guarantee: no file any test
+imports may take a dependency, and CI proves it by running the tests before
+it installs anything.
+
+**And it proved it immediately.** The first push asserted in these very
+docs that no test imported `vision.ts`, which was false: the job store
+imported it at the top of the file, and the job store is in the test
+suite's import graph. CI went red on a file that would not load, seven
+tests never ran, and the claim was wrong in writing before it was wrong in
+code. The store now reaches it through `await import('./vision')` inside
+`propose`, and the fix was verified the way CI verifies it – by moving
+`node_modules` aside and running the suite, which passes 188 with nothing
+installed. A guarantee asserted is not a guarantee checked.
+
+**Two bugs found by writing the tests**, both in the cleaning of a draft.
+The first regex missed a leading article, so “A picture of a bar chart” kept
+its opener. Broadening it then over-stripped “A chart of enrolment”, which is
+a *good* description – “chart” names what the thing is, not the medium. The
+list is medium words only and both halves are pinned.
+
+**And a harness lesson, for the third time this session.** The end-to-end
+script reported the feature broken twice: it read the page before the server
+action had redirected. Calling `propose` directly proved the logic was right
+and the script was wrong. Next's server actions take seconds on this path;
+wait for the outcome to appear, never for the network to go quiet.
+
+**Not done:** no live call has been made. There is no API key in the cloud
+container, so the request is assembled and sent and the failure is an
+authentication error. The first real description has to be drawn on Josh's
+own machine.
+
 ## 2026-09-21, later — the vision pass, stopped by what a figure is made of
 
 Retention was decided and drafted alternative text was unblocked, so the

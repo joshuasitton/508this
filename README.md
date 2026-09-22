@@ -415,6 +415,57 @@ refused from the first commit, or accept that vector figures are described
 by hand and build the vision pass only for documents that carry raster
 images. Nothing was built on a guess about which.
 
+### Drafted descriptions
+
+A reviewer describing 76 figures by hand is the reason this exists. The
+button beside a figure asks a vision model for a description and puts it in
+the box the reviewer was about to type in. **It is a proposal and never a
+fix**: nothing in the document changes until a named person presses apply,
+and the screen says a model wrote it every time it shows one. A wrong
+description is a finding, not a remediation.
+
+**What leaves the box is one picture.** `src/server/vision.ts` is the only
+module in the repository that talks to anything outside this service, and it
+sends the image of a single figure and the instruction – never the document,
+its text, its filename, or a Word file's XML. For a job the customer marked
+CUI, `propose` refuses before any of that happens, and the page does not
+offer the button either; the page alone would not be enough, because a page
+is a thing a person can navigate around.
+
+**Getting the picture is the hard half, and usually it fails.** The two
+formats hide an image in different places:
+
+| | Where the picture is | How often there is one |
+|---|---|---|
+| `.docx` | a real part in the archive (`word/media/chart.png`), reached through the drawing's relationship id | almost always |
+| PDF | an image XObject drawn inside the figure's marked-content span | **often not at all** |
+
+A PDF figure holds a marked content id, not an image; somewhere in the page's
+content stream is `/P <</MCID 24>> BDC … EMC`, and the picture exists only if
+something inside that span draws one. On design work it usually does not:
+the artwork is vector, and `figureImage` reports `vector`, which is an answer
+rather than a failure. The reviewer is told to describe it themselves instead
+of being invited to try again at something that cannot work.
+
+**What comes back is cleaned before it is shown.** `normaliseDraft` strips
+the opener that describes the medium – a screen reader already announces
+that it is an image, so "Image of a bar chart" is read as "image, image of a
+bar chart". That list is **only medium words**. "Chart", "diagram", "map" and
+"logo" name what the thing *is*, which is content: a reader is better served
+by "Bar chart of enrolment by year" than by "Enrolment by year". Stripping
+those was the first version of the function and it turned good descriptions
+into worse ones; a test now pins both halves.
+
+The instruction tells the model to reply `CANNOT DESCRIBE` rather than guess,
+and a decline is shown as one. A confident invention is the worst thing this
+product can generate: it reads well, a reviewer accepts it, and the document
+ships with a lie where a description belongs.
+
+**A misconfigured server is not a model declining.** An authentication,
+permission or rate-limit error becomes "drafting is not configured", not "the
+model could not describe this figure" – they are different problems and only
+one of them is the reviewer's to work around.
+
 ### What is not here yet
 
 Writing fixes back into a PDF. The job page says so plainly rather than

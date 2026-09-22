@@ -41,9 +41,21 @@ npm run triage -- DIR # classify a folder of PDFs; prints no document content
 ## Invariants — do not break these silently
 
 - **`npm test` runs with zero dependencies installed.** Nothing under
-  `src/domain/` may import React, Next or a Node API; `src/server/` may use
-  Node's own modules and nothing from npm. This is what makes the build
-  verifiable from a sandbox with no npm access, and it is worth keeping.
+  `src/domain/` may import React, Next or a Node API, and **no file any test
+  imports may take an npm dependency.** `src/server/` is Node's own modules
+  and nothing from npm, with exactly one exception: `src/server/vision.ts`
+  imports the Anthropic SDK, because it is the one module that talks to
+  something outside this service and writing an HTTP client by hand to
+  preserve a slogan would be worse than the slogan is worth. No test imports
+  it – `src/server/jobs.ts` reaches it through `await import('./vision')`
+  inside `propose`, precisely so the SDK stays out of the test suite's
+  import graph. A static import there was the first attempt and **CI caught
+  it on the first push**, which is the guarantee working and the reason it
+  is stated as a property of the import graph rather than as a claim about
+  one file. Add a second such module only with the same two properties: no
+  test reaches it, and `npm test` still passes with `node_modules` absent –
+  which is worth checking by actually moving the folder aside, since that is
+  what CI does.
 - **One source of truth per concept, pinned by a test.** `domain/criteria.ts`
   is the list of what "508 conformant" means – WCAG 2.0 A and AA, 38 criteria,
   plus the E205.4 exception for non-web documents. `domain/findings.ts` owns
@@ -122,6 +134,25 @@ npm run triage -- DIR # classify a folder of PDFs; prints no document content
   table names its header row – and why **nothing in it is marked by colour**.
   Tinting the rows that wait on a reviewer would be a 1.4.1 failure of the
   exact kind the report flags in other people's documents.
+- **A drafted description is a proposal and never a fix.** `propose` in the
+  job store writes `finding.proposal` and changes nothing in the document;
+  only a reviewer pressing apply, under their name, turns it into a
+  decision. The screen says a draft was written by a model every time it
+  shows one. A wrong description is a finding, not a remediation, and the
+  service's promise is conformance.
+- **One figure's image is all that ever leaves.** `src/server/vision.ts` is
+  the only module that talks to anything outside this service. It sends the
+  picture and the instruction, never the document, its text, its filename or
+  a Word file's XML – and **`propose` refuses outright for a job marked
+  `cui`**, before any of that, because zero data retention is a storage
+  commitment and not a FedRAMP authorisation. The review page also hides the
+  button for such a job, but the page is a thing a person can navigate
+  around and the store is not.
+- **A figure has no image more often than it has one.** PDF artwork out of
+  Illustrator or InDesign is vector: path operators, no picture in the file.
+  `figureImage` reports `vector`, which is an answer and not a failure, and
+  the reviewer is told to describe it themselves rather than to try again at
+  something that cannot work.
 - **Never put a secret in a `NEXT_PUBLIC_` variable** — they are bundled into
   the browser in plaintext.
 

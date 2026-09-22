@@ -8,6 +8,68 @@ for. Where an entry has since been overtaken, `docs/build-state.md` says so.
 
 ---
 
+## 2026-09-21, night — drafted descriptions, and the invariant that paid for them
+
+### Done
+
+The Chairman chose raster-only over a rendering dependency. It is built: a
+reviewer presses a button beside a figure and gets a description to edit,
+for any figure that is already a picture. Word documents almost always
+qualify. PDFs often do not, and are told so in a sentence rather than left
+to fail.
+
+The product rule holds throughout: **a draft is a proposal and never a
+fix.** Nothing in a document changes until a named person applies it, and
+the screen says a model wrote it every time it shows one.
+
+### The invariant that changed
+
+`src/server/` took its first npm dependency, the Anthropic SDK. The rule as
+written was “Node's own modules and nothing from npm”; what it was
+protecting is that `npm test` runs with nothing installed. Those are not the
+same sentence, and the difference only showed when something had to talk to
+the outside world.
+
+The rule is now stated as the guarantee it was always for: no file any test
+imports may take a dependency, and CI proves it by running the tests before
+it installs anything. Engineering's view is that writing an HTTP client by
+hand to preserve the older wording would have been worse than the wording
+was worth. Recorded plainly because an invariant that quietly loosens is a
+worse outcome than one that is argued with.
+
+### What the Chairman should know before the demonstration
+
+**No live call has been made.** There is no API key in the cloud container,
+so every path was exercised up to and including the request, and the failure
+is an authentication error. The first real drafted description will be drawn
+on Josh's own machine, and it is the thing to watch: the honest question is
+not whether it works but whether the descriptions are good enough that a
+reviewer edits them rather than retyping them.
+
+**The Hermes submission is still the test case**, and it is unknown whether
+its 76 figures are raster or vector. If they are vector, this feature does
+not touch the document that motivated it, and that is the number to get from
+the triage next.
+
+### Also
+
+Two bugs were found by writing the tests, both in the cleaning of a model's
+answer, and the second is the interesting one: stripping “chart” from “A
+chart of enrolment” makes a good description worse, because “chart” names
+what the thing *is* rather than the medium it arrived in. The boundary
+between those two is now a test.
+
+The end-to-end harness reported the feature broken twice before a direct
+call proved the logic right and the script wrong – the third harness
+false-alarm of the week. Noted because the standing instruction to check
+against a real file only helps if the check itself is trustworthy.
+
+### Still with the Chairman
+
+Pricing per tier, unchanged, and now the only strategic item outstanding.
+
+---
+
 ## 2026-09-21, later — the vision pass met the file
 
 ### What happened

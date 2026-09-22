@@ -223,3 +223,15 @@
     grid-template-columns: 1fr;
   }
 }
+
+/*
+ * A drafted description is marked as one. A reviewer reading a box that was
+ * empty a moment ago should never have to wonder whether a person wrote it.
+ */
+.drafted {
+  margin: 0 0 0.5rem;
+  padding: 0.4rem 0.75rem;
+  border-left: 4px solid var(--rule);
+  color: var(--muted);
+  font-size: 0.9rem;
+}

@@ -36,6 +36,12 @@ export interface DocxParts {
   contentTypes?: string;
   /** _rels/.rels – likewise. */
   rels?: string;
+  /**
+   * word/_rels/document.xml.rels – the document's own relationship table,
+   * which is how a drawing reaches the picture it displays. Only the
+   * alternative-text drafting path needs it.
+   */
+  documentRels?: string;
 }
 
 const WHITE: Rgb = [255, 255, 255];

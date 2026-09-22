@@ -16,6 +16,7 @@ const OPTIONAL: Array<[keyof Omit<DocxParts, 'document'>, string]> = [
   ['core', 'docProps/core.xml'],
   ['contentTypes', '[Content_Types].xml'],
   ['rels', '_rels/.rels'],
+  ['documentRels', 'word/_rels/document.xml.rels'],
 ];
 const PATHS: Record<keyof DocxParts, string> = {
   document: DOCUMENT,
@@ -24,6 +25,7 @@ const PATHS: Record<keyof DocxParts, string> = {
   core: 'docProps/core.xml',
   contentTypes: '[Content_Types].xml',
   rels: '_rels/.rels',
+  documentRels: 'word/_rels/document.xml.rels',
 };
 
 export function readDocxParts(bytes: Uint8Array): DocxParts {
@@ -49,6 +51,15 @@ function partsOf(entries: Map<string, Uint8Array>): DocxParts {
     if (bytes) parts[key] = decoder.decode(bytes);
   }
   return parts;
+}
+
+/**
+ * The bytes of one part of the archive – a picture, for the drafting path.
+ * Returns null rather than throwing for a part that is not there, because a
+ * document can name a relationship whose target was never packed.
+ */
+export function readDocxPart(original: Uint8Array, part: string): Uint8Array | null {
+  return readEntries(original).get(part) ?? null;
 }
 
 /**

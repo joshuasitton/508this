@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 
 import type { Decision } from '@/domain/findings';
-import { confirm, decide, getJob, setReviewer, unconfirm, undecide } from '@/server/jobs';
+import { confirm, decide, getJob, propose, setReviewer, unconfirm, undecide } from '@/server/jobs';
 
 /**
  * The reviewer's hands.
@@ -57,6 +57,18 @@ export async function decideAction(formData: FormData): Promise<void> {
   if (value) decision.value = value;
   if (note) decision.note = note;
   await decide(id, key, decision);
+  back(id);
+}
+
+/**
+ * Draft a description for one figure. It fills the box the reviewer was
+ * going to type in and changes nothing in the document; only the button
+ * beneath it, pressed by a named person, does that.
+ */
+export async function proposeAction(formData: FormData): Promise<void> {
+  const id = field(formData, 'id');
+  const result = await propose(id, field(formData, 'key'));
+  if (!result.ok) back(id, `draft-${result.reason}`);
   back(id);
 }
 

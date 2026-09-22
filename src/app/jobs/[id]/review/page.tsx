@@ -4,10 +4,12 @@ import { notFound } from 'next/navigation';
 
 import { coverageOf, labelFor } from '@/domain/criteria';
 import { assessAll, describeSummary, findingKey, isOpen, summarise, type Finding } from '@/domain/findings';
+import { describeNoImage, type NoImage } from '@/domain/alt';
 import { MAX_REVIEWER } from '@/domain/job';
 import { KINDS, REVIEW_INPUT } from '@/domain/kinds';
 import { getJob } from '@/server/jobs';
-import { confirmAction, decideAction, identifyAction, unconfirmAction, undoAction } from './actions';
+import { visionConfigured } from '@/server/vision';
+import { confirmAction, decideAction, identifyAction, proposeAction, unconfirmAction, undoAction } from './actions';
 import styles from './page.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -19,6 +21,14 @@ const PROBLEMS: Record<string, string> = {
   value: 'Write the text to apply, or choose another action.',
   note: 'A dismissal needs a reason. It goes in the report.',
   action: 'Choose an action.',
+  'draft-cui': 'This document is marked Controlled Unclassified Information, so no part of it is sent anywhere. Describe the figure yourself.',
+  'draft-unavailable': 'Drafting is not configured on this server. Describe the figure yourself.',
+  'draft-refused': 'The model could not describe this figure. Describe it yourself.',
+  ...Object.fromEntries(
+    (['vector', 'not-found', 'unsupported-filter', 'unsupported-colour', 'too-large', 'no-anchor'] as NoImage[]).map(
+      (reason) => [`draft-${reason}`, describeNoImage(reason)],
+    ),
+  ),
 };
 
 /**
@@ -61,6 +71,9 @@ export default async function ReviewPage({
   );
   const reviewer = job.reviewer ?? '';
   const message = problem ? PROBLEMS[problem] : undefined;
+  // A document the customer marked CUI never has any part of it sent
+  // anywhere, so the button is not offered rather than offered and refused.
+  const canDraft = !job.cui && visionConfigured();
 
   return (
     <>
@@ -128,7 +141,7 @@ export default async function ReviewPage({
           </p>
         )}
         {toDecide.map((f) => (
-          <ReviewItem key={findingKey(f)} f={f} jobId={job.id} canDecide={!!reviewer} />
+          <ReviewItem key={findingKey(f)} f={f} jobId={job.id} canDecide={!!reviewer} canDraft={canDraft} />
         ))}
       </section>
 
@@ -234,7 +247,17 @@ function IdentifyForm({ jobId, label, button }: { jobId: string; label: string; 
   );
 }
 
-function ReviewItem({ f, jobId, canDecide }: { f: Finding; jobId: string; canDecide: boolean }) {
+function ReviewItem({
+  f,
+  jobId,
+  canDecide,
+  canDraft,
+}: {
+  f: Finding;
+  jobId: string;
+  canDecide: boolean;
+  canDraft: boolean;
+}) {
   const info = KINDS[f.kind];
   const input = REVIEW_INPUT[f.kind];
   const key = findingKey(f);
@@ -256,12 +279,23 @@ function ReviewItem({ f, jobId, canDecide }: { f: Finding; jobId: string; canDec
 
       {canDecide && input === 'alt' && (
         <div className={styles.forms}>
+          {f.proposal && (
+            <p className={styles.drafted}>
+              Drafted by a model, not by a person. Read it against the figure and edit it before you apply it.
+            </p>
+          )}
           <form action={decideAction} className={styles.form}>
             {base}
             <input type="hidden" name="action" value="apply" />
             <label className={styles.field}>
               <span>Alternative text – what the image shows, for someone who cannot see it</span>
-              <textarea name="value" rows={2} required className={styles.textarea} />
+              <textarea
+                name="value"
+                rows={2}
+                required
+                className={styles.textarea}
+                defaultValue={f.proposal?.text ?? ''}
+              />
             </label>
             <button type="submit" className={styles.button}>
               Write it into the document
@@ -274,6 +308,14 @@ function ReviewItem({ f, jobId, canDecide }: { f: Finding; jobId: string; canDec
               Mark decorative – it carries no information
             </button>
           </form>
+          {canDraft && (
+            <form action={proposeAction} className={styles.form}>
+              {base}
+              <button type="submit" className={styles.secondary}>
+                {f.proposal ? 'Draft it again' : 'Draft a description to edit'}
+              </button>
+            </form>
+          )}
         </div>
       )}
 
