@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 
-import { remediateJob } from '@/server/jobs';
+import { remediate } from '@/server/access';
 
 /**
  * The button. One job, one run; running it again is harmless because every
@@ -12,7 +12,7 @@ import { remediateJob } from '@/server/jobs';
  */
 export async function remediateAction(formData: FormData): Promise<void> {
   const id = String(formData.get('id') ?? '');
-  const job = await remediateJob(id);
+  const job = await remediate(id);
   if (!job) redirect('/start?problem=no-file');
   revalidatePath(`/jobs/${id}`);
   redirect(`/jobs/${id}`);

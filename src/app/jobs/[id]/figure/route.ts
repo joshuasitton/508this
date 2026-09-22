@@ -1,4 +1,4 @@
-import { figureImage } from '@/server/jobs';
+import { openFigureImage } from '@/server/access';
 
 /**
  * One figure from the customer's document, so the reviewer can look at the
@@ -19,8 +19,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const key = new URL(request.url).searchParams.get('key');
   if (!key) return new Response('Not found', { status: 404 });
 
-  const found = await figureImage(id, key);
-  if (!found.ok) return new Response('No image', { status: 404 });
+  // `null` is "not yours, or no such job"; a `FigureResult` that is not ok
+  // is "yours, and there is no picture". Both are a 404 here — the review
+  // screen is where the second one gets its sentence.
+  const found = await openFigureImage(id, key);
+  if (!found || !found.ok) return new Response('No image', { status: 404 });
 
   return new Response(Buffer.from(found.image.bytes), {
     headers: {

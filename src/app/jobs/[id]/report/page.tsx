@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { COLUMNS, buildAcr } from '@/domain/acr';
-import { getJob } from '@/server/jobs';
+import { openJob } from '@/server/access';
 import styles from './page.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -24,7 +24,7 @@ export const metadata: Metadata = { title: 'Conformance statement' };
  */
 export default async function ReportPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const job = await getJob(id);
+  const job = await openJob(id);
   if (!job) notFound();
   const acr = buildAcr(job);
 

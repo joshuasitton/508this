@@ -24,6 +24,19 @@ export interface Job {
   applied?: Applied[];
   remediatedAt?: string;
   /**
+   * The account this job belongs to. Exactly one of `account` and
+   * `visitor` is set on every job written since ownership existed; a
+   * record with neither is one from before it, and `mayOpen` refuses it.
+   */
+  account?: string;
+  /**
+   * The browser this job belongs to, as a SHA-256 digest of the cookie
+   * rather than the cookie itself — a leaked record must not hand over the
+   * thing that opens it. A visitor's reach stops at their own free
+   * assessment; see `src/domain/viewer.ts`.
+   */
+  visitor?: string;
+  /**
    * Which of the four PDF tiers this document landed in, established at
    * intake and stored because the price depends on it. Absent for a Word
    * file, which has no tier — the four-way split is a fact about PDFs.
@@ -84,7 +97,7 @@ export function formatFor(filename: string): Format | null {
 
 export type UploadCheck = { ok: true; format: Format } | { ok: false; reason: UploadProblem };
 
-export type UploadProblem = 'no-file' | 'unsupported-format' | 'too-large' | 'not-a-document';
+export type UploadProblem = 'no-file' | 'unsupported-format' | 'too-large' | 'not-a-document' | 'cui-needs-account';
 
 /**
  * Checked in this order because it is the order a person can act on: pick a
@@ -113,6 +126,8 @@ export function describeUploadProblem(reason: UploadProblem): string {
       return 'That document is over 25 MB. Remove embedded video or send it in parts.';
     case 'not-a-document':
       return 'That file is not what its name says it is. Open it in Word or Acrobat and save it again in the right format.';
+    case 'cui-needs-account':
+      return 'A document marked Controlled Unclassified Information needs an account. Identification and authentication is what the standard asks for, and a browser cookie is neither. Sign in, or create an account, and upload it again — nothing was stored.';
   }
 }
 

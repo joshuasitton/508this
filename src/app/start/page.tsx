@@ -6,7 +6,13 @@ import styles from './page.module.css';
 
 export const metadata: Metadata = { title: 'Start a remediation' };
 
-const PROBLEMS = new Set<string>(['no-file', 'unsupported-format', 'too-large', 'not-a-document']);
+const PROBLEMS = new Set<string>([
+  'no-file',
+  'unsupported-format',
+  'too-large',
+  'not-a-document',
+  'cui-needs-account',
+]);
 
 /**
  * One form, one file. No JavaScript is needed to submit it and none is

@@ -1,7 +1,7 @@
 import { buildAcr } from '@/domain/acr';
 import { acrFilename } from '@/domain/acrDocx';
 import { acrDocx } from '@/server/acr';
-import { getJob } from '@/server/jobs';
+import { openJobToChange } from '@/server/access';
 
 const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
@@ -18,7 +18,7 @@ const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.doc
  */
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const job = await getJob(id);
+  const job = await openJobToChange(id);
   if (!job) return new Response('Not found', { status: 404 });
 
   const acr = buildAcr(job);

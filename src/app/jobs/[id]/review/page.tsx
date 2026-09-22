@@ -7,8 +7,9 @@ import { assessAll, describeSummary, findingKey, isOpen, summarise, type Finding
 import { describeNoImage, type NoImage } from '@/domain/alt';
 import { MAX_REVIEWER } from '@/domain/job';
 import { KINDS, REVIEW_INPUT } from '@/domain/kinds';
-import { figureImages, getJob } from '@/server/jobs';
+import { openFigureImages, openJobFor } from '@/server/access';
 import { visionConfigured } from '@/server/vision';
+import { describeSignInNeeded, mayReview } from '@/domain/viewer';
 import { confirmAction, decideAction, identifyAction, proposeAction, unconfirmAction, undoAction } from './actions';
 import styles from './page.module.css';
 
@@ -58,7 +59,7 @@ export default async function ReviewPage({
 }) {
   const { id } = await params;
   const { problem } = await searchParams;
-  const job = await getJob(id);
+  const { job, who } = await openJobFor(id);
   if (!job) notFound();
 
   const confirmed = new Set(Object.keys(job.confirmations ?? {}));
@@ -69,15 +70,19 @@ export default async function ReviewPage({
   const reviewCriteria = assessAll(job.findings, job.format, confirmed).filter(
     (a) => coverageOf(a.criterion, job.format)?.coverage === 'reviewer' && a.status !== 'Not Applicable',
   );
-  const reviewer = job.reviewer ?? '';
+  // A visitor may read their own assessment and may not decide anything in
+   // it: a decision puts a named person on a federal conformance statement,
+   // and a cookie is not a named person.
+  const signedIn = mayReview(who);
+  const reviewer = signedIn ? (job.reviewer ?? '') : '';
   const message = problem ? PROBLEMS[problem] : undefined;
   // A document the customer marked CUI never has any part of it sent
   // anywhere, so the button is not offered rather than offered and refused.
-  const canDraft = !job.cui && visionConfigured();
+  const canDraft = signedIn && !job.cui && visionConfigured();
   // Asked once for the whole document rather than once per figure: a
   // submission with 76 of them would otherwise reopen and reparse the file
   // 76 times to draw one screen.
-  const pictures = await figureImages(job.id);
+  const pictures = await openFigureImages(job.id);
 
   return (
     <>
@@ -107,7 +112,15 @@ export default async function ReviewPage({
         <h2 id="who-title" className={styles.h2}>
           Reviewer
         </h2>
-        {reviewer ? (
+        {!signedIn ? (
+          <>
+            <p className={styles.note}>{describeSignInNeeded('review')}</p>
+            <p className={styles.note}>
+              <Link href="/account/sign-in">Sign in</Link> or{' '}
+              <Link href="/account/sign-up">create an account</Link>. This document comes with you.
+            </p>
+          </>
+        ) : reviewer ? (
           <>
             <p className={styles.reviewerLine}>
               Reviewing as <strong>{reviewer}</strong>. This name goes on the conformance statement beside every
@@ -149,7 +162,7 @@ export default async function ReviewPage({
             key={findingKey(f)}
             f={f}
             jobId={job.id}
-            canDecide={!!reviewer}
+            canDecide={signedIn && !!reviewer}
             canDraft={canDraft}
             picture={pictures.get(findingKey(f))}
           />
