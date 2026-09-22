@@ -8,6 +8,85 @@ for. Where an entry has since been overtaken, `docs/build-state.md` says so.
 
 ---
 
+## 2026-09-22, night — the Hermes figures are vector, and mail exists
+
+### What the Chairman said
+
+Merge it and start on mail. And: the Hermes figures are vector.
+
+### The second half of that is the bigger news
+
+All 76. That answers the question standing since the 21st, the unwelcome
+way. **Drafted alternative text does not reach the document that motivated
+it**, and does not reach either of the other two real PDFs. The feature is
+not broken and was not a mistake — it works, it costs one to three cents a
+figure, and it reaches Word documents, which is the format the service takes
+furthest. What has changed is that a suspicion is now a finding.
+
+What is established: **the PDFs this business receives are drawn, not
+photographed.** Three real documents — the Hermes submission's 76 figures,
+plus the five across the infographic and the logo sheet recorded on the
+21st — and not one raster image among them. Every one of those figures is a
+reviewer's to describe by hand.
+
+**This reopens the decision the Chairman made on the 21st**, and it should.
+Raster-only was chosen over a PDF rendering dependency on a sample of two,
+with engineering's own note that "(1) is a large commitment to make on a
+sample of two". The sample is no longer two, and it is unanimous. The
+arithmetic has also changed: at $3 a figure past the first ten, the Hermes
+submission is $198 of surcharge for work a renderer would reduce to
+reviewing rather than composing. Engineering is not asking for a decision
+tonight and is recording that the evidence for one has arrived.
+
+It is also the third time in five days that measuring a real file changed
+the plan — "mostly PDF", then "mostly vector", now "entirely vector". The
+standing instruction from the 21st (a feature gets checked against a real
+customer file before it is *scheduled*) is doing its job, one step too late
+each time.
+
+### What was built
+
+Mail, and the reset flow on top of it. Two answers in this service are
+deliberately uninformative — a taken address at sign-up, and a reset
+request for an address with no account — and both were costing an honest
+person a dead end. The address itself is the only channel where the truth is
+safe to say, so that is where it is now said.
+
+Thirty minutes, once, and a completed reset ends every session the account
+has. That last one is not a nicety: people reset a passphrase because they
+think somebody else has it.
+
+No SMTP and no npm package. One HTTPS `POST` with a bearer token, which
+`fetch` does on its own — a dependency in the code path that carries
+credentials is a supply-chain risk worth not taking.
+
+### Decided by engineering, for the Chairman to overturn
+
+**A letter's only variable is a link, and the link must be on our own
+origin**, enforced by a throw. A reset link is a credential, and a template
+that renders whatever link it is handed is a phishing page with 508This's
+return address on it. The same closed shape means no filename, finding or
+passphrase has a route into an email.
+
+**Unconfigured mail writes to `accounts/outbox/` in development and is
+refused outright in production.** A service that silently writes
+password-reset links to local disk because somebody forgot an environment
+variable looks like it is working, which is the worst of the three states.
+
+### Still with the Chairman
+
+The first live drafted description, on his own machine — the vision path has
+still never made a real call. The four prices. And now, reopened by his own
+measurement: **does 508This take a PDF rendering dependency?**
+
+### Next
+
+Production storage, with deletion, scrubbing and encryption built in from
+the first commit rather than retrofitted — the last thing standing between
+this and a service that can hold a real customer's document.
+
+---
+
 ## 2026-09-22, evening — the door is shut, and the front door is still open
 
 ### What the Chairman said

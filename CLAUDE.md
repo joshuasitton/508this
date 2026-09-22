@@ -142,6 +142,24 @@ npm run triage -- DIR # classify a folder of PDFs; prints no document content
   outside a three-name allowlist. "Not yours" and "no such job" are the same
   404 with the same page, because telling a stranger a document exists tells
   them who the customer is.
+- **A letter is a fixed template plus at most one link, and the link must be
+  on our own origin.** `letterFor` in `src/domain/mail.ts` throws otherwise.
+  A reset link is a credential, so a template that renders whatever link it
+  is handed is a phishing page with our return address on it — and the same
+  hole is how a filename or a finding's text gets mailed out of the building.
+  No free-text field, same as the audit record.
+- **The origin in a link comes from `PUBLIC_BASE_URL`, never from a request
+  header.** `src/server/origin.ts` refuses to guess in production. A reset
+  link built from the `Host` header is a credential mailed to the right
+  person pointing at somebody else's server.
+- **A reset lasts thirty minutes, is spent on use whether or not the new
+  passphrase was accepted, and ends every session the account has.** People
+  reset because they think somebody else has the passphrase; leaving that
+  session alive makes it theatre.
+- **Mail goes out by HTTPS `fetch`, never SMTP and never a package**, and
+  falls back to `accounts/outbox/` when unconfigured — which is **refused in
+  production**, because a service quietly writing reset links to local disk
+  looks like it is working.
 - **A session token is never stored, only its SHA-256.** A leaked session
   file is then not a set of live sessions. Fast hash here, scrypt for
   passphrases: a token is 256 bits of randomness and cannot be guessed, so

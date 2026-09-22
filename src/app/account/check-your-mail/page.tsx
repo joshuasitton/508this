@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
+import { transport } from '@/server/mail';
 import styles from '../page.module.css';
 
 export const metadata: Metadata = { title: 'Check your mail' };
@@ -12,12 +13,16 @@ export const metadata: Metadata = { title: 'Check your mail' };
  * This page is the cost of not telling a stranger who has an account here.
  * A form that answers "that address is taken" is a tool for enumerating
  * 508This's customers, and they are federal contractors; the only channel
- * that can safely tell the truth is the address itself. **508This cannot
- * send mail yet**, so this page says plainly that the message it describes
- * has not arrived, rather than leaving somebody waiting for one. It is an
- * honest dead end and it is temporary.
+ * that can safely tell the truth is the address itself.
+ *
+ * That channel now exists, so the page no longer has to apologise for a
+ * message that was never coming. What it will not do is claim more than the
+ * server can deliver: if this build has no mail transport it says so, in
+ * those words, rather than leaving somebody refreshing an inbox.
  */
 export default function CheckYourMail() {
+  const via = transport();
+
   return (
     <>
       <h1>Check your mail</h1>
@@ -29,10 +34,22 @@ export default function CheckYourMail() {
         &ldquo;that one is taken&rdquo; is a way of finding out who our customers are. The address itself is the
         only place it is safe to say which.
       </p>
+      {via === 'outbox' && (
+        <p className={styles.note}>
+          <strong>Development build:</strong> no mail went anywhere. The letter was written to{' '}
+          <code>accounts/outbox/</code> on this machine.
+        </p>
+      )}
+      {via === 'none' && (
+        <p className={styles.note}>
+          <strong>This server cannot send mail.</strong> No letter went out, so if the address already had an
+          account nobody has been told. That is a fault in the service and it is worth telling somebody about.
+        </p>
+      )}
       <p className={styles.note}>
-        <strong>Being straight with you: 508This cannot send mail yet</strong>, so no message is actually on its
-        way. If you already had an account, <Link href="/account/sign-in">sign in</Link>. If you did not, this is a
-        dead end until the mail channel is built, and it is the next thing after this.
+        If you already had an account and have forgotten the passphrase, the letter has a reset link in it — or{' '}
+        <Link href="/account/forgot">ask for one here</Link>. If you did not, you can{' '}
+        <Link href="/account/sign-in">sign in</Link> once the account is set up.
       </p>
     </>
   );

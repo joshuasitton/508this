@@ -127,6 +127,34 @@ export async function getAccount(id: string): Promise<Account | null> {
   return stored ? publicPart(stored) : null;
 }
 
+/** The account for an address, or null. Server-side only, for obvious reasons. */
+export async function accountFor(rawEmail: string): Promise<Account | null> {
+  const email = checkEmail(rawEmail);
+  if (!email.ok) return null;
+  const id = await idForEmail(email.email);
+  if (!id) return null;
+  const stored = await readStored(id);
+  return stored ? publicPart(stored) : null;
+}
+
+/**
+ * Replace an account's passphrase. The policy is checked here as well as at
+ * the form, because this is reachable from a reset link and a form is a
+ * thing a person can navigate around.
+ *
+ * Ending the account's sessions is the caller's job and not an option:
+ * see `endAllSessions`.
+ */
+export async function changePassword(id: string, password: string): Promise<boolean> {
+  const stored = await readStored(id);
+  if (!stored || stored.disabledAt) return false;
+  if (!checkPassword(password, stored.email).ok) return false;
+  stored.passwordHash = await hashPassword(password);
+  delete stored.failures;
+  await writeStored(stored);
+  return true;
+}
+
 export type AuthResult =
   | { ok: true; account: Account }
   | { ok: false; reason: 'no' }

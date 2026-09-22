@@ -6,6 +6,8 @@ import { redirect } from 'next/navigation';
 import { checkEmail, checkPassword } from '@/domain/account';
 import { minutesLeft } from '@/domain/session';
 import { authenticate, createAccount } from '@/server/accounts';
+import { origin } from '@/server/origin';
+import { consume, request, tellTaken } from '@/server/resets';
 import { claimJobs } from '@/server/jobs';
 import { COOKIE, COOKIE_OPTIONS, endSession, startSession } from '@/server/sessions';
 import { VISITOR_COOKIE, visitorDigest } from '@/server/access';
@@ -60,9 +62,15 @@ export async function signUpAction(formData: FormData): Promise<void> {
 
   const made = await createAccount(email, password);
   if (!made.ok) {
-    // `taken` lands here with the others and is deliberately not told
-    // apart: see the note at the top of this file.
-    redirect('/account/check-your-mail');
+    // The address is already in use. The person at the form is told what a
+    // successful sign-up is told; the person who owns the address is told
+    // the truth, on the address, which is the only channel where that is
+    // safe. `tellTaken` answers the same way whether or not it worked.
+    if (made.reason === 'taken') await tellTaken(email, origin());
+    if (made.reason === 'taken') redirect('/account/check-your-mail');
+    // The form already checked these, so reaching here means the two checks
+    // disagree — which is a bug, and is shown rather than swallowed.
+    back('up', made.reason === 'bad-email' ? 'email:malformed' : 'password:too-short', email);
   }
 
   await establish(made.account.id);
@@ -90,4 +98,36 @@ async function establish(account: string): Promise<void> {
   const visitor = jar.get(VISITOR_COOKIE)?.value;
   if (visitor) await claimJobs(visitorDigest(visitor), account);
   jar.set(COOKIE, await startSession(account), COOKIE_OPTIONS);
+}
+
+
+/**
+ * Ask for a reset link. Always redirects to the same page with the same
+ * sentence: "sent", "no such account" and "mail is down" are three
+ * different answers, and three different answers is a way to find out which
+ * addresses have accounts here.
+ */
+export async function forgotAction(formData: FormData): Promise<void> {
+  await request(String(formData.get('email') ?? ''), origin());
+  redirect('/account/forgot?sent=1');
+}
+
+/**
+ * Spend a link and set the new passphrase. The token travels in the form
+ * rather than being read again from the URL, so that what is spent is the
+ * link the person actually opened.
+ */
+export async function resetAction(formData: FormData): Promise<void> {
+  const token = String(formData.get('token') ?? '');
+  const password = String(formData.get('password') ?? '');
+
+  const result = await consume(token, password);
+  if (result.ok) redirect('/account/sign-in?problem=reset-done');
+
+  const query = new URLSearchParams({ problem: `reset:${result.reason}` });
+  // The token goes back only when the link is still worth another go. A
+  // spent or expired one is not, and putting it back in the URL would
+  // invite somebody to keep trying it.
+  if (result.reason === 'bad-password') query.set('token', token);
+  redirect(`/account/reset?${query}`);
 }

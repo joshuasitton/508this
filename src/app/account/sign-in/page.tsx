@@ -76,7 +76,7 @@ export default async function SignIn({
         characters and nothing else is required of it.
       </p>
       <p className={styles.note}>
-        There is no way to reset a passphrase yet, because 508This cannot send mail yet. That is the next thing.
+        <Link href="/account/forgot">Forgotten your passphrase?</Link>
       </p>
     </>
   );

@@ -16,6 +16,7 @@ const { authenticate, createAccount, disableAccount, getAccount } = await import
 const { endSession, resolveSession, startSession, touchSession } = await import('../src/server/sessions');
 const { history } = await import('../src/server/audit');
 const { hashPassword, needsRehash, verifyPassword } = await import('../src/server/passwords');
+const { consume, inspect, request, tellTaken } = await import('../src/server/resets');
 
 const PASSPHRASE = 'correct horse battery staple';
 
@@ -246,4 +247,114 @@ test('no passphrase and no email address ever reaches the audit log', async () =
   assert.ok(!raw.includes('a wrong one'));
   assert.ok(!raw.includes('secrets@example.gov'));
   assert.ok(raw.includes(made.id), 'the account is named by its id, which is the point');
+});
+
+
+const ORIGIN = 'https://508this.example';
+
+/** The link out of the newest letter in the development outbox. */
+async function lastLink(): Promise<string | null> {
+  const dir = path.join(ROOT, 'outbox');
+  const names = (await readdir(dir)).sort();
+  const last = names.at(-1);
+  if (!last) return null;
+  const text = await readFile(path.join(dir, last), 'utf8');
+  return /https:\/\/\S+/.exec(text)?.[0] ?? null;
+}
+
+test('a reset link arrives, works once, and signs every session out', async () => {
+  const made = await account('reset@example.gov');
+  const staySignedIn = await startSession(made.id);
+  assert.ok((await resolveSession(staySignedIn)).ok);
+
+  await request('Reset@Example.GOV', ORIGIN);
+  const link = await lastLink();
+  assert.ok(link, 'a letter was written');
+  const token = new URL(link).searchParams.get('token');
+  assert.ok(token && token.length > 30, 'the link carries a real token');
+  assert.equal(await inspect(token), 'good');
+
+  const done = await consume(token, 'a brand new passphrase');
+  assert.ok(done.ok);
+  assert.equal(done.account, made.id);
+
+  // The reason people reset a passphrase is that they think somebody has
+  // it. Leaving that somebody signed in would make the reset theatre.
+  assert.deepEqual(await resolveSession(staySignedIn), { ok: false, reason: 'none' });
+
+  assert.ok((await authenticate('reset@example.gov', 'a brand new passphrase')).ok);
+  assert.equal((await authenticate('reset@example.gov', PASSPHRASE)).ok, false, 'the old one is gone');
+
+  // Once.
+  assert.deepEqual(await consume(token, 'yet another passphrase'), { ok: false, reason: 'used' });
+});
+
+test('the token is never stored, only its digest', async () => {
+  const made = await account('digest@example.gov');
+  await request('digest@example.gov', ORIGIN);
+  const token = new URL((await lastLink())!).searchParams.get('token')!;
+
+  for (const name of await readdir(path.join(ROOT, 'resets'))) {
+    assert.match(name, /^[0-9a-f]{64}\.json$/);
+    const raw = await readFile(path.join(ROOT, 'resets', name), 'utf8');
+    assert.ok(!raw.includes(token), 'the token itself is never on disk');
+  }
+  assert.ok(made.id.length > 0);
+});
+
+/**
+ * A weak passphrase burns the link. That is inconvenient and it is the
+ * right way round: the alternative is a live link somebody can keep trying
+ * passphrases against.
+ */
+test('a refused passphrase still spends the link', async () => {
+  await account('weak@example.gov');
+  await request('weak@example.gov', ORIGIN);
+  const token = new URL((await lastLink())!).searchParams.get('token')!;
+
+  assert.deepEqual(await consume(token, 'short'), { ok: false, reason: 'bad-password' });
+  assert.equal(await inspect(token), 'used');
+  assert.deepEqual(await consume(token, 'a perfectly fine passphrase'), { ok: false, reason: 'used' });
+});
+
+test('an unknown token is unknown, and asking for one is the same for everybody', async () => {
+  assert.equal(await inspect('a token nobody ever issued'), 'unknown');
+  assert.deepEqual(await consume('a token nobody ever issued', PASSPHRASE), { ok: false, reason: 'unknown' });
+
+  // An address with no account still gets a letter, and it carries no link.
+  await request('nobody-here@example.gov', ORIGIN);
+  const dir = path.join(ROOT, 'outbox');
+  const last = (await readdir(dir)).sort().at(-1)!;
+  const text = await readFile(path.join(dir, last), 'utf8');
+  assert.match(text, /no account here/i);
+  assert.ok(!text.includes('/account/reset'), 'there is nothing to reset, so there is no link');
+});
+
+test('the person who owns a taken address is told on the address', async () => {
+  const made = await account('taken-told@example.gov');
+  await tellTaken('Taken-Told@Example.gov', ORIGIN);
+
+  const dir = path.join(ROOT, 'outbox');
+  const last = (await readdir(dir)).sort().at(-1)!;
+  const text = await readFile(path.join(dir, last), 'utf8');
+  assert.match(text, /already has an account/i);
+  assert.match(text, /Nothing changed/);
+
+  const token = new URL(/https:\/\/\S+/.exec(text)![0]).searchParams.get('token')!;
+  assert.equal(await inspect(token), 'good', 'and it carries a way back in');
+  assert.ok(made.id.length > 0);
+});
+
+test('no passphrase and no reset token reaches the audit log', async () => {
+  const made = await account('quiet@example.gov');
+  await request('quiet@example.gov', ORIGIN);
+  const token = new URL((await lastLink())!).searchParams.get('token')!;
+  await consume(token, 'a replacement passphrase');
+
+  const raw = await readFile(path.join(ROOT, made.id, 'audit.log'), 'utf8');
+  assert.ok(!raw.includes(token), 'a reset token is a credential and never appears in a log');
+  assert.ok(!raw.includes('a replacement passphrase'));
+  assert.ok(!raw.includes('quiet@example.gov'));
+  assert.match(raw, /reset\.requested/);
+  assert.match(raw, /reset\.completed/);
 });

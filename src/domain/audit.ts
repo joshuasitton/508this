@@ -38,6 +38,9 @@ export const AUDIT_ACTIONS = [
   'sign-in.locked',
   'sign-out',
   'session.expired',
+  'reset.requested',
+  'reset.completed',
+  'mail.failed',
   'job.created',
   'job.opened',
   'job.remediated',
@@ -122,6 +125,12 @@ export function describeAction(action: AuditAction): string {
       return 'Signed out';
     case 'session.expired':
       return 'Session ended';
+    case 'reset.requested':
+      return 'Passphrase reset requested';
+    case 'reset.completed':
+      return 'Passphrase reset, and every session ended';
+    case 'mail.failed':
+      return 'A letter could not be sent';
     case 'job.created':
       return 'Document uploaded';
     case 'job.opened':
@@ -151,7 +160,13 @@ export function describeAction(action: AuditAction): string {
  * everything gets recorded.
  */
 export function isSecurityEvent(action: AuditAction): boolean {
-  return action.startsWith('sign-in') || action.startsWith('account') || action === 'session.expired';
+  return (
+    action.startsWith('sign-in') ||
+    action.startsWith('account') ||
+    action.startsWith('reset') ||
+    action === 'session.expired' ||
+    action === 'mail.failed'
+  );
 }
 
 /** One line, fixed width at the front, for a log a person reads or exports. */
