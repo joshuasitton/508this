@@ -6,6 +6,7 @@
 
 import type { Finding } from './findings';
 import type { Kind } from './kinds';
+import type { Tier } from './triage';
 
 export type JobStatus = 'received' | 'detected' | 'remediated' | 'in-review' | 'delivered';
 
@@ -22,6 +23,12 @@ export interface Job {
   /** What automatic remediation changed, in order. Absent until it has run. */
   applied?: Applied[];
   remediatedAt?: string;
+  /**
+   * Which of the four PDF tiers this document landed in, established at
+   * intake and stored because the price depends on it. Absent for a Word
+   * file, which has no tier — the four-way split is a fact about PDFs.
+   */
+  tier?: Tier;
   /** Criteria a reviewer has confirmed, by whom and when. */
   confirmations?: Record<string, { by: string; at: string }>;
   /** The reviewer named on the statement. Set the first time a person decides anything. */

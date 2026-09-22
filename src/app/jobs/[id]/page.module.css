@@ -261,3 +261,72 @@
     padding-right: 0.5rem;
   }
 }
+
+/*
+ * The price and the sentence saying what it buys are one block on purpose.
+ * `src/domain/pricing.ts` refuses to hand back a number without its promise,
+ * and a layout that put the numbers in one column and the caveats somewhere
+ * below would undo that in a stylesheet.
+ */
+.offers {
+  margin: 0 0 3rem;
+  max-width: 70ch;
+}
+
+.promise {
+  margin: 0 0 1.25rem;
+}
+
+.offerList {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.offer,
+.offerOut {
+  border: 1px solid var(--rule);
+  border-left-width: 5px;
+  padding: 0.9rem 1.1rem;
+}
+
+/*
+ * An offer the service will not sell is marked at its edge and not in its
+ * prose. The sentence explaining why is the most honest thing on the page,
+ * and greying it out would make the one paragraph a customer most needs to
+ * read look like the one they can skip.
+ */
+.offerOut {
+  border-left-color: var(--muted);
+}
+
+.offerOut .price {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.offerTitle {
+  font-size: 1.05rem;
+  margin: 0 0 0.4rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.price {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.offerBody {
+  margin: 0;
+}
+
+.caveat {
+  margin: 0.6rem 0 0;
+  font-weight: 600;
+}

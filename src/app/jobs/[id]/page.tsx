@@ -6,6 +6,7 @@ import { DOCUMENT_EXEMPT, labelFor } from '@/domain/criteria';
 import { assessAll, describeRemarks, describeSummary, isOpen, stateOf, summarise } from '@/domain/findings';
 import { describeStatus } from '@/domain/job';
 import { groupByKind } from '@/domain/kinds';
+import { bestOffer, describeOffer, labelFor as offerLabel, money, quoteAll, workFor } from '@/domain/pricing';
 import { FIXABLE_KINDS } from '@/domain/remediate';
 import { PDF_FIXABLE_KINDS } from '@/domain/pdfRemediate';
 import { getJob } from '@/server/jobs';
@@ -49,6 +50,9 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
   const automatic = true;
   const canFix = job.format === 'pdf' ? PDF_FIXABLE_KINDS : (FIXABLE_KINDS as ReadonlySet<string>);
   const fixable = job.findings.filter((f) => !f.remediated && canFix.has(f.kind)).length;
+  const work = workFor(job);
+  const quotes = quoteAll(work);
+  const best = bestOffer(work);
 
   return (
     <>
@@ -61,6 +65,41 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
           {verdict.headline}
         </h2>
         <p className={styles.verdictDetail}>{verdict.detail}</p>
+      </section>
+
+      <section className={styles.offers} aria-labelledby="price-title">
+        <h2 id="price-title" className={styles.actionsTitle}>
+          What this costs
+        </h2>
+        <p className={styles.promise}>{quotes[0]?.available ? quotes[0].promise : null}</p>
+        <ul className={styles.offerList}>
+          {quotes.map((quote) => (
+            <li key={quote.offer} className={quote.available ? styles.offer : styles.offerOut}>
+              <h3 className={styles.offerTitle}>
+                {offerLabel(quote.offer)}
+                <span className={styles.price}>{quote.available ? money(quote.cents) : 'Not sold for this document'}</span>
+              </h3>
+              {quote.available ? (
+                <>
+                  <p className={styles.offerBody}>{describeOffer(quote.offer)}</p>
+                  {quote.lines.length > 1 && (
+                    <p className={styles.muted}>
+                      {quote.lines.map((l) => `${l.label} ${money(l.cents)}`).join(' + ')}
+                    </p>
+                  )}
+                  {quote.caveat && <p className={styles.caveat}>{quote.caveat}</p>}
+                </>
+              ) : (
+                <p className={styles.offerBody}>{quote.because}</p>
+              )}
+            </li>
+          ))}
+        </ul>
+        <p className={styles.footnote}>
+          {best === 'assessment'
+            ? 'Nothing here is billable, and you have already had the part that is free.'
+            : `Everything on this page is the free assessment. The ${offerLabel(best).toLowerCase()} is as far as this document can be taken, and nothing is charged until you ask for it.`}
+        </p>
       </section>
 
       <section className={styles.actions} aria-labelledby="actions-title">
