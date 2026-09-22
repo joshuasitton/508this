@@ -4,6 +4,51 @@ The running project-level record. Sections are dated and kept in order rather
 than rewritten, so the reasoning stays readable. Decisions live in
 `docs/leadership-standup.md`; this file says where the code stands.
 
+## 2026-09-22, night — the object store
+
+`src/server/blobs.ts` and `src/server/s3.ts`. Documents now live in an
+object store when `S3_BUCKET`, `S3_ACCESS_KEY_ID` and
+`S3_SECRET_ACCESS_KEY` are set, and on disk otherwise. No `STORAGE=s3`
+switch: a switch set without credentials is a service that starts and then
+cannot read anything. 295 tests, still green with `node_modules` moved
+aside.
+
+The seam paid for itself. Encryption, retention, scrubbing and the
+ownership check all happen above the four functions that were written to be
+replaced, so none of them changed and the 287 tests that covered them went
+on passing throughout.
+
+**Signature Version 4 is written by hand, and the reason that is defensible
+is that it is checked.** AWS publishes a worked example with a fixed key, a
+fixed timestamp and the exact signature the algorithm must produce, and the
+test reproduces `get-vanilla` byte for byte. The service name is a
+parameter rather than a constant specifically so that vector runs against
+the real code path instead of a copy — it names a service called `service`,
+and a hard-coded `s3` would have made the strongest available check
+impossible. A second implementation, written from the specification in
+Python, agrees on every S3 case as well.
+
+The alternative was the AWS SDK: four hundred-odd transitive dependencies
+to do four verbs, on a service holding federal records.
+
+**What the fake server proves.** `__tests__/s3.test.ts` runs a real HTTP
+server speaking PUT, GET, DELETE and ListObjectsV2 with pagination, and
+drives the whole job store through it — upload, read back, deliver, sweep.
+It checks that `x-amz-content-sha256` is the hash of the body actually
+sent, and that the bucket holds the sealed form rather than the customer's
+archive or filename. What it cannot prove is that AWS agrees; that is the
+vector's job, and between them the untested surface is AWS's own error
+behaviour and nothing else.
+
+**Found by the runtime, not by review:** TypeScript constructor parameter
+properties are not supported in Node's strip-only mode, which is how `npm
+test` runs. `S3Error` was written with them and is now written out.
+
+**Still on local disk:** accounts, sessions, the audit log and reset
+tokens. Documents went first because they are the federal records. One part
+of the rest is a design question rather than a port — the audit log is
+`appendFile` to one file per account, and an object store has no append.
+
 ## 2026-09-22, night — the renderer, and the crop that makes it allowed
 
 The Chairman took the dependency. `src/server/render.ts`: pdf.js and a

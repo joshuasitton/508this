@@ -8,6 +8,8 @@ import { describeStatus } from '@/domain/job';
 import { groupByKind } from '@/domain/kinds';
 import { describeSignInNeeded, mayReview } from '@/domain/viewer';
 import { describeRetention } from '@/domain/retention';
+import { encrypting } from '@/server/crypto';
+import { storage } from '@/server/blobs';
 import { describeScrub } from '@/domain/scrub';
 import { bestOffer, describeOffer, labelFor as offerLabel, money, quoteAll, workFor } from '@/domain/pricing';
 import { FIXABLE_KINDS } from '@/domain/remediate';
@@ -201,6 +203,17 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
             How long we keep it
           </h2>
           <p className={styles.actionNote}>{retention}</p>
+          {/*
+            Said rather than implied. A customer entitled to ask where their
+            federal document is kept and whether it is encrypted should not
+            have to take it on trust from a marketing page, and a build that
+            is not doing either of those things should not be able to look
+            like one that is.
+          */}
+          <p className={styles.muted}>
+            {storage() === 's3' ? 'Stored in object storage' : 'Stored on this server’s own disk'}
+            {encrypting() ? ', encrypted at rest.' : ', unencrypted — this is a development build.'}
+          </p>
           {scrubbed && <p className={styles.actionNote}>{scrubbed}</p>}
           {job.deletedAt && (
             <p className={styles.actionNote}>

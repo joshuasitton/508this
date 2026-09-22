@@ -8,6 +8,62 @@ for. Where an entry has since been overtaken, `docs/build-state.md` says so.
 
 ---
 
+## 2026-09-22, night — the object store, and one thing that does not port
+
+### What the Chairman said
+
+Write the object store.
+
+### Done
+
+Documents live in an object store when the credentials are there and on
+disk when they are not. The seam built this afternoon did its job: every
+one of the 287 tests covering encryption, retention, scrubbing and
+ownership went on passing untouched, because all of that happens above the
+line.
+
+### The decision worth defending
+
+**Signature Version 4 is written by hand rather than taken from the AWS
+SDK.** That SDK is four hundred-odd transitive dependencies to do four
+verbs — PUT, GET, DELETE, LIST — on a service holding federal records, and
+every package in that path is a package that can read a customer's document
+on the way past.
+
+Hand-rolled crypto is normally indefensible because nobody can check it.
+This is checkable and is checked: AWS publishes a worked example with a
+fixed key, a fixed timestamp and the exact signature the algorithm must
+produce, and the test reproduces it byte for byte. Engineering made the
+service name a parameter specifically so that vector could run against the
+real code path rather than a copy of it — the published case names a
+service called `service`, and a hard-coded `s3` would have put the
+strongest available check out of reach.
+
+Chairman's call if he disagrees: the SDK is one `npm install` away and the
+change is one file.
+
+### What this does not solve
+
+**Accounts, sessions, the audit log and reset tokens are still local.**
+Documents went first because they are the records the retention decision is
+about. One part of the remainder is a design question rather than a port:
+the audit log is an append to one file per account, and **an object store
+has no append.** Either every event becomes its own object, or the log
+needs a real database. Porting it without deciding that turns an
+append-only log into a read-modify-write race, which is the one property
+that log exists to have.
+
+Engineering's read, not acted on: **one object per event.** It keeps the
+append-only guarantee that 800-171 wants, it needs no database, and listing
+a prefix is how a log gets read anyway.
+
+### Still with the Chairman
+
+The first live drafted description. The four prices. What happens to a
+document nobody downloads.
+
+---
+
 ## 2026-09-22, night — the rendering dependency, taken
 
 ### What the Chairman said
