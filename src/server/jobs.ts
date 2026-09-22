@@ -16,7 +16,7 @@
  * document content, so whatever logs it cannot leak it.
  */
 
-import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 
@@ -29,6 +29,9 @@ import { findingKey, isOpen, summarise, type Decision, type Finding } from '@/do
 import type { NoImage } from '@/domain/alt';
 import { imageForFinding, imagesForFindings, type FigureResult } from './figures';
 import { reviewerName, type Format, type Job } from '@/domain/job';
+import { open as unseal, openText, seal, sealText } from './crypto';
+import { deleteAfter as deleteAfterFor, expired } from '@/domain/retention';
+import { scrubJob } from '@/domain/scrub';
 import type { Owner } from '@/domain/viewer';
 import { applyDecisions, remediateDocx } from '@/domain/remediate';
 import { readDocxParts, writeDocx } from './docx';
@@ -84,21 +87,15 @@ export async function createJob(
   else job.visitor = options.owner.visitor;
   const dir = dirFor(job.id);
   await mkdir(dir, { recursive: true });
-  await writeFile(path.join(dir, `original.${format}`), bytes);
-  await writeFile(path.join(dir, 'job.json'), JSON.stringify(job, null, 2));
+  await writeBlob(job.id, `original.${format}`, bytes);
+  await writeRecord(job);
   return job;
 }
 
 export async function getJob(id: string): Promise<Job | null> {
   if (!ID.test(id)) return null;
-  let job: Job;
-  try {
-    const raw = await readFile(path.join(dirFor(id), 'job.json'), 'utf8');
-    job = JSON.parse(raw) as Job;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
-    throw error;
-  }
+  const job = await readRecord(id);
+  if (!job) return null;
   return isCurrent(job) ? job : redetect(job);
 }
 
@@ -117,14 +114,15 @@ function isCurrent(job: Job): boolean {
 }
 
 async function redetect(job: Job): Promise<Job> {
-  const bytes = await readFile(path.join(dirFor(job.id), `original.${job.format}`));
+  const bytes = await readBlob(job.id, `original.${job.format}`);
+  if (!bytes) return job;
   // Whichever format the job is. This read the Word parts unconditionally
   // until the tier made PDFs repairable too, which would have thrown on the
   // first PDF record an older build had written.
-  const { findings, tier } = detect(job.format, new Uint8Array(bytes));
+  const { findings, tier } = detect(job.format, bytes);
   const repaired: Job = { ...job, findings };
   if (tier) repaired.tier = tier;
-  await writeFile(path.join(dirFor(job.id), 'job.json'), JSON.stringify(repaired, null, 2));
+  await writeRecord(repaired);
   return repaired;
 }
 
@@ -156,7 +154,9 @@ export async function claimJobs(visitor: string, account: string): Promise<numbe
     if (!ID.test(id)) continue;
     let job: Job;
     try {
-      job = JSON.parse(await readFile(path.join(dirFor(id), 'job.json'), 'utf8')) as Job;
+      const found = await readRecord(id);
+      if (!found) continue;
+      job = found;
     } catch {
       // A directory without a readable record is not a job to claim.
       continue;
@@ -164,10 +164,49 @@ export async function claimJobs(visitor: string, account: string): Promise<numbe
     if (job.account || job.visitor !== visitor) continue;
     delete job.visitor;
     job.account = account;
-    await writeFile(path.join(dirFor(id), 'job.json'), JSON.stringify(job, null, 2));
+    await writeRecord(job);
     claimed += 1;
   }
   return claimed;
+}
+
+
+/**
+ * Every read and write of a customer's bytes goes through these four
+ * functions, and nothing else in this file touches the filesystem for one.
+ *
+ * That is what makes encryption at rest a property of the store rather than
+ * a thing nine call sites each remember, and it is the seam an object store
+ * slides into when this stops being local disk. The job id is passed as
+ * associated data on every seal, so a record or a document cannot be moved
+ * into another job's directory and still open — without that, moving files
+ * around is a way to read somebody else's document.
+ */
+async function writeRecord(job: Job): Promise<void> {
+  await writeFile(path.join(dirFor(job.id), 'job.json'), sealText(JSON.stringify(job, null, 2), job.id));
+}
+
+async function readRecord(id: string): Promise<Job | null> {
+  try {
+    const stored = new Uint8Array(await readFile(path.join(dirFor(id), 'job.json')));
+    return JSON.parse(openText(stored, id)) as Job;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw error;
+  }
+}
+
+async function writeBlob(id: string, name: string, bytes: Uint8Array): Promise<void> {
+  await writeFile(path.join(dirFor(id), name), seal(bytes, id));
+}
+
+async function readBlob(id: string, name: string): Promise<Uint8Array | null> {
+  try {
+    return unseal(new Uint8Array(await readFile(path.join(dirFor(id), name))), id);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw error;
+  }
 }
 
 export type JobFile = 'original' | 'remediated';
@@ -181,8 +220,9 @@ export async function getJobFile(
   if (!job) return null;
   if (which === 'remediated' && !job.remediatedAt) return null;
   try {
-    const bytes = await readFile(path.join(dirFor(id), `${which}.${job.format}`));
-    return { bytes: new Uint8Array(bytes), filename: deliveredName(job.filename, which), format: job.format };
+    const bytes = await readBlob(id, `${which}.${job.format}`);
+    if (!bytes) return null;
+    return { bytes, filename: deliveredName(job.filename, which), format: job.format };
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
     throw error;
@@ -218,7 +258,7 @@ export async function remediateJob(id: string): Promise<Job | null> {
  * the original.
  */
 async function rebuild(job: Job): Promise<Job> {
-  const original = new Uint8Array(await readFile(path.join(dirFor(job.id), `original.${job.format}`)));
+  const original = (await readBlob(job.id, `original.${job.format}`)) ?? new Uint8Array();
   if (job.format === 'pdf') return rebuildPdf(job, original);
   const parts = readDocxParts(original);
   const auto = remediateDocx(parts, { fallbackTitle: stem(job.filename) });
@@ -238,8 +278,8 @@ async function rebuild(job: Job): Promise<Job> {
     remediatedAt: new Date().toISOString(),
   };
   updated.status = statusOf(updated);
-  await writeFile(path.join(dirFor(job.id), `remediated.${job.format}`), remediated);
-  await writeFile(path.join(dirFor(job.id), 'job.json'), JSON.stringify(updated, null, 2));
+  await writeBlob(job.id, `remediated.${job.format}`, remediated);
+  await writeRecord(updated);
   return updated;
 }
 
@@ -272,7 +312,7 @@ export async function setReviewer(id: string, name: string): Promise<Job | null>
   const clean = reviewerName(name);
   if (!clean) return null;
   job.reviewer = clean;
-  await writeFile(path.join(dirFor(id), 'job.json'), JSON.stringify(job, null, 2));
+  await writeRecord(job);
   return job;
 }
 
@@ -288,7 +328,7 @@ export async function figureImages(id: string): Promise<Map<string, FigureResult
   const job = await getJob(id);
   if (!job) return new Map();
   try {
-    const original = new Uint8Array(await readFile(path.join(dirFor(job.id), `original.${job.format}`)));
+    const original = (await readBlob(job.id, `original.${job.format}`)) ?? new Uint8Array();
     return imagesForFindings(original, job.format, job.findings);
   } catch {
     // A document that cannot be reopened is a broken job, not a broken
@@ -336,7 +376,7 @@ export async function propose(id: string, findingKeyValue: string): Promise<Prop
   const target = job.findings.find((f) => findingKey(f) === findingKeyValue);
   if (!target || !isOpen(target) || target.kind !== 'image-alt') return { ok: false, reason: 'not-found' };
 
-  const original = new Uint8Array(await readFile(path.join(dirFor(job.id), `original.${job.format}`)));
+  const original = (await readBlob(job.id, `original.${job.format}`)) ?? new Uint8Array();
   const found = imageForFinding(original, job.format, target);
   if (!found.ok) return { ok: false, reason: found.reason };
 
@@ -352,7 +392,7 @@ export async function propose(id: string, findingKeyValue: string): Promise<Prop
   if (draft.refused || !draft.text) return { ok: false, reason: 'refused' };
 
   target.proposal = { text: draft.text, at: new Date().toISOString() };
-  await writeFile(path.join(dirFor(job.id), 'job.json'), JSON.stringify(job, null, 2));
+  await writeRecord(job);
   return { ok: true, job };
 }
 
@@ -382,7 +422,7 @@ export async function confirm(id: string, criterion: string, by: string): Promis
   job.confirmations = { ...(job.confirmations ?? {}), [criterion]: { by, at: new Date().toISOString() } };
   job.reviewer = by;
   job.status = statusOf(job);
-  await writeFile(path.join(dirFor(id), 'job.json'), JSON.stringify(job, null, 2));
+  await writeRecord(job);
   return job;
 }
 
@@ -393,7 +433,7 @@ export async function unconfirm(id: string, criterion: string): Promise<Job | nu
   void _gone;
   job.confirmations = rest;
   job.status = statusOf(job);
-  await writeFile(path.join(dirFor(id), 'job.json'), JSON.stringify(job, null, 2));
+  await writeRecord(job);
   return job;
 }
 
@@ -422,8 +462,8 @@ async function rebuildPdf(job: Job, original: Uint8Array): Promise<Job> {
     remediatedAt: new Date().toISOString(),
   };
   updated.status = statusOf(updated);
-  await writeFile(path.join(dirFor(job.id), `remediated.${job.format}`), remediated);
-  await writeFile(path.join(dirFor(job.id), 'job.json'), JSON.stringify(updated, null, 2));
+  await writeBlob(job.id, `remediated.${job.format}`, remediated);
+  await writeRecord(updated);
   return updated;
 }
 
@@ -434,4 +474,67 @@ function key(f: Finding): string {
 function stem(filename: string): string {
   const dot = filename.lastIndexOf('.');
   return dot > 0 ? filename.slice(0, dot) : filename;
+}
+
+
+/**
+ * The customer has the delivered file. Two things happen, and they are the
+ * two halves of the Chairman's retention decision:
+ *
+ * 1. **The clock starts.** Seven days, from now, not from upload — a
+ *    conformance review does not finish on a schedule, and a clock started
+ *    at upload deletes the file in the middle of the job.
+ * 2. **The record is scrubbed.** The detectors write the customer's own
+ *    sentences into nearly every finding, and deleting the document in
+ *    seven days while keeping a record that quotes it is a deletion policy
+ *    in name only.
+ *
+ * Idempotent: downloading twice does not restart the clock, because the
+ * seven days run from when the customer first had what they came for.
+ */
+export async function markDelivered(id: string): Promise<Job | null> {
+  const job = await readRecord(id);
+  if (!job || job.deleteAfter) return job;
+
+  const now = new Date().toISOString();
+  const delivered: Job = { ...scrubJob(job, now), deleteAfter: deleteAfterFor(now) };
+  await writeRecord(delivered);
+  return delivered;
+}
+
+/**
+ * Remove the documents whose time is up, and keep their records.
+ *
+ * The record outlives the file on purpose. A conformance statement is a
+ * claim somebody may have to answer for years later, and an audit log that
+ * names a job id which resolves to nothing turns a record of what happened
+ * into a record that something happened. What goes is the customer's
+ * document and everything made from it; what stays is the finding list with
+ * the customer's words already taken out of it.
+ *
+ * Nothing calls this on a timer yet. It is a function so that whatever ends
+ * up calling it — a cron, a queue, a request — calls the same one.
+ */
+export async function sweepExpired(now = Date.now()): Promise<string[]> {
+  let ids: string[];
+  try {
+    ids = await readdir(ROOT);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+    throw error;
+  }
+
+  const swept: string[] = [];
+  for (const id of ids) {
+    if (!ID.test(id)) continue;
+    const job = await readRecord(id);
+    if (!job || job.deletedAt || !expired(job, now)) continue;
+
+    for (const name of [`original.${job.format}`, `remediated.${job.format}`]) {
+      await rm(path.join(dirFor(id), name), { force: true });
+    }
+    await writeRecord({ ...job, deletedAt: new Date(now).toISOString() });
+    swept.push(id);
+  }
+  return swept;
 }

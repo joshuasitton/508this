@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { randomBytes as randomBytesSync } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -10,9 +11,16 @@ import { zip } from './helpers/zip';
 // module is loaded and the module is loaded dynamically.
 const root = mkdtempSync(path.join(tmpdir(), '508this-jobs-'));
 process.env.DOCUMENTS_DIR = root;
+// Every test in this file therefore runs against an encrypted store, which
+// is the point: encryption at rest is a property of the store and not a
+// mode, so the whole suite exercises it rather than one test proving the
+// cipher works in isolation.
+process.env.STORAGE_KEY = randomBytesSync(32).toString('base64');
 const {
   claimJobs,
   confirm,
+  markDelivered,
+  sweepExpired,
   createJob,
   decide,
   getJob,
@@ -23,6 +31,7 @@ const {
   undecide,
 } = await import('../src/server/jobs');
 const { unzip } = await import('../src/server/unzip');
+const { openText } = await import('../src/server/crypto');
 
 /**
  * Every job needs an owner now. The store takes it as a required argument
@@ -71,7 +80,14 @@ test('a record written by an earlier build, without kinds, is repaired from the 
   assert.equal(job.filename, 'old.docx', 'the record itself is kept');
   assert.equal(job.createdAt, stale.createdAt);
   for (const f of job.findings) assert.equal(typeof f.kind, 'string');
-  const rewritten = JSON.parse(readFileSync(path.join(dir, 'job.json'), 'utf8'));
+  // Read back through the seal: the stale record and its document were
+  // written in plaintext, which is how anything on disk before encryption
+  // existed looks, and the repair writes the replacement sealed. Both halves
+  // of that matter — turning encryption on must not strand what is already
+  // there, and must not leave the replacement in the clear either.
+  const raw = new Uint8Array(readFileSync(path.join(dir, 'job.json')));
+  assert.notEqual(raw[0], 0x7b, 'the rewritten record is not an open brace, so it is not plain JSON');
+  const rewritten = JSON.parse(openText(raw, id));
   assert.equal(rewritten.findings.every((f: { kind?: string }) => typeof f.kind === 'string'), true);
 });
 
@@ -217,4 +233,77 @@ test('a browser\u2019s jobs move to the account that browser signs in to, and no
   );
 
   assert.equal(await claimJobs(browser, account), 0, 'claiming twice claims nothing the second time');
+});
+
+
+/**
+ * The whole of the Chairman's retention decision, end to end: taking the
+ * delivered file starts the clock and scrubs the record, and the sweep
+ * removes the document while leaving the record that describes it.
+ */
+test('downloading the delivered file starts the clock and takes the document’s words out of the record', async () => {
+  // A link whose text is “here”: the detector quotes the document, which is
+  // the whole reason the record has to be scrubbed.
+  const W3 = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"';
+  const quoting = zip({
+    '[Content_Types].xml': '<Types xmlns="ct"/>',
+    '_rels/.rels': '<Relationships xmlns="r"/>',
+    'word/document.xml': `<w:document ${W3}><w:body><w:p><w:hyperlink r:id="x" xmlns:r="r"><w:r><w:t>here</w:t></w:r></w:hyperlink></w:p></w:body></w:document>`,
+  });
+  const made = await createJob('quoted.docx', 'docx', quoting, { owner: OWNER });
+  await remediateJob(made.id);
+
+  const before = await getJob(made.id);
+  assert.ok(before);
+  assert.ok(JSON.stringify(before).includes('\u201c'), 'the detector really did quote the document');
+  assert.equal(before.deleteAfter, undefined);
+
+  const delivered = await markDelivered(made.id);
+  assert.ok(delivered?.deleteAfter, 'the clock started');
+  assert.ok(delivered?.scrubbedAt, 'and the record was scrubbed');
+  assert.ok(!JSON.stringify(delivered).includes('\u201c'), 'nothing the document said is left');
+
+  // The seven days run from when the customer first had what they came for,
+  // so a second download does not extend them.
+  const again = await markDelivered(made.id);
+  assert.equal(again?.deleteAfter, delivered?.deleteAfter);
+});
+
+test('the sweep removes the document and keeps the record', async () => {
+  const made = await createJob('sweep.docx', 'docx', docx, { owner: OWNER });
+  await remediateJob(made.id);
+  const delivered = await markDelivered(made.id);
+  assert.ok(delivered?.deleteAfter);
+
+  assert.deepEqual(await sweepExpired(Date.now()), [], 'nothing is due yet');
+  assert.ok(await getJobFile(made.id, 'original'), 'and the file is still there');
+
+  const after = Date.parse(delivered.deleteAfter) + 1;
+  assert.ok((await sweepExpired(after)).includes(made.id));
+
+  assert.equal(await getJobFile(made.id, 'original'), null, 'the document is gone');
+  assert.equal(await getJobFile(made.id, 'remediated'), null, 'and so is the remediated copy');
+
+  const record = await getJob(made.id);
+  assert.ok(record, 'the record outlives the file');
+  assert.ok(record.deletedAt);
+  assert.ok(record.findings.length > 0, 'and still says what was wrong with it');
+
+  assert.deepEqual(await sweepExpired(after + 1), [], 'sweeping twice sweeps nothing');
+});
+
+/**
+ * Encryption is a property of the store, so the bytes on disk are the check
+ * — not a round-trip through the same functions that wrote them.
+ */
+test('what is actually on disk is neither the document nor the record', async () => {
+  const made = await createJob('secret.docx', 'docx', docx, { owner: OWNER });
+
+  const onDisk = readFileSync(path.join(root, made.id, 'job.json'));
+  assert.ok(!onDisk.toString('utf8').includes('secret.docx'), 'the filename is not readable on disk');
+  assert.ok(!onDisk.toString('utf8').includes(made.id), 'nor is anything else from the record');
+  assert.equal((await getJob(made.id))?.filename, 'secret.docx', 'and it still reads back');
+
+  const document = readFileSync(path.join(root, made.id, 'original.docx'));
+  assert.notEqual(document[0], 0x50, 'the stored bytes do not start PK, so they are not the archive');
 });

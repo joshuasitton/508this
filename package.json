@@ -9,7 +9,8 @@
     "test": "node --experimental-strip-types --import ./scripts/ts-resolve.mjs --test \"__tests__/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",
     "lint": "eslint",
-    "triage": "node --experimental-strip-types --import ./scripts/ts-resolve.mjs scripts/triage.ts"
+    "triage": "node --experimental-strip-types --import ./scripts/ts-resolve.mjs scripts/triage.ts",
+    "sweep": "node --experimental-strip-types --import ./scripts/ts-resolve.mjs scripts/sweep.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.127.0",

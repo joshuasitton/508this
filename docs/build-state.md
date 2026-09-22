@@ -4,6 +4,49 @@ The running project-level record. Sections are dated and kept in order rather
 than rewritten, so the reasoning stays readable. Decisions live in
 `docs/leadership-standup.md`; this file says where the code stands.
 
+## 2026-09-22, night — the three things a production store has to do
+
+Encryption at rest, deletion, and the scrub. 285 tests, still green with
+`node_modules` moved aside — all of it on `node:crypto`.
+
+**Encryption.** AES-256-GCM over every byte the store writes, with the job
+id as associated data so a blob moved into another job's directory will not
+open. The authentication matters as much as the secrecy here: a job record
+decides who may open a document, and a record an attacker can silently edit
+is an authorisation bug with extra steps. A blob written before a key
+existed opens as itself; no key means plaintext in development and a refusal
+in production. The whole job-store suite now runs against an encrypted
+store, because encryption is a property of the store and not a mode.
+
+**Deletion.** `RETENTION_DAYS = 7`, and the clock starts at *download*. A
+clock started at upload deletes the file in the middle of a fortnight's
+review. The cost — a document nobody downloads has no deletion date — is
+named in the code rather than hidden. `npm run sweep` removes what is due
+and **keeps the record**: a conformance statement is a claim somebody may
+have to answer for years.
+
+**The scrub**, decided on 21 September and unimplemented until now. Taking
+the delivered file removes every quotation from the record. The detectors
+quote the document inside curly quotes, so one function finds them all —
+which makes that prose convention load-bearing, and a test now says so out
+loud.
+
+**Verified in the browser, end to end, against a real encrypted store.** On
+disk: the record is not JSON, does not contain the filename, and the
+document does not start `PK`. The page warns before the download button that
+taking the file starts the countdown. After downloading: the deletion date
+is shown, the applied change that read `Set the title to “Enrolment over
+time”` reads `[removed]`, the scrub notice is shown, and the `.docx` that
+arrived is a real archive. No page errors.
+
+**A harness false positive, caught rather than reported.** The first run
+checked for a curly quote anywhere on the page and said the report still
+quoted the document — but the page's own copy contains `says “Conforms to
+Section 508”`. The check was rewritten to look for the document's own words.
+Five harness false alarms this week; this is the first that would have been
+reported as a *failure* rather than as a pass, and the lesson is the same
+one: check the thing, not a proxy for it.
+
 ## 2026-09-22, night — mail, and the two lies it lets the service stop telling
 
 `/account/forgot` sends a link, `/account/reset` spends it. Thirty minutes,

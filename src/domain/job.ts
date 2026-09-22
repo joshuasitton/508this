@@ -42,6 +42,17 @@ export interface Job {
    * file, which has no tier — the four-way split is a fact about PDFs.
    */
   tier?: Tier;
+  /**
+   * When the document and everything made from it are deleted. Set the
+   * moment the customer downloads the delivered file, because that is the
+   * only point at which the service can be sure they no longer need the
+   * original here. See `src/domain/retention.ts`.
+   */
+  deleteAfter?: string;
+  /** When the document's own words were taken out of this record. */
+  scrubbedAt?: string;
+  /** When the files were actually removed. The record outlives them. */
+  deletedAt?: string;
   /** Criteria a reviewer has confirmed, by whom and when. */
   confirmations?: Record<string, { by: string; at: string }>;
   /** The reviewer named on the statement. Set the first time a person decides anything. */

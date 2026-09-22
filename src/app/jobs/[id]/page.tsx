@@ -7,6 +7,8 @@ import { assessAll, describeRemarks, describeSummary, isOpen, stateOf, summarise
 import { describeStatus } from '@/domain/job';
 import { groupByKind } from '@/domain/kinds';
 import { describeSignInNeeded, mayReview } from '@/domain/viewer';
+import { describeRetention } from '@/domain/retention';
+import { describeScrub } from '@/domain/scrub';
 import { bestOffer, describeOffer, labelFor as offerLabel, money, quoteAll, workFor } from '@/domain/pricing';
 import { FIXABLE_KINDS } from '@/domain/remediate';
 import { PDF_FIXABLE_KINDS } from '@/domain/pdfRemediate';
@@ -52,6 +54,8 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
   const canFix = job.format === 'pdf' ? PDF_FIXABLE_KINDS : (FIXABLE_KINDS as ReadonlySet<string>);
   const fixable = job.findings.filter((f) => !f.remediated && canFix.has(f.kind)).length;
   const signedIn = mayReview(who);
+  const retention = describeRetention(job);
+  const scrubbed = describeScrub(job);
   const work = workFor(job);
   const quotes = quoteAll(work);
   const best = bestOffer(work);
@@ -139,6 +143,13 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
             </p>
           </form>
         )}
+        {signedIn && job.remediatedAt && !job.deleteAfter && (
+          <p className={styles.actionNote}>
+            <strong>Downloading the remediated document starts the seven-day countdown to deletion</strong>, and
+            takes the quotations from your document out of this report. If you want the conformance statement with
+            those quotations in it, take that first.
+          </p>
+        )}
         {signedIn && job.remediatedAt && (
           <ul className={styles.downloads}>
             <li>
@@ -183,6 +194,22 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
           </details>
         )}
       </section>
+
+      {signedIn && (
+        <section className={styles.actions} aria-labelledby="keeping-title">
+          <h2 id="keeping-title" className={styles.actionsTitle}>
+            How long we keep it
+          </h2>
+          <p className={styles.actionNote}>{retention}</p>
+          {scrubbed && <p className={styles.actionNote}>{scrubbed}</p>}
+          {job.deletedAt && (
+            <p className={styles.actionNote}>
+              <strong>The document has been deleted.</strong> This report and the conformance statement remain;
+              the file and the remediated copy do not.
+            </p>
+          )}
+        </section>
+      )}
 
       {groups.length > 0 && (
         <section aria-labelledby="found-title">
