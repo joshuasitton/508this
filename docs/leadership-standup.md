@@ -8,6 +8,82 @@ for. Where an entry has since been overtaken, `docs/build-state.md` says so.
 
 ---
 
+## 2026-09-22, night — the audit log, and the shape a bucket forced
+
+### What the Chairman said
+
+Merge it and port the audit log.
+
+### Done
+
+The audit log is on the object store, **one object per event**, which is
+the recommendation the last round-table put up and the Chairman's
+instruction settled. Nothing is ever rewritten: `record` only writes a key
+that did not exist, `history` only reads. 302 tests.
+
+### Why the shape had to change
+
+An append-only file does not port. A bucket has no append, and faking one
+— read the log, add a line, write it back — is a read-modify-write race
+that loses records under precisely the concurrency an audit log is there to
+capture, and it hands whoever holds the bucket a single object to rewrite.
+The one property the log exists to have would have been the first thing the
+move cost.
+
+One object per event keeps it, and it turns out to buy something disk never
+had. **Each record is sealed with its own key as associated data**, so a
+record cannot be moved: re-file it under another account's prefix, or
+rename it to an earlier time to back-date it, and it stops opening. The old
+claim was append-only *by construction* — true of our source code and
+nothing else, because anybody who could reach `audit.log` could edit a line
+in it. This claim survives somebody who can reach the store. Object
+versioning and an object-lock policy on the prefix are now available from
+outside the application as well, which is the control 800-171 3.3.8
+actually wants and which a local file could not accept.
+
+### What the log now admits
+
+`history` returns how many records were listed and did not come back as
+events — a torn write, or one that has been moved or altered. The file it
+replaces skipped a corrupt line silently, which meant the single thing an
+audit log exists to reveal was the thing it could not say. The number
+carries no content, so it cannot become somewhere for text to hide.
+
+### The risk this created, and the test that holds it
+
+Documents and evidence now share a store. Documents are deleted seven days
+after download; audit records are evidence and are not. What keeps them
+apart is that the retention sweep only ever looks at keys whose first
+segment is a job id, and `audit` is not one. **If that ever stops being
+true, a retention policy becomes an evidence shredder and it does it
+quietly.** That is a test, not a comment. Security's note for the day the
+bucket is created: no lifecycle rule on the `audit/` prefix, ever.
+
+The store's folder is `store/` rather than `documents/` now, because a
+folder named for one of the two things in it is how the next person files
+the sessions wrongly.
+
+### What this does not solve
+
+**Accounts, sessions and reset tokens are still local.** They are
+credentials rather than records and none of them has a design question in
+the way — that is a port, not a decision.
+
+Reading a log is one round trip per record. Honest rather than clever, and
+fine while a few thousand events is a large log; the escape hatch is in the
+key, which carries the time, so a date range narrows the listing before
+anything is fetched. Engineering will build that with the log page, not
+before it.
+
+### Still with the Chairman
+
+The first live drafted description. The four prices. What happens to a
+document nobody downloads — recommendation unchanged: 90 days from last
+activity, as a second and longer clock rather than a replacement for the
+seven days from download.
+
+---
+
 ## 2026-09-22, night — the object store, and one thing that does not port
 
 ### What the Chairman said
@@ -55,7 +131,8 @@ that log exists to have.
 
 Engineering's read, not acted on: **one object per event.** It keeps the
 append-only guarantee that 800-171 wants, it needs no database, and listing
-a prefix is how a log gets read anyway.
+a prefix is how a log gets read anyway. *(Acted on the same night, on the
+Chairman's instruction — see the entry above.)*
 
 ### Still with the Chairman
 

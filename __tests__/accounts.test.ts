@@ -11,6 +11,11 @@ import type { AuditEvent } from '../src/domain/audit';
 // be named before anything imports it.
 const ROOT = await mkdtemp(path.join(tmpdir(), '508this-accounts-'));
 process.env.ACCOUNTS_DIR = ROOT;
+// The audit log is on the blob seam now, which has a root of its own. No
+// STORAGE_KEY is set here on purpose: the test below reads the stored bytes
+// looking for a passphrase, and it only means something if they are plain.
+const STORE = await mkdtemp(path.join(tmpdir(), '508this-store-'));
+process.env.STORE_DIR = STORE;
 
 const { authenticate, createAccount, disableAccount, getAccount } = await import('../src/server/accounts');
 const { endSession, resolveSession, startSession, touchSession } = await import('../src/server/sessions');
@@ -19,6 +24,19 @@ const { hashPassword, needsRehash, verifyPassword } = await import('../src/serve
 const { consume, inspect, request, tellTaken } = await import('../src/server/resets');
 
 const PASSPHRASE = 'correct horse battery staple';
+
+/**
+ * Every audit record stored for an account, as the bytes actually on the
+ * store — not as `history` reads them back. The point of the two checks
+ * that use this is what is *written*, so reading it through the thing that
+ * wrote it would prove nothing.
+ */
+async function storedAudit(account: string): Promise<string> {
+  const dir = path.join(STORE, 'audit', account);
+  const names = (await readdir(dir)).sort();
+  const parts = await Promise.all(names.map((n) => readFile(path.join(dir, n), 'utf8')));
+  return parts.join('\n');
+}
 
 async function account(email: string) {
   const made = await createAccount(email, PASSPHRASE);
@@ -221,15 +239,18 @@ test('the audit log records the account that acted and the attempts that named n
   await endSession(token);
 
   const mine = await history(made.id);
+  // One object per event, and the order the keys sort in is the order the
+  // events were written in — which is what the key's counter is for.
   assert.deepEqual(
-    mine.map((e) => e.action),
+    mine.events.map((e) => e.action),
     ['account.created', 'sign-in.failed', 'sign-in.succeeded', 'sign-out'],
   );
-  for (const event of mine) assert.equal(event.account, made.id);
+  for (const event of mine.events) assert.equal(event.account, made.id);
+  assert.equal(mine.unreadable, 0, 'every record listed came back as an event');
 
   await authenticate('never-existed@example.gov', PASSPHRASE);
   const house = await history(null);
-  assert.ok(house.some((e: AuditEvent) => e.action === 'sign-in.failed' && e.account === null));
+  assert.ok(house.events.some((e: AuditEvent) => e.action === 'sign-in.failed' && e.account === null));
 });
 
 /**
@@ -242,7 +263,7 @@ test('no passphrase and no email address ever reaches the audit log', async () =
   await authenticate('secrets@example.gov', PASSPHRASE);
   await authenticate('secrets@example.gov', 'a wrong one');
 
-  const raw = await readFile(path.join(ROOT, made.id, 'audit.log'), 'utf8');
+  const raw = await storedAudit(made.id);
   assert.ok(!raw.includes(PASSPHRASE));
   assert.ok(!raw.includes('a wrong one'));
   assert.ok(!raw.includes('secrets@example.gov'));
@@ -351,7 +372,7 @@ test('no passphrase and no reset token reaches the audit log', async () => {
   const token = new URL((await lastLink())!).searchParams.get('token')!;
   await consume(token, 'a replacement passphrase');
 
-  const raw = await readFile(path.join(ROOT, made.id, 'audit.log'), 'utf8');
+  const raw = await storedAudit(made.id);
   assert.ok(!raw.includes(token), 'a reset token is a credential and never appears in a log');
   assert.ok(!raw.includes('a replacement passphrase'));
   assert.ok(!raw.includes('quiet@example.gov'));
