@@ -1135,13 +1135,126 @@ the store moves off local disk.
 
 ---
 
+## Storage, and the three things a production one has to do
+
+The store is still one file and still local disk. What changed is that the
+three promises made about it are now kept in code rather than in a standup
+entry, and the seam an object store slides into exists.
+
+### Encryption at rest, and what that is worth
+
+Every byte the store writes — the original, the remediated file, the record
+— goes through `src/server/crypto.ts` first: AES-256-GCM, a fresh 96-bit
+nonce per write, from `node:crypto` and no package.
+
+It protects a disk, a backup, a snapshot and a mislaid volume. It does
+**not** protect against anybody who can run the process, because the process
+has the key. That is the honest limit of encryption at rest everywhere it is
+deployed, and it is written in the file so "encrypted at rest" cannot do
+more work in a sales conversation than it does in a threat model.
+
+Two details earn their place:
+
+- **The job id is the associated data.** A sealed blob moved from one job's
+  directory into another's will not open. Without that, somebody who can
+  move files around can swap a document they own for one they do not.
+- **GCM authenticates as well as encrypts**, and here the authentication
+  matters more than the confidentiality in one specific case: a job record
+  decides *who may open a document*, and a record an attacker can silently
+  edit is an authorisation bug with extra steps.
+
+A blob written before a key existed opens as itself, so turning encryption
+on does not strand what is already stored. With no key configured the store
+writes plain bytes — right for development, **refused outright in
+production**, because a service that silently stops encrypting because
+somebody forgot a variable is worse than one that will not start.
+
+`npm test` runs the whole job-store suite against an encrypted store, which
+is the point: encryption is a property of the store and not a mode.
+
+### Deletion, and why the clock starts at download
+
+`RETENTION_DAYS = 7`, from the Chairman's decision on 21 September, and the
+second half of that sentence is the interesting one: **the countdown starts
+when the customer downloads the remediated file**, not when they upload.
+
+A fixed age from upload is the usual answer and it is wrong here. A
+conformance review does not finish on a schedule — a contractor sends a
+document, a reviewer works through it over a fortnight — and a clock started
+at upload deletes the file in the middle of the job. Download is the only
+moment the service can be sure they have what they came for.
+
+The cost is real and is named rather than hidden: **a document nobody ever
+downloads has no deletion date.** Whether an outer limit should also run
+from upload is the Chairman's to decide, and `NEVER_DOWNLOADED` says so
+where somebody will read it.
+
+`npm run sweep` deletes what is due. A command rather than a timer, because
+nothing here has a scheduler yet and a deletion policy that depends on a
+cron nobody wrote is a deletion policy that does not run. **The record
+outlives the file**: a conformance statement is a claim somebody may have to
+answer for years, and an audit entry naming a job id that resolves to
+nothing turns a record of what happened into a record that something
+happened.
+
+### Scrubbing, and the convention that makes it possible
+
+The other half of the retention decision, unimplemented until now: **the
+record is scrubbed of its quotations at delivery.** Not a tidy-up. The Word
+detector writes the customer's own sentences into nearly every finding — a
+link's text, a paragraph's opening, the sentence that relies on colour — and
+deleting the file in seven days while keeping a record that quotes it is a
+deletion policy in name only.
+
+Every place the detectors and the remediator quote the document, they do it
+inside **curly quotes**. That was a prose convention before it was a
+boundary; making it the boundary is what lets one function find every
+quotation without each detector having to remember to mark its own. The
+convention is therefore load-bearing, and a test says so in as many words: a
+detector that quotes with straight quotes puts a sentence somewhere the
+scrub cannot reach.
+
+What stays is the claim the conformance statement rests on — kind,
+criterion, severity, the location's number, who decided it and how. What
+goes is every word that came out of the document. A reader of a scrubbed
+record can see that paragraph 4 failed 1.4.1 and cannot see what paragraph 4
+said.
+
+`decision.value` goes too, which costs something: the delivered document can
+no longer be rebuilt from the original. That is the right way round. A
+record that can rebuild the document is a record that still contains it, and
+delivery is the point after which nothing needs rebuilding.
+
+**The customer is told before it happens**, on the page, above the download
+button: taking the remediated file starts the countdown and takes the
+quotations out of the report, so take the conformance statement first if you
+want it with them.
+
+### What is deliberately not here
+
+**It is still local disk.** The object-store implementation is not written,
+because it cannot be tested from here and an untested storage backend is
+worse than an honest local one. What exists is the seam: four functions in
+`src/server/jobs.ts` are the only code in the repository that reads or
+writes a customer's bytes, and every one of them already seals and opens.
+
+**No key rotation.** Every sealed blob carries a version byte so that adding
+it later does not strand what is written; that is the whole of the provision
+made.
+
+**Nothing calls the sweep on a timer.**
+
+---
+
 ## Storage, and why it is one file
 
 `src/server/jobs.ts` writes each job under `documents/<id>/` on local disk,
 or under `DOCUMENTS_DIR`. It is right for development and for the first jobs
 run by hand on one machine, and wrong for Vercel, whose filesystem does not
-persist. It stays that way until the Chairman has decided retention; then it
-is the one file to replace. Two rules from `CLAUDE.md` live here as code: the
+persist. Retention is decided and built, so what is left is the backend
+itself: four functions in this file — `readRecord`, `writeRecord`,
+`readBlob`, `writeBlob` — are the only code in the repository that touches a
+customer's bytes, and replacing local disk means replacing those four. Two rules from `CLAUDE.md` live here as code: the
 job id is the only thing that ever becomes a path, and no error raised in
 this module carries document content, so whatever logs it cannot leak it.
 

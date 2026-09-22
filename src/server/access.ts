@@ -39,6 +39,7 @@ import {
   figureImages as figureImagesInStore,
   getJobFile,
   propose as proposeInStore,
+  markDelivered,
   remediateJob,
   setReviewer as setReviewerInStore,
   unconfirm as unconfirmInStore,
@@ -48,6 +49,7 @@ import {
   getJob,
 } from './jobs';
 import { COOKIE as SESSION_COOKIE, COOKIE_OPTIONS, resolveSession, touchSession } from './sessions';
+import { record } from './audit';
 
 export const VISITOR_COOKIE = 'visitor';
 
@@ -148,10 +150,25 @@ export async function openJobToChange(id: string): Promise<Job | null> {
   return job && mayReview(who) ? job : null;
 }
 
-/** The document's bytes, if the job is this viewer's and they may have them. */
+/**
+ * The document's bytes, if the job is this viewer's and they may have them.
+ *
+ * Taking the **delivered** file is what starts the retention clock and
+ * scrubs the record, so that happens here rather than in the route: the
+ * bytes and the consequence of handing them over belong together, and a
+ * second route that serves the same file would otherwise have to remember
+ * to do it too. Downloading the original changes nothing — the customer
+ * already had that.
+ */
 export async function openJobFile(id: string, which: JobFile) {
   if (!(await openJobToChange(id))) return null;
-  return getJobFile(id, which);
+  const file = await getJobFile(id, which);
+  if (file && which === 'remediated') {
+    await markDelivered(id);
+    const who = await viewer();
+    await record('job.downloaded', who.kind === 'account' ? who.account : null, id);
+  }
+  return file;
 }
 
 /** Figures for the review screen. Reading, so a visitor may. */

@@ -25,6 +25,7 @@ npm run lint          # eslint, including the jsx-a11y rules
 npm run dev           # http://localhost:3000
 npm run build         # what Vercel runs
 npm run triage -- DIR # classify a folder of PDFs; prints no document content
+npm run sweep         # delete the documents whose retention window has run out
 ```
 
 ## Where things are
@@ -97,6 +98,24 @@ npm run triage -- DIR # classify a folder of PDFs; prints no document content
   real headings, a skip link, visible focus, `lang` on the document, contrast
   checked. `npm run lint` carries the jsx-a11y rules and they are not to be
   disabled. A remediation service with an inaccessible website is over.
+- **Four functions in `src/server/jobs.ts` touch a customer's bytes, and
+  nothing else does.** `readRecord`, `writeRecord`, `readBlob`, `writeBlob`.
+  That is what makes encryption at rest a property of the store rather than
+  something nine call sites remember, and it is the seam an object store
+  replaces.
+- **Everything stored is sealed with AES-256-GCM, with the job id as
+  associated data.** A blob moved into another job's directory will not
+  open. The authentication matters as much as the secrecy: a job record
+  decides who may open a document. No key means plaintext in development and
+  a refusal in production; a blob written before a key existed still opens.
+- **The retention clock starts at download, not at upload**, and taking the
+  delivered file also scrubs the record. `RETENTION_DAYS = 7`. A document
+  nobody downloads has no deletion date — a named gap, not an oversight.
+  `npm run sweep` deletes what is due; **the record outlives the file.**
+- **The detectors quote the document inside curly quotes, and that is
+  load-bearing.** `scrubText` finds the customer's words by them. A detector
+  that quotes with straight quotes puts a sentence where the scrub cannot
+  reach, and a test says so.
 - **Customer documents are the customer's, and retention is now decided.**
   Nothing about a document's contents goes into a log, an analytics event or
   an error report. The Chairman settled the rest on 21 September 2026

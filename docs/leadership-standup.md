@@ -8,6 +8,84 @@ for. Where an entry has since been overtaken, `docs/build-state.md` says so.
 
 ---
 
+## 2026-09-22, night — production storage, and one decision that is now overdue
+
+### What the Chairman said
+
+Merge it and start on production storage.
+
+### What was built
+
+The three things a production store has to do, all of them on Node's own
+crypto and none of them adding a dependency.
+
+**Encryption at rest.** Every byte, AES-256-GCM, with the job id as
+associated data so a sealed blob cannot be moved between jobs and still
+open. Engineering's note, written into the file so it cannot be quoted out
+of context in a sales conversation: this protects a disk, a backup and a
+mislaid volume, and it does not protect against anybody who can run the
+process, because the process has the key. That is the honest limit of
+encryption at rest everywhere it is deployed.
+
+**Deletion, seven days from download.** The Chairman's decision of 21
+September, built. The clock starts at download rather than upload because a
+conformance review does not finish on a schedule and a clock started at
+upload deletes the file in the middle of the job.
+
+**The scrub.** The other half of that decision, and the half that had been
+sitting unimplemented: the record is stripped of every quotation from the
+document at delivery. Deleting the file while keeping a record that quotes
+it is a deletion policy in name only.
+
+### Decision needed from the Chairman, and it follows from his own rule
+
+**A document nobody downloads has no deletion date.**
+
+That is a direct consequence of starting the countdown at download, and it
+is the right trade for the common case. It also means a customer who
+uploads, reads the free assessment and never comes back leaves their
+document on this server indefinitely. Three options:
+
+1. **An outer limit from upload** — say ninety days — running alongside the
+   seven-day one. Simple, and it deletes work somebody may still be doing.
+2. **A limit from last activity**: ninety days after the job was last
+   opened. More forgiving, slightly more to build, and it is what most
+   services actually mean.
+3. **Nothing**, and say so on the page.
+
+Engineering's read: **(2)**, because it never deletes a document somebody is
+still working on and it closes the gap. Not acted on.
+
+### Also worth the team's attention
+
+A prose convention became a security boundary. The detectors have always
+quoted the customer's words inside curly quotes; that is now how the scrub
+finds them. It is load-bearing and a test says so, because the failure mode
+is silent — a detector written next month with straight quotes puts a
+customer's sentence somewhere the scrub cannot reach, and nothing would go
+red.
+
+The browser harness produced its fifth false alarm of the week, and the
+first that would have been reported as a failure rather than a pass: it
+checked for a quotation mark anywhere on the page, and the page's own copy
+contains one. Caught before it was written up. The standing instruction
+stands and gains a clause: **check the thing, not a proxy for it.**
+
+### Still with the Chairman
+
+The first live drafted description, on his own machine. The four prices.
+**Does 508This take a PDF rendering dependency?** — reopened by his own
+triage. And now: what happens to a document nobody downloads.
+
+### Next
+
+The object store itself. The seam is built — four functions in the job store
+are the only code that touches a customer's bytes — and the implementation
+is deliberately not written, because it cannot be tested from a cloud
+container and an untested storage backend is worse than an honest local one.
+
+---
+
 ## 2026-09-22, night — the Hermes figures are vector, and mail exists
 
 ### What the Chairman said
