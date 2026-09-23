@@ -4,6 +4,30 @@ The running project-level record. Sections are dated and kept in order rather
 than rewritten, so the reasoning stays readable. Decisions live in
 `docs/leadership-standup.md`; this file says where the code stands.
 
+## 2026-09-23 — AWS, and the addressing branch that had no test
+
+The Chairman chose AWS over R2, on the CUI question rather than on price.
+`docs/deploy.md` now has the AWS steps: region first because it is inside
+every signature, Block Public Access fully on, versioning and Object Lock at
+creation, and an IAM policy scoped to the four verbs this service uses.
+
+**The IAM policy has a trap worth knowing about.** `ListObjectsV2` is an
+operation on the bucket, so `s3:ListBucket` has to be granted on the bucket
+ARN with no `/*`. Granting it on the objects ARN instead fails listing only —
+uploads and downloads work, and the retention sweep silently never finds
+anything to delete. That is the failure this service would notice last.
+
+**Virtual-hosted addressing had no test**, which mattered because choosing
+AWS made it the production path: every existing S3 test sets `S3_ENDPOINT`
+and therefore exercises path style. `locate` is exported now, for the same
+reason `sign` is, and both branches are pinned — the bucket in the host, the
+region in the host, and the empty key that `s3List` uses resolving to the
+bucket itself rather than to an object called nothing. 315 tests.
+
+The host is inside the signature, so a wrong region or a wrong host is a 403
+that explains nothing rather than a 404 that does. That is the whole reason
+this is worth a test rather than a comment.
+
 ## 2026-09-23 — `npm run check:store`, and a question the price comparison skipped
 
 `scripts/check-store.ts`. It runs PUT, GET, ListObjectsV2 and DELETE against

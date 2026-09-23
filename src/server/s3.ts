@@ -180,8 +180,22 @@ export function sign(
   return { url: `https://${host}${uriEncode(path, true)}${search}`, headers };
 }
 
-/** Where a key lives: path style behind an endpoint, virtual-hosted on AWS. */
-function locate(config: S3Config, key: string): { host: string; path: string; scheme: string } {
+export interface Located {
+  host: string;
+  path: string;
+  scheme: string;
+}
+
+/**
+ * Where a key lives: path style behind an endpoint, virtual-hosted on AWS.
+ *
+ * Exported for the same reason `sign` is. The host is **inside the
+ * signature** — it is the one canonical header S3 always signs — so getting
+ * it wrong is not a 404 saying the bucket is missing, it is a 403 saying
+ * nothing. The region is in the host too, which is why a wrong `S3_REGION`
+ * fails the same opaque way.
+ */
+export function locate(config: S3Config, key: string): Located {
   if (config.endpoint) {
     const endpoint = new URL(config.endpoint);
     return {

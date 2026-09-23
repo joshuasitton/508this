@@ -13,61 +13,90 @@ Three accounts, none of which the repository can create for itself:
 | Thing | Why it is needed | What it gives you |
 |---|---|---|
 | A Vercel project | runs the app | the deployment |
-| An S3-compatible bucket | **everything the service persists** | bucket, region, key id, secret |
+| An AWS S3 bucket | **everything the service persists** | bucket, region, key id, secret |
 | A mail sender (Resend by default) | passphrase resets | an API token and a from-address |
 
-The bucket can be AWS S3, Cloudflare R2, or MinIO — `src/server/s3.ts` speaks
-the four verbs and signs them by hand, and an endpoint switches it to path
-style. R2 is the cheapest of the three for this workload and has no egress
-charge, which for a service that hands documents back is the dominant cost.
+**The store is AWS S3**, decided by the Chairman on 23 September. The
+reason is not price — R2 is cheaper and has no egress charge — it is that
+this service accepts CUI, and R2 is not FedRAMP authorised. AWS commercial
+regions are FedRAMP Moderate and GovCloud is High. The README already draws
+this line for the vision vendor, and the bucket holds more of the document
+than the vision vendor ever sees.
 
-### Before choosing on price: the same question the vision vendor answered
+`src/server/s3.ts` speaks the four verbs against any S3-compatible store, so
+R2 and MinIO remain possible if that reasoning ever changes; everything
+below except the IAM policy applies to them through `S3_ENDPOINT`.
 
-This service **accepts CUI**, decided 21 September. The README already makes
-the distinction that matters here, about the model vendor: *a zero-data-
-retention commitment is not a FedRAMP authorisation, and the two are not
-substitutes.* That argument does not stop at the model. **The bucket holds
-the documents.**
+### AWS S3, step by step
 
-Cloudflare R2 is not FedRAMP authorised. AWS commercial regions are FedRAMP
-Moderate and GovCloud is High, and MinIO on infrastructure you already have
-authorised is a third answer. Cost says R2; a customer's contract may not.
+1. **Pick the region first.** It is in the bucket's hostname and therefore
+   inside every signature, so changing it later is a new bucket. If a
+   customer's contract asks for FedRAMP High or for data to stay in a
+   specific boundary, that is a GovCloud decision and it is made here, not
+   afterwards.
 
-This is the Chairman's call and it is not made by this file. What the code
-needs is identical either way — the same five variables, and `npm run
-check:store` proves whichever you pick. **Nothing about the decision is
-hard to reverse in code; moving documents that already exist is the hard
-part**, which is the argument for settling it before the first upload
-rather than after.
+2. **Create the bucket** with Block Public Access **fully on** — all four
+   settings. Nothing in this service serves from the bucket; documents are
+   read by the server and handed over through a route that checks who is
+   asking.
 
-### Cloudflare R2, step by step
+3. **Turn on Versioning**, and **Object Lock** if you want the audit log's
+   append-only claim to hold against somebody with write access rather than
+   only against our source code. Object Lock needs versioning, and enabling
+   it when the bucket is created is much the simplest path.
 
-1. **Create the bucket.** Cloudflare dashboard → R2 → *Create bucket*. Give
-   it a location hint if the jurisdiction matters to you; it is not
-   changeable afterwards.
-2. **Create a token scoped to it.** R2 → *Manage R2 API Tokens* → *Create API
-   Token*. Permission **Object Read & Write**, and scope it to **this bucket
-   only** — the service uses four verbs on one bucket and a token that can do
-   more is a token that can do more when it leaks.
-3. **Keep what it shows you once.** The Access Key ID and the Secret Access
-   Key are displayed a single time.
-4. **Note the endpoint.** R2 shows an S3 API endpoint of the form
-   `https://<account-id>.r2.cloudflarestorage.com`. That is `S3_ENDPOINT`;
-   the bucket name is **not** part of it.
-5. **Set `S3_REGION=auto`.** R2 wants that literal value. The signature is
-   computed over it, so a different one is a 403 that says nothing useful.
-6. **Leave public access off.** It is off by default and should stay off —
-   nothing in the service serves from the bucket directly.
+4. **Leave default encryption on** (SSE-S3 is the default and is free).
+   Everything this service writes is *already* sealed before it leaves the
+   process — see `src/server/crypto.ts` — so this is belt and braces rather
+   than the protection. It costs nothing and it answers a question every
+   security questionnaire asks.
+
+5. **Create an IAM user for the app** and give it exactly this policy,
+   nothing wider. Four verbs on one bucket is the whole of what the service
+   does:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "TheFourVerbsOnTheObjects",
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"],
+      "Resource": "arn:aws:s3:::YOUR-BUCKET/*"
+    },
+    {
+      "Sid": "ListingNeedsTheBucketItself",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::YOUR-BUCKET"
+    }
+  ]
+}
+```
+
+   **The second statement is the one people get wrong.** `ListObjectsV2` is
+   an operation on the *bucket*, so `s3:ListBucket` has to be granted on the
+   bucket ARN with no `/*`. Granting it on the objects ARN instead produces a
+   403 on listing only — which means uploads and downloads work, and the
+   retention sweep silently never finds anything to delete.
+
+6. **Create an access key** for that user. It is shown once. Long-lived keys
+   are what Vercel needs; if the app ever moves somewhere that can assume a
+   role, `S3_SESSION_TOKEN` is already supported and the key can go.
 
 That gives you:
 
 ```
-S3_BUCKET=<the bucket name>
-S3_REGION=auto
-S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
-S3_ACCESS_KEY_ID=<from the token>
-S3_SECRET_ACCESS_KEY=<from the token>
+S3_BUCKET=your-bucket-name
+S3_REGION=us-east-2
+S3_ACCESS_KEY_ID=<from the access key>
+S3_SECRET_ACCESS_KEY=<from the access key>
 ```
+
+**Do not set `S3_ENDPOINT` for AWS.** Its absence is what selects
+virtual-hosted addressing — `bucket.s3.region.amazonaws.com` — which is what
+AWS requires for buckets created since 2020.
 
 ### Prove it before you deploy into it
 
@@ -127,7 +156,7 @@ credentials is a service that starts and then cannot read anything.
 | Variable | Default | When to set it |
 |---|---|---|
 | `S3_REGION` | `us-east-1` | any other region; R2 wants `auto` |
-| `S3_ENDPOINT` | AWS, virtual-hosted style | R2, MinIO, anything S3-compatible — switches to path style |
+| `S3_ENDPOINT` | AWS, virtual-hosted style | **not set for AWS.** R2, MinIO or anything S3-compatible — it switches to path style |
 | `S3_SESSION_TOKEN` | — | instance-role credentials, which carry one |
 | `MAIL_TOKEN`, `MAIL_FROM` | — | **both** are needed before any mail is sent |
 | `MAIL_ENDPOINT` | `https://api.resend.com/emails` | a different provider |
@@ -165,14 +194,15 @@ whose first segment is a job id. A bucket-level expiry rule does not know the
 difference and would quietly delete the evidence. There is a test holding the
 code side of this; the bucket side is a setting nobody can test for you.
 
-**Object versioning and object lock on `audit/` are worth turning on.** The
-audit log is one object per event and nothing in this repository ever rewrites
-one, but that is a claim about our source code. Versioning makes it a claim
-about the bucket, which is the control 800-171 3.3.8 actually wants.
+**Why versioning and Object Lock are in the steps above.** The audit log is
+one object per event and nothing in this repository ever rewrites one — but
+that is a claim about our source code, which is worth exactly as much as the
+next person's access to the bucket. Versioning makes it a claim about the
+bucket instead, which is the control 800-171 3.3.8 actually wants.
 
-**The bucket is not public.** Nothing in the service serves from it directly;
-documents are read by the server and handed to the customer through a route
-that checks who is asking.
+**Block Public Access stays fully on.** Nothing in the service serves from
+the bucket directly; documents are read by the server and handed to the
+customer through a route that checks who is asking.
 
 ## Deploying
 

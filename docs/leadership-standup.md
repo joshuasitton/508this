@@ -8,6 +8,49 @@ for. Where an entry has since been overtaken, `docs/build-state.md` says so.
 
 ---
 
+## 2026-09-23 — decided: AWS
+
+### What the Chairman said
+
+Merge it and use AWS instead.
+
+### The decision
+
+**The store is AWS S3.** Not on price — R2 is cheaper and charges nothing for
+egress, which for a service that hands documents back is the dominant cost —
+but because this service accepts CUI and R2 is not FedRAMP authorised. That
+is the Chairman reversing engineering's recommendation on the ground
+engineering should have put up first, which is the right outcome by the wrong
+route.
+
+Recorded here because it is the kind of decision that gets re-litigated in
+six months by somebody looking at the invoice: **the money was the reason to
+choose R2, and it lost to the authorisation question.** If the CUI decision
+of 21 September is ever revisited, this one is downstream of it.
+
+### Done
+
+`docs/deploy.md` has the AWS steps — region first, because it is inside every
+signature and changing it later is a new bucket; Block Public Access fully
+on; versioning and Object Lock at creation, which is what turns the audit
+log's append-only claim from a statement about our source code into one about
+the bucket; and an IAM policy scoped to the four verbs and nothing else.
+
+Security's note for whoever applies that policy: **`s3:ListBucket` goes on
+the bucket ARN, not the objects ARN.** Get it wrong and uploads and downloads
+work while listing 403s — which means the retention sweep silently finds
+nothing to delete, and a deletion policy that does not run is the failure
+this service would notice last.
+
+### The gap the decision exposed
+
+Choosing AWS made virtual-hosted addressing the production path, and it had
+no test: every S3 test in the repository sets an endpoint and therefore
+exercises path style. Now pinned, both ways. The host is inside the
+signature, so getting it wrong is a 403 that explains nothing.
+
+---
+
 ## 2026-09-23 — setting up storage, and a question engineering should have asked first
 
 ### What the Chairman said
