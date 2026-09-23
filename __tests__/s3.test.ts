@@ -265,6 +265,41 @@ test('the audit log records and reads back through the object store', async () =
   }
 });
 
+/**
+ * The credentials against the object store, including the one path whose
+ * shape exists because of it: `endAllSessions` reaching an account's
+ * sessions through an index rather than by listing every session there is.
+ */
+test('accounts, sessions and reset tokens work through the object store', async () => {
+  process.env.STORAGE_KEY = createHash('sha256').update('a test key').digest('base64');
+  process.env.ACCOUNTS_DIR = `${process.env.STORE_DIR ?? '/tmp'}/remote-outbox`;
+
+  const { createAccount, authenticate } = await import('../src/server/accounts');
+  const { endAllSessions, resolveSession, startSession } = await import('../src/server/sessions');
+
+  const made = await createAccount('remote@example.gov', 'correct horse battery staple');
+  assert.ok(made.ok);
+  const id = made.account.id;
+
+  // The record is in the bucket, and it is the sealed form.
+  const stored = objects.get(`accounts/${id}/account.json`);
+  assert.ok(stored, 'the account is an object in the bucket');
+  assert.ok(!stored.toString('utf8').includes('remote@example.gov'), 'and it is unreadable');
+
+  assert.ok((await authenticate('remote@example.gov', 'correct horse battery staple')).ok);
+  assert.equal((await authenticate('remote@example.gov', 'the wrong one entirely')).ok, false);
+
+  const one = await startSession(id);
+  const two = await startSession(id);
+  assert.ok((await resolveSession(one)).ok);
+  assert.equal([...objects.keys()].filter((key) => key.startsWith(`sessions/by-account/${id}/`)).length, 2);
+
+  assert.equal(await endAllSessions(id), 2, 'found through the index, not by listing every session');
+  assert.deepEqual(await resolveSession(one), { ok: false, reason: 'none' });
+  assert.deepEqual(await resolveSession(two), { ok: false, reason: 'none' });
+  assert.equal([...objects.keys()].filter((key) => key.startsWith(`sessions/by-account/${id}/`)).length, 0);
+});
+
 test('a key that is not plain segments is refused before it becomes a request', async () => {
   const { BadKeyError, getBlob, putBlob } = await import('../src/server/blobs');
   for (const bad of ['../escape', 'a//b', '/leading', 'trailing/', 'has space', '', 'a/../b']) {

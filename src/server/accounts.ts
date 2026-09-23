@@ -1,21 +1,29 @@
 /**
  * The account store: who has an account here, and what it takes to get in.
  *
- * Local disk under `accounts/`, or `ACCOUNTS_DIR`, in the same shape and
- * for the same reasons as the job store — right for development and for a
- * service one person runs, wrong for an ephemeral filesystem, and one file
- * to replace when it moves. The rules the job store holds hold here too:
- * the account id is the only thing that becomes a path, and no error raised
- * in this module carries a credential.
+ * On the same store as everything else, under `accounts/`, through
+ * `blobs.ts` — so disk in development and an object store in production,
+ * decided by the credentials and not by this file. The rules the job store
+ * holds hold here too: the account id is the only thing that becomes part
+ * of a key, and no error raised in this module carries a credential.
+ *
+ * Each record is sealed with its own key as associated data, which buys the
+ * same thing it buys a job: **a record cannot be moved.** An account record
+ * copied over another account's key, or an index entry re-filed under a
+ * different address's digest, stops opening rather than quietly becoming a
+ * way to sign in as somebody else. That is worth more here than the secrecy
+ * is: the passphrase is already a scrypt hash, and it is the authentication
+ * that decides who gets in.
  *
  * ## The email index is a hash, not the address
  *
- * `by-email/` is keyed by SHA-256 of the normalised address rather than by
- * the address itself. A directory listing of a filesystem is a thing that
- * gets backed up, synced and screenshotted, and a customer list of federal
- * contractors is worth something to somebody. The address is still inside
- * the record — this is not encryption and does not pretend to be — but it
- * is no longer readable from a file name.
+ * `accounts/by-email/` is keyed by SHA-256 of the normalised address rather
+ * than by the address itself. A listing is a thing that gets backed up,
+ * synced and screenshotted — and in a bucket it is a thing an over-broad
+ * policy hands out — and a customer list of federal contractors is worth
+ * something to somebody. The address is inside the record, which is now
+ * sealed; the point of the digest is that the *name* never has to be
+ * trusted to anybody.
  *
  * ## Sign-in answers one way
  *
@@ -25,16 +33,15 @@
  * investigator can see it and a stranger with a sign-in form cannot.
  */
 
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createHash, randomUUID } from 'node:crypto';
-import path from 'node:path';
 
 import { checkEmail, checkPassword, type Account } from '@/domain/account';
 import { countFailure, lockState, type Failures } from '@/domain/session';
 import { hashPassword, needsRehash, spendTime, verifyPassword } from './passwords';
 import { record } from './audit';
+import { getBlob, putBlob } from './blobs';
+import { openText, sealText } from './crypto';
 
-const ROOT = process.env.ACCOUNTS_DIR ?? path.join(process.cwd(), 'accounts');
 const ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 /** The account record as stored: the domain's `Account`, plus the secrets. */
@@ -43,39 +50,32 @@ interface Stored extends Account {
   failures?: Failures;
 }
 
-function dirFor(id: string): string {
+function keyFor(id: string): string {
   if (!ID.test(id)) throw new Error('Invalid account id');
-  return path.join(ROOT, id);
+  return `accounts/${id}/account.json`;
 }
 
 function indexFor(email: string): string {
-  return path.join(ROOT, 'by-email', `${createHash('sha256').update(email).digest('hex')}.json`);
+  return `accounts/by-email/${createHash('sha256').update(email).digest('hex')}.json`;
 }
 
 async function readStored(id: string): Promise<Stored | null> {
-  try {
-    return JSON.parse(await readFile(path.join(dirFor(id), 'account.json'), 'utf8')) as Stored;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
-    throw error;
-  }
+  const key = keyFor(id);
+  const stored = await getBlob(key);
+  return stored ? (JSON.parse(openText(stored, key)) as Stored) : null;
 }
 
 async function writeStored(account: Stored): Promise<void> {
-  const dir = dirFor(account.id);
-  await mkdir(dir, { recursive: true });
-  await writeFile(path.join(dir, 'account.json'), JSON.stringify(account, null, 2));
+  const key = keyFor(account.id);
+  await putBlob(key, sealText(JSON.stringify(account, null, 2), key));
 }
 
 async function idForEmail(email: string): Promise<string | null> {
-  try {
-    const raw = await readFile(indexFor(email), 'utf8');
-    const { id } = JSON.parse(raw) as { id: string };
-    return ID.test(id) ? id : null;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
-    throw error;
-  }
+  const key = indexFor(email);
+  const stored = await getBlob(key);
+  if (!stored) return null;
+  const { id } = JSON.parse(openText(stored, key)) as { id: string };
+  return ID.test(id) ? id : null;
 }
 
 /** Only what the rest of the app may see. The hash never leaves this file. */
@@ -115,8 +115,7 @@ export async function createAccount(rawEmail: string, password: string): Promise
   };
   await writeStored(stored);
   const index = indexFor(email.email);
-  await mkdir(path.dirname(index), { recursive: true });
-  await writeFile(index, JSON.stringify({ id: stored.id }));
+  await putBlob(index, sealText(JSON.stringify({ id: stored.id }), index));
   await record('account.created', stored.id);
   return { ok: true, account: publicPart(stored) };
 }

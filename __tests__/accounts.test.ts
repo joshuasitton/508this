@@ -9,6 +9,8 @@ import type { AuditEvent } from '../src/domain/audit';
 
 // The store reads its root at module load, so the directory has to exist and
 // be named before anything imports it.
+// `ACCOUNTS_DIR` names only the development mail outbox now — accounts,
+// sessions and reset tokens all live on the store below.
 const ROOT = await mkdtemp(path.join(tmpdir(), '508this-accounts-'));
 process.env.ACCOUNTS_DIR = ROOT;
 // The audit log is on the blob seam now, which has a root of its own. No
@@ -85,7 +87,7 @@ test('an account is created, found by its address, and never stores the passphra
   assert.deepEqual(Object.keys(made).sort(), ['createdAt', 'email', 'id']);
   assert.equal((made as { passwordHash?: string }).passwordHash, undefined, 'the hash never leaves the store');
 
-  const raw = await readFile(path.join(ROOT, made.id, 'account.json'), 'utf8');
+  const raw = await readFile(path.join(STORE, 'accounts', made.id, 'account.json'), 'utf8');
   assert.ok(!raw.includes(PASSPHRASE));
 
   const found = await getAccount(made.id);
@@ -99,7 +101,7 @@ test('an account is created, found by its address, and never stores the passphra
  */
 test('the email index does not have the address in its file name', async () => {
   await account('contracting.officer@agency.example.gov');
-  const names = await readdir(path.join(ROOT, 'by-email'));
+  const names = await readdir(path.join(STORE, 'accounts', 'by-email'));
   assert.ok(names.length > 0);
   for (const name of names) {
     assert.match(name, /^[0-9a-f]{64}\.json$/);
@@ -188,11 +190,22 @@ test('a session resolves while it lives, and the token is never on disk', async 
   assert.ok(resolved.ok);
   assert.equal(resolved.session.account, made.id);
 
-  const files = await readdir(path.join(ROOT, 'sessions'));
-  for (const name of files) {
-    assert.match(name, /^[0-9a-f]{64}\.json$/, 'the file is named by the hash, not the token');
-    const raw = await readFile(path.join(ROOT, 'sessions', name), 'utf8');
+  // `by-account/` is the index; the records themselves sit beside it.
+  const entries = await readdir(path.join(STORE, 'sessions'), { withFileTypes: true });
+  const records = entries.filter((entry) => entry.isFile());
+  assert.ok(records.length > 0, 'there is a record to look at');
+  for (const entry of records) {
+    assert.match(entry.name, /^[0-9a-f]{64}\.json$/, 'the record is named by the digest, not the token');
+    const raw = await readFile(path.join(STORE, 'sessions', entry.name), 'utf8');
     assert.ok(!raw.includes(token), 'the token itself is never stored');
+  }
+
+  // The index is named by the digest too, and holds nothing.
+  const indexed = await readdir(path.join(STORE, 'sessions', 'by-account', made.id));
+  assert.equal(indexed.length, records.length, 'one index entry per record');
+  for (const name of indexed) {
+    assert.match(name, /^[0-9a-f]{64}\.json$/);
+    assert.equal((await readFile(path.join(STORE, 'sessions', 'by-account', made.id, name))).byteLength, 0);
   }
 
   assert.deepEqual(await resolveSession(undefined), { ok: false, reason: 'none' });
@@ -315,10 +328,10 @@ test('the token is never stored, only its digest', async () => {
   await request('digest@example.gov', ORIGIN);
   const token = new URL((await lastLink())!).searchParams.get('token')!;
 
-  for (const name of await readdir(path.join(ROOT, 'resets'))) {
+  for (const name of await readdir(path.join(STORE, 'resets'))) {
     assert.match(name, /^[0-9a-f]{64}\.json$/);
-    const raw = await readFile(path.join(ROOT, 'resets', name), 'utf8');
-    assert.ok(!raw.includes(token), 'the token itself is never on disk');
+    const raw = await readFile(path.join(STORE, 'resets', name), 'utf8');
+    assert.ok(!raw.includes(token), 'the token itself is never stored');
   }
   assert.ok(made.id.length > 0);
 });

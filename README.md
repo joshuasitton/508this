@@ -961,8 +961,8 @@ look like anything, because no page mentions it.
 | `src/domain/session.ts` | the two session clocks and the lockout rule, as pure functions over a time you pass in |
 | `src/domain/audit.ts` | the shape of an audit record — and, structurally, what cannot go in one |
 | `src/server/passwords.ts` | scrypt, from `node:crypto`, with the parameters written into every hash |
-| `src/server/accounts.ts` | the store, sign-in, and the single answer a failure gets |
-| `src/server/sessions.ts` | tokens the server never stores, and the cookie that carries them |
+| `src/server/accounts.ts` | the store under `accounts/`, sign-in, and the single answer a failure gets |
+| `src/server/sessions.ts` | tokens the server never stores, the cookie that carries them, and the index that makes ending them all cheap |
 | `src/server/audit.ts` | one object per event, sealed to its own key, under a prefix per account and one for the events that belong to nobody |
 
 ### An audit record has no free-text field, and that is the design
@@ -1354,12 +1354,65 @@ No multipart upload, no retries, no presigned URLs. A job's document is
 under 25 MB by the upload limit, which is a single PUT. Adding the rest
 before anything needs it is how four verbs become a library.
 
-### What is deliberately not here
+### The credentials, and the index a bucket needed
 
-**Accounts, sessions and reset tokens are still on local disk.** Documents
-were moved first because they are the federal records that retention and
-encryption are about; the audit log followed, because it was the part that
-needed a decision rather than a port. Credentials are what is left.
+Accounts, sessions and reset tokens are on the store too, under
+`accounts/`, `sessions/` and `resets/`. **Nothing the service persists is on
+local disk any more**, which is the sentence that makes an ephemeral
+filesystem — Vercel's, specifically — survivable.
+
+Each record is sealed with its own key as associated data, and here that
+binding is worth more than the secrecy. A passphrase is already a scrypt
+hash; what the seal protects is **where a record sits**. A session record is
+what the server accepts *instead of* a passphrase, so a record that could be
+copied onto the digest of a token an attacker holds is a way to sign in as
+somebody else without touching a credential at all. A reset record names the
+account its link resets, and moving one is a passphrase reset for an account
+you do not own. All three stop opening when moved, and there are tests for
+each.
+
+#### `endAllSessions` needed an index
+
+Ending every session an account has used to mean reading every session
+record in the service and keeping the ones that matched. On a disk that was
+linear and fine. Against a bucket it is a listing of every session there is
+plus a fetch each — on the path that runs whenever **somebody resets a
+passphrase**, which is to say the path that runs when somebody thinks their
+account is compromised.
+
+So there is an index: an empty object at
+`sessions/by-account/<account>/<digest>.json`, whose *name* carries
+everything needed to find and delete the record.
+
+**The index entry is written before the record**, which is the ordering that
+fails safe. An entry with no record is harmless — deleting is idempotent on
+both stores, so ending it is a no-op. A record with no entry would be a
+session `endAllSessions` cannot see, which is a session that survives the
+reset it was supposed to end. Every path that ends a session takes the entry
+with it, or the index becomes a permanent list of every session the service
+ever issued.
+
+#### A broken seal is an error in one place and "no" in two others
+
+`accounts.ts` lets a failed authentication check throw. An account record is
+fetched by an id the server has already resolved, so a record that will not
+open is a real problem and should be loud.
+
+`sessions.ts` and `resets.ts` return null instead, because their keys come
+from a cookie and a URL — whatever the caller sent. Throwing there would
+turn any forged token into a 500, which is both a way to knock the service
+over and a way to tell a stranger their guess landed on something. So it is
+treated exactly as a token nobody was ever issued.
+
+#### What stays on disk, on purpose
+
+The development mail outbox, and only that. `ACCOUNTS_DIR` now names it and
+nothing else. It holds letters containing live reset links — credentials in
+the clear — and it exists only when no mail token is configured, which in
+production means no letter is sent at all. Putting that on the shared store
+would be moving credentials somewhere more exposed to make a folder tidier.
+
+### What is deliberately not here
 
 ### One object per event, because a bucket cannot append
 
@@ -1422,15 +1475,16 @@ made.
 
 ## Storage, and why it is one file
 
-`src/server/jobs.ts` writes each job under `<id>/` in the store — `store/`
-on local disk, or wherever `STORE_DIR` points. It is right for development and for the first jobs
-run by hand on one machine, and wrong for Vercel, whose filesystem does not
-persist. Retention is decided and built, so what is left is the backend
-itself: four functions in this file — `readRecord`, `writeRecord`,
-`readBlob`, `writeBlob` — are the only code in the repository that touches a
-customer's bytes, and replacing local disk means replacing those four. Two rules from `CLAUDE.md` live here as code: the
-job id is the only thing that ever becomes a path, and no error raised in
-this module carries document content, so whatever logs it cannot leak it.
+`src/server/jobs.ts` writes each job under `<id>/` in the store, and four
+functions in it — `readRecord`, `writeRecord`, `readBlob`, `writeBlob` —
+are the only code in the repository that touches a customer's bytes. They
+were written to be the seam, and they were: moving to an object store
+changed them and nothing above them. Everything else the service persists
+followed through the same door.
+
+Two rules from `CLAUDE.md` live here as code: the job id is the only thing
+that ever becomes a key, and no error raised in this module carries document
+content, so whatever logs it cannot leak it.
 
 The job page reads through the same module, so what the customer sees is
 whatever the store says and nothing else.

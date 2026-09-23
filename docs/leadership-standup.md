@@ -8,6 +8,78 @@ for. Where an entry has since been overtaken, `docs/build-state.md` says so.
 
 ---
 
+## 2026-09-22, night — the credentials, and the end of local disk
+
+### What the Chairman said
+
+Merge it and port the credentials.
+
+### Done
+
+Accounts, sessions and reset tokens are on the object store. **Nothing the
+service persists is on local disk any more.** That is the milestone rather
+than the diff: Vercel's filesystem does not survive a deploy, and until
+tonight that was the thing standing between this service and being
+deployable at all. 311 tests.
+
+### The part that was not a port
+
+`endAllSessions` read every session record in the service to find one
+account's. On a disk that is linear and fine. Against a bucket it is a
+listing of every session there is plus a fetch each — and it runs on the
+passphrase-reset path, which is to say **the path that runs when a customer
+thinks their account is compromised**. The slowest, most expensive thing in
+the store was wired to the moment it most needs to work.
+
+So sessions gained an index, an empty object whose name carries the digest.
+The entry is written *before* the record, which is the ordering that fails
+safe: an entry with no record deletes to nothing, while a record with no
+entry is a session that survives the reset that was meant to end it. Every
+path that ends a session takes the entry with it, or the index quietly
+becomes a permanent list of every session the service has ever issued.
+
+### The decision worth defending
+
+Everything is sealed to its own key, and **here the binding is worth more
+than the secrecy**. The passphrase is already a scrypt hash. What the seal
+protects is *where a record sits*: a session record is what the server
+accepts instead of a passphrase, so one that could be copied onto the digest
+of a token an attacker holds is a sign-in as somebody else without a
+credential ever being guessed. A reset record names the account its link
+resets. Anybody with write access to the store could have done that with
+files on a disk. They cannot now, and there is a test per record type
+watching each moved copy refuse to open.
+
+Security's second note: a broken seal is an error in `accounts.ts` and a
+plain "no" in `sessions.ts` and `resets.ts`. An account is fetched by an id
+the server already resolved, so a failure there is real and should be loud.
+A session or reset key comes from a cookie or a URL. Throwing on those would
+hand anybody a way to knock the service over with a forged token, and would
+tell a stranger when their guess landed on something.
+
+### What stays on disk, deliberately
+
+The development mail outbox. It holds letters carrying **live reset links**,
+and it only exists when no mail token is configured — in production nothing
+is written at all. Moving credentials somewhere more exposed in order to
+tidy up a folder is the wrong trade, so `ACCOUNTS_DIR` now names the outbox
+and nothing else.
+
+### Still with the Chairman
+
+The first live drafted description — still the one thing in this product
+that has never actually run, because no API key has ever existed in this
+environment. The four prices. What happens to a document nobody downloads;
+recommendation unchanged at 90 days from last activity, as a second and
+longer clock rather than a replacement for the seven days from download.
+
+With storage finished, the standing question for the next round-table is
+what the service needs before it can take a real customer's document — and
+management's read is that the answer is now a deployment and a key, not more
+code.
+
+---
+
 ## 2026-09-22, night — the audit log, and the shape a bucket forced
 
 ### What the Chairman said
@@ -67,7 +139,8 @@ the sessions wrongly.
 
 **Accounts, sessions and reset tokens are still local.** They are
 credentials rather than records and none of them has a design question in
-the way — that is a port, not a decision.
+the way — that is a port, not a decision. *(Done the same night. One part
+was not a port after all: `endAllSessions` needed an index.)*
 
 Reading a log is one round trip per record. Honest rather than clever, and
 fine while a few thousand events is a large log; the escape hatch is in the

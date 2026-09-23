@@ -6,6 +6,13 @@
  * is right here: the token is not chosen by a person and cannot be guessed
  * at any price, so scrypt would buy nothing.
  *
+ * The record is on the same store as everything else, under `resets/`, and
+ * sealed with its own key as associated data. A reset record moved onto
+ * another token's key stops opening, which matters more here than almost
+ * anywhere: the record names the account the link resets, so one that could
+ * be re-filed under a token an attacker holds is a passphrase reset for
+ * somebody else's account.
+ *
  * ## Everybody gets the same answer
  *
  * `request` returns nothing. Not "sent", not "no such account", not "mail
@@ -28,9 +35,7 @@
  * attempt, it is somebody else.
  */
 
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createHash, randomBytes } from 'node:crypto';
-import path from 'node:path';
 
 import { letterFor } from '@/domain/mail';
 import { resetState, type Reset, type ResetState } from '@/domain/reset';
@@ -38,14 +43,34 @@ import { accountFor, changePassword } from './accounts';
 import { record } from './audit';
 import { send } from './mail';
 import { endAllSessions } from './sessions';
+import { getBlob, putBlob } from './blobs';
+import { openText, sealText } from './crypto';
 
-const ROOT = process.env.ACCOUNTS_DIR ?? path.join(process.cwd(), 'accounts');
-const RESETS = path.join(ROOT, 'resets');
+function keyFor(token: string): string {
+  // Hex of a digest is what becomes a key, so a token from a URL cannot be
+  // a key however it is spelled.
+  return `resets/${createHash('sha256').update(token).digest('hex')}.json`;
+}
 
-function fileFor(token: string): string {
-  // Hex of a digest is what becomes a path, so a token from a URL cannot be
-  // a path however it is spelled.
-  return path.join(RESETS, `${createHash('sha256').update(token).digest('hex')}.json`);
+/** The record for a token, or null if there is none or it will not open. */
+async function readReset(token: string): Promise<Reset | null> {
+  const key = keyFor(token);
+  const stored = await getBlob(key);
+  if (!stored) return null;
+  try {
+    return JSON.parse(openText(stored, key)) as Reset;
+  } catch {
+    // Not a record to reset a passphrase on — and null rather than a throw
+    // for the same reason `sessions.ts` gives: the key comes from a token in
+    // a URL, so a bad one must be "unknown" and not a 500. The failure is
+    // not inspected: it named an account.
+    return null;
+  }
+}
+
+async function writeReset(token: string, reset: Reset): Promise<void> {
+  const key = keyFor(token);
+  await putBlob(key, sealText(JSON.stringify(reset), key));
 }
 
 /** Where a reset link points. The one place that URL is built. */
@@ -75,9 +100,7 @@ export async function request(rawEmail: string, origin: string): Promise<void> {
   }
 
   const token = randomBytes(32).toString('base64url');
-  const reset: Reset = { account: account.id, issuedAt: new Date().toISOString() };
-  await mkdir(RESETS, { recursive: true });
-  await writeFile(fileFor(token), JSON.stringify(reset));
+  await writeReset(token, { account: account.id, issuedAt: new Date().toISOString() });
 
   const sent = await send(letterFor(account.email, { kind: 'reset', link: resetLink(origin, token) }, origin));
   if (!sent.ok) await record('mail.failed', account.id);
@@ -89,8 +112,7 @@ export async function tellTaken(rawEmail: string, origin: string): Promise<void>
   if (!account) return;
 
   const token = randomBytes(32).toString('base64url');
-  await mkdir(RESETS, { recursive: true });
-  await writeFile(fileFor(token), JSON.stringify({ account: account.id, issuedAt: new Date().toISOString() }));
+  await writeReset(token, { account: account.id, issuedAt: new Date().toISOString() });
 
   const sent = await send(letterFor(account.email, { kind: 'taken', link: resetLink(origin, token) }, origin));
   if (!sent.ok) await record('mail.failed', account.id);
@@ -111,20 +133,14 @@ export type ConsumeResult =
 export async function consume(token: string, password: string): Promise<ConsumeResult> {
   if (!token) return { ok: false, reason: 'unknown' };
 
-  const file = fileFor(token);
-  let reset: Reset;
-  try {
-    reset = JSON.parse(await readFile(file, 'utf8')) as Reset;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { ok: false, reason: 'unknown' };
-    throw error;
-  }
+  const reset = await readReset(token);
+  if (!reset) return { ok: false, reason: 'unknown' };
 
   const state = resetState(reset, Date.now());
   if (state !== 'good') return { ok: false, reason: state };
 
   reset.usedAt = new Date().toISOString();
-  await writeFile(file, JSON.stringify(reset));
+  await writeReset(token, reset);
 
   if (!(await changePassword(reset.account, password))) return { ok: false, reason: 'bad-password' };
 
@@ -136,11 +152,6 @@ export async function consume(token: string, password: string): Promise<ConsumeR
 /** What state a link is in, without spending it. For the page that renders the form. */
 export async function inspect(token: string): Promise<ResetState | 'unknown'> {
   if (!token) return 'unknown';
-  try {
-    const reset = JSON.parse(await readFile(fileFor(token), 'utf8')) as Reset;
-    return resetState(reset, Date.now());
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return 'unknown';
-    throw error;
-  }
+  const reset = await readReset(token);
+  return reset ? resetState(reset, Date.now()) : 'unknown';
 }
