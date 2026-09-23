@@ -8,6 +8,52 @@ for. Where an entry has since been overtaken, `docs/build-state.md` says so.
 
 ---
 
+## 2026-09-23 — setting up storage, and a question engineering should have asked first
+
+### What the Chairman said
+
+Help me set up S3. Asked which store, he chose Cloudflare R2.
+
+### Done
+
+`docs/deploy.md` has the R2 steps — bucket, a token scoped to **that bucket
+only** with object read and write, the account-specific S3 endpoint, and
+`S3_REGION=auto`, which R2 requires literally and which is a silent 403 when
+it is wrong.
+
+And `npm run check:store`, which proves a bucket before a deploy trusts it
+with somebody's document: the four verbs against the real thing with the real
+signature code, then that what came back is sealed and that a sealed object
+cannot be moved to another key and still open. Every failure path was
+exercised rather than described, including the two that say least by default —
+an unreachable endpoint and a wrong region.
+
+### The question we should have asked before quoting a price
+
+R2 was recommended on cost. **This service accepts CUI**, decided on
+21 September against the recommendation of this table, and the README already
+makes the argument that settles this: *a zero-data-retention commitment is
+not a FedRAMP authorisation, and the two are not substitutes.*
+
+That was written about the model vendor, which sees one figure. It applies
+with more force to the bucket, which holds the whole document. **R2 is not
+FedRAMP authorised.** AWS commercial regions are Moderate, GovCloud is High,
+and MinIO on infrastructure already authorised is a third answer.
+
+Engineering put the cheap option up without putting that beside it, which was
+the wrong way round for a service that accepts CUI. The runbook now states
+the choice rather than making it. What the code needs is identical either
+way; what is not identical is moving documents that already exist, which is
+the argument for the Chairman settling it before the first upload.
+
+### Still with the Chairman
+
+The store, now that the question is properly framed. The four prices. What
+happens to a document nobody downloads. And the first live drafted
+description, which has still never run.
+
+---
+
 ## 2026-09-23 — ready to deploy, and a promise that was not being kept
 
 ### What the Chairman said

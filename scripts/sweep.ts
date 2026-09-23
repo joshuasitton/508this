@@ -1,11 +1,10 @@
 /**
  * Delete the documents whose retention window has run out.
  *
- * `npm run sweep`. It is a command rather than a timer because nothing in
- * this service has a scheduler yet, and a deletion policy that depends on a
- * cron somebody has not written is a deletion policy that does not run. A
- * command can be run by hand today and by a cron tomorrow, and both call
- * the same function the tests cover.
+ * `npm run sweep`, by hand. The scheduled one is `/api/sweep`, which a
+ * Vercel cron calls daily — this stayed because the two call the same
+ * function the tests cover, and being able to run it from a terminal is
+ * worth keeping when you want to know what it would do right now.
  *
  * It prints counts and job ids. It never prints a filename, a finding or a
  * word of anybody's document — the same rule the triage holds, and for the

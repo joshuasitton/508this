@@ -21,6 +21,75 @@ the four verbs and signs them by hand, and an endpoint switches it to path
 style. R2 is the cheapest of the three for this workload and has no egress
 charge, which for a service that hands documents back is the dominant cost.
 
+### Before choosing on price: the same question the vision vendor answered
+
+This service **accepts CUI**, decided 21 September. The README already makes
+the distinction that matters here, about the model vendor: *a zero-data-
+retention commitment is not a FedRAMP authorisation, and the two are not
+substitutes.* That argument does not stop at the model. **The bucket holds
+the documents.**
+
+Cloudflare R2 is not FedRAMP authorised. AWS commercial regions are FedRAMP
+Moderate and GovCloud is High, and MinIO on infrastructure you already have
+authorised is a third answer. Cost says R2; a customer's contract may not.
+
+This is the Chairman's call and it is not made by this file. What the code
+needs is identical either way — the same five variables, and `npm run
+check:store` proves whichever you pick. **Nothing about the decision is
+hard to reverse in code; moving documents that already exist is the hard
+part**, which is the argument for settling it before the first upload
+rather than after.
+
+### Cloudflare R2, step by step
+
+1. **Create the bucket.** Cloudflare dashboard → R2 → *Create bucket*. Give
+   it a location hint if the jurisdiction matters to you; it is not
+   changeable afterwards.
+2. **Create a token scoped to it.** R2 → *Manage R2 API Tokens* → *Create API
+   Token*. Permission **Object Read & Write**, and scope it to **this bucket
+   only** — the service uses four verbs on one bucket and a token that can do
+   more is a token that can do more when it leaks.
+3. **Keep what it shows you once.** The Access Key ID and the Secret Access
+   Key are displayed a single time.
+4. **Note the endpoint.** R2 shows an S3 API endpoint of the form
+   `https://<account-id>.r2.cloudflarestorage.com`. That is `S3_ENDPOINT`;
+   the bucket name is **not** part of it.
+5. **Set `S3_REGION=auto`.** R2 wants that literal value. The signature is
+   computed over it, so a different one is a 403 that says nothing useful.
+6. **Leave public access off.** It is off by default and should stay off —
+   nothing in the service serves from the bucket directly.
+
+That gives you:
+
+```
+S3_BUCKET=<the bucket name>
+S3_REGION=auto
+S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
+S3_ACCESS_KEY_ID=<from the token>
+S3_SECRET_ACCESS_KEY=<from the token>
+```
+
+### Prove it before you deploy into it
+
+```
+npm run check:store
+```
+
+It runs PUT, GET, ListObjectsV2 and DELETE against the real bucket with the
+real signature code, then checks that what it wrote came back **sealed** and
+that a sealed object **cannot be moved to another key and still open**. It
+writes one object under `check/`, deletes it on the way out — including out
+of a failure — and prints no secret and no bucket contents.
+
+It exists because the alternative is finding out from a customer. A mistyped
+secret, a bucket in another region, a token scoped to read: every one of
+those deploys cleanly and fails on the first upload, and the first upload is
+a federal record.
+
+A failure names the likely cause rather than the status alone — an
+unreachable endpoint, a 403 on the signature or the permissions, a 404 on the
+bucket name or region. It exits non-zero, so it can go in a deploy script.
+
 ## The variables
 
 Every one of these is read by `src/` and nothing else is. **Not one of them
