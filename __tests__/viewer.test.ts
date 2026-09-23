@@ -102,6 +102,13 @@ test('nothing in the app reaches the job store except through the guard', async 
     'account/actions.ts': ['claimJobs'],
     // A type, which carries no access to anything.
     'jobs/[id]/download/route.ts': ['JobFile'],
+    // The retention sweep, which has no viewer by construction: it is the
+    // service deleting what it promised to delete, not somebody reaching a
+    // job. Putting it behind the door would mean giving `access.ts` a
+    // function that deliberately checks nobody, which is a worse thing to
+    // have than this line. It has its own guard — a shared secret — and it
+    // answers with a count rather than the ids it swept.
+    'api/sweep/route.ts': ['sweepExpired'],
   };
 
   const root = new URL('../src/app/', import.meta.url).pathname;
