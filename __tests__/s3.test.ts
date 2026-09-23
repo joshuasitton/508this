@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
 
-import { sign } from '../src/server/s3';
+import { locate, sign } from '../src/server/s3';
 
 /**
  * A stand-in for S3: PUT, GET, DELETE and ListObjectsV2, path style, in
@@ -143,6 +143,39 @@ test('paths are encoded the way AWS encodes them, not the way JavaScript does', 
   const signed = sign(config, 's3', 'GET', 'h', "/a b!c'd(e)f*g~h", {}, new Uint8Array(), new Date(0));
   assert.match(signed.url, /\/a%20b%21c%27d%28e%29f%2Ag~h$/);
   assert.ok(signed.url.includes('~h'), 'a tilde is unreserved and stays as itself');
+});
+
+/**
+ * Addressing, both ways, because the production one had no test.
+ *
+ * Every other test in this file sets `S3_ENDPOINT` and therefore exercises
+ * path style. AWS is the other branch — virtual-hosted, the bucket in the
+ * host — and it is the one a deploy uses. The host is inside the signature,
+ * so a wrong host is a 403 that explains nothing rather than a 404 that
+ * does.
+ */
+test('AWS is addressed virtual-hosted, and an endpoint is addressed path style', () => {
+  const aws = { bucket: 'records', region: 'us-east-2', accessKeyId: 'A', secretAccessKey: 'S' };
+  assert.deepEqual(locate(aws, 'job-id/original.pdf'), {
+    host: 'records.s3.us-east-2.amazonaws.com',
+    path: '/job-id/original.pdf',
+    scheme: 'https',
+  });
+
+  // The region is in the host, which is why setting it wrong fails opaquely.
+  assert.equal(locate({ ...aws, region: 'eu-west-2' }, 'k').host, 'records.s3.eu-west-2.amazonaws.com');
+
+  // `s3List` calls with an empty key: the bucket itself, not an object in it.
+  assert.equal(locate(aws, '').path, '/');
+
+  const hosted = { ...aws, endpoint: 'http://127.0.0.1:9000' };
+  assert.deepEqual(locate(hosted, 'job-id/original.pdf'), {
+    host: '127.0.0.1:9000',
+    path: '/records/job-id/original.pdf',
+    scheme: 'http',
+  });
+  assert.equal(locate(hosted, '').path, '/records/', 'and the bucket itself, path style');
+  assert.equal(locate({ ...hosted, endpoint: 'https://s3.example.gov' }, 'k').scheme, 'https');
 });
 
 test('a signature covers the bytes that are actually sent', async () => {
