@@ -8,6 +8,70 @@ for. Where an entry has since been overtaken, `docs/build-state.md` says so.
 
 ---
 
+## 2026-09-23 — ready to deploy, and a promise that was not being kept
+
+### What the Chairman said
+
+Merge it and deploy it.
+
+### The honest answer on the deploy
+
+**It is not deployed, and it cannot be from this environment.**
+`api.vercel.com` is denied by the network policy and there is no Vercel
+token here. Everything that does not depend on that is done, and the deploy
+is now a runbook and three accounts rather than a question.
+
+`docs/deploy.md` names every variable the code actually reads — derived by
+grepping `process.env` out of `src/`, so it cannot drift from the source the
+way a remembered list would — with the two orderings that matter, the bucket
+settings, and four things to check afterwards.
+
+### What we checked so the first deploy is not the test
+
+The production build was run **in the object-store configuration**, against
+a local S3-compatible server, because the disk configuration is not the one
+being deployed. The whole identity flow and a document upload went through
+it; everything landed sealed under the right prefixes; and the job page said
+*"Stored in object storage, encrypted at rest."* without a line of code
+changing, which is the storage seam earning its keep in public.
+
+Two things that would have failed at deploy time were checked here instead:
+the renderer's native binary ships prebuilt for Vercel's runtime and the
+lockfile carries that platform, and the heaviest route traces to 67 MB
+against a 250 MB limit.
+
+### The gap this found, and why we closed it rather than filing it
+
+Writing the runbook surfaced that **`sweepExpired` was called by nothing.**
+"Documents are deleted seven days after the customer downloads them" is not
+a nice-to-have — it is in the data-handling story this service sells, and it
+was true of the code and false of the service. That is the worst shape a
+promise can be in, because it reads as kept.
+
+Deploying a service whose retention promise silently does not hold is not a
+deploy anyone should want, so it was treated as part of deploying rather
+than as a follow-up. A daily cron now calls it. The route is the only thing
+in the service that deletes a customer's document, so what it *accepts*
+mattered more than what it does: Vercel's cron token compared in constant
+time, the same 404 for every other caller, and no route at all until
+somebody sets `CRON_SECRET` and thereby decides who may call it.
+
+Security's note: it answers with a count and never the ids it swept. A job
+id names a customer's document and a response body gets logged.
+
+### Still with the Chairman
+
+Three accounts only he can open — Vercel, a bucket, and a mail sender — plus
+the network policy or a token if he wants the deploy driven from a session
+rather than his own terminal.
+
+And unchanged: the first live drafted description, the four prices, and what
+happens to a document nobody downloads. The last of those is now the only
+retention question without an answer in code, and the recommendation stands
+at 90 days from last activity.
+
+---
+
 ## 2026-09-22, night — the credentials, and the end of local disk
 
 ### What the Chairman said

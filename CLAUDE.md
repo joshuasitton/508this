@@ -23,7 +23,7 @@ npm test              # domain tests — Node's built-in runner, no framework
 npm run typecheck     # tsc --noEmit
 npm run lint          # eslint, including the jsx-a11y rules
 npm run dev           # http://localhost:3000
-npm run build         # what Vercel runs
+npm run build         # what Vercel runs; deploying is docs/deploy.md
 npm run triage -- DIR # classify a folder of PDFs; prints no document content
 npm run sweep         # delete the documents whose retention window has run out
 ```
@@ -137,6 +137,12 @@ npm run sweep         # delete the documents whose retention window has run out
   an id the server resolved, so a failure is a real problem; a session or
   reset key comes from a cookie or a URL, so throwing would turn any forged
   token into a 500 and a signal.
+- **`/api/sweep` is the only thing in the service that deletes a customer's
+  document.** It accepts Vercel's cron bearer token against `CRON_SECRET` in
+  constant time and 404s everything else, including every request when that
+  variable is unset. It answers with a count, never the job ids. It is the
+  one allowed exception to the `access.ts` door, because a sweep has no
+  viewer — the reason is argued in the allowlist in `__tests__/viewer.test.ts`.
 - **The retention sweep must never be able to reach the `audit/` prefix**,
   or `accounts/`, `sessions/` or `resets/`.
   It sees only keys whose first segment is a job id. Documents, evidence and

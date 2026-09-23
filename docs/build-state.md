@@ -4,6 +4,56 @@ The running project-level record. Sections are dated and kept in order rather
 than rewritten, so the reasoning stays readable. Decisions live in
 `docs/leadership-standup.md`; this file says where the code stands.
 
+## 2026-09-23 — ready to deploy, and the promise that was not being kept
+
+`docs/deploy.md` is the runbook: every variable the code actually reads
+(derived by grepping `process.env` out of `src/`, not from memory), the two
+orderings that matter, the bucket settings, and four things to check after
+the first deploy. 314 tests, green with `node_modules` moved aside.
+
+**The deploy itself is not done, and cannot be from here.** `api.vercel.com`
+is denied by this environment's network policy and no Vercel token exists in
+it. Everything that does not depend on that is done.
+
+**What was checked rather than assumed**, because these are what break at
+deploy time:
+
+- `@napi-rs/canvas` ships a prebuilt `linux-x64-gnu` binary and the lockfile
+  carries that platform, so the renderer works on Vercel's Node runtime with
+  nothing to install.
+- The heaviest route traces to 67 MB against a 250 MB function limit, so the
+  build's "dynamic filesystem access causes tracing of the whole project"
+  warning costs nothing.
+- The production build was run **in the object-store configuration** against
+  a local S3-compatible server — the config a deploy uses, not the disk one.
+  Sign-up, sign-out, sign-in, a second session and a document upload all
+  worked, everything landed sealed under the right prefixes, session records
+  and index entries matched one for one, and the job page said *"Stored in
+  object storage, encrypted at rest."* — the page told the truth about a
+  different store with no code change, which is the seam working.
+- With no `STORAGE_KEY`, production **refuses**: sign-up fails through the
+  browser, nothing at all is written, and the log names the reason. Checked
+  through the browser after a plain form POST turned out not to invoke the
+  server action — the first attempt proved nothing.
+
+**The gap the runbook found, and closed.** `sweepExpired` was written, tested
+and called by nothing. "Documents are deleted seven days after you download
+them" was true of the code and false of the service — a promise in the shape
+that reads as kept. `vercel.json` now schedules `/api/sweep` daily; the route
+takes Vercel's cron bearer token against `CRON_SECRET` in constant time,
+404s everything else including every request when that variable is unset,
+and answers with a count rather than the job ids it swept.
+
+It is the one exception to the `access.ts` door, argued in the allowlist:
+a sweep has no viewer by construction, and putting it behind the door would
+mean giving that door a function that deliberately checks nobody.
+
+**A test expectation of mine was wrong, not the code.** `Bearer <secret> `
+with a trailing space is accepted — HTTP defines a header value as trimmed
+and the Headers API strips it before the route sees it, so the two are the
+same header value. Asserting a refusal would have been asserting a bug. A
+trailing `x` is refused.
+
 ## 2026-09-22, night — the credentials, and the end of local disk
 
 `accounts.ts`, `sessions.ts` and `resets.ts` are on the blob seam. **Nothing

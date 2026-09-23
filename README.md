@@ -1469,7 +1469,39 @@ than a comment.
 it later does not strand what is written; that is the whole of the provision
 made.
 
-**Nothing calls the sweep on a timer.**
+### The sweep, on a timer at last
+
+`sweepExpired` was written when retention was decided, tested, and then
+called by nothing. That is the worst shape a promise can be in: "documents
+are deleted seven days after you download them" was true of the code and
+false of the service, and it read as kept.
+
+`vercel.json` now schedules `/api/sweep` daily. Daily rather than hourly
+because the promise is measured in days — an hourly sweep deletes a document
+within an hour of its deadline rather than within a day of it, and buys
+twenty-three extra runs to do it.
+
+The route is the one place in the service that deletes a customer's
+document, so what it accepts matters more than what it does. It takes the
+`Authorization: Bearer` that Vercel's cron sends, compared against
+`CRON_SECRET` in constant time, and **with that variable unset it 404s every
+request** — an endpoint that deletes documents should not exist until
+somebody has decided who may call it. Every refusal is the same 404, wrong
+secret or wrong length alike, because a 401 would confirm the route is
+there.
+
+It answers with a count and never the ids it swept: a job id names a
+customer's document, and a response body is a thing that gets logged.
+
+It is also the one thing under `src/app/` allowed to reach the job store
+without going through `access.ts`, and the reason is in the allowlist beside
+it — the sweep has no viewer by construction. It is the service deleting
+what it promised to delete, not somebody reaching a job. Putting it behind
+the door would mean giving that door a function which deliberately checks
+nobody, and that is a worse thing to own than one named exception.
+
+**Deploying** is `docs/deploy.md`: every variable, where it comes from, and
+the two orderings that matter.
 
 ---
 
