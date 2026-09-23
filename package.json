@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint",
     "triage": "node --experimental-strip-types --import ./scripts/ts-resolve.mjs scripts/triage.ts",
-    "sweep": "node --experimental-strip-types --import ./scripts/ts-resolve.mjs scripts/sweep.ts"
+    "sweep": "node --experimental-strip-types --import ./scripts/ts-resolve.mjs scripts/sweep.ts",
+    "check:store": "node --experimental-strip-types --import ./scripts/ts-resolve.mjs scripts/check-store.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.127.0",

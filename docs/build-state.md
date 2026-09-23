@@ -4,6 +4,39 @@ The running project-level record. Sections are dated and kept in order rather
 than rewritten, so the reasoning stays readable. Decisions live in
 `docs/leadership-standup.md`; this file says where the code stands.
 
+## 2026-09-23 — `npm run check:store`, and a question the price comparison skipped
+
+`scripts/check-store.ts`. It runs PUT, GET, ListObjectsV2 and DELETE against
+a real bucket with the real signature code, then checks that what it wrote
+came back sealed and that a sealed object cannot be moved to another key and
+still open. One probe object under `check/` — a prefix the retention sweep
+cannot see, because it is not a job id — deleted on the way out including out
+of a failure. No secret and no bucket contents in the output.
+
+It exists because a mistyped secret, a bucket in the wrong region and a
+read-scoped token all deploy cleanly and fail on the first upload, and the
+first upload is a federal record.
+
+**Every failure path was exercised here rather than described**: nothing
+configured, configured without `STORAGE_KEY`, an endpoint nothing listens on,
+a host that does not resolve, a store answering 403, and one answering 404.
+`fetch` reports every transport failure as "fetch failed" and hides the cause,
+so the unreachable-endpoint case — the likeliest mistake of the six — said the
+least by default and now names `ECONNREFUSED` or `ENOTFOUND` and what to check.
+Exit code is 1 on any failure, so it can go in a deploy script.
+
+**The question the recommendation skipped.** R2 was recommended on cost, and
+this service accepts CUI. The README already draws the line for the model
+vendor — a zero-data-retention commitment is not a FedRAMP authorisation —
+and the same argument applies to the bucket, which holds the documents rather
+than seeing one figure of them. R2 is not FedRAMP authorised; AWS commercial
+is Moderate and GovCloud High. `docs/deploy.md` now puts the choice to the
+Chairman instead of settling it on price. The code is identical either way;
+moving documents that already exist is the part that is not.
+
+`scripts/sweep.ts` had a comment saying nothing in the service has a
+scheduler, which stopped being true this morning. Corrected.
+
 ## 2026-09-23 — ready to deploy, and the promise that was not being kept
 
 `docs/deploy.md` is the runbook: every variable the code actually reads
