@@ -4,6 +4,26 @@ The running project-level record. Sections are dated and kept in order rather
 than rewritten, so the reasoning stays readable. Decisions live in
 `docs/leadership-standup.md`; this file says where the code stands.
 
+## 2026-09-25 — the sentences a reviewer has to judge, found for them
+
+1.3.3 and 1.4.1 keep their reviewer, and the PDF path now flags what the
+Word path has always flagged. The same criterion used to mean "confirm
+these three sentences" for a .docx and "read the whole document" for a PDF.
+`pdfSignals.ts`, over the same `phrases.ts`. 353 tests.
+
+**Colour as emphasis needed a narrower rule than Word's.** Word flags a
+coloured run among plain ones, which works because a .docx is mostly plain.
+A designed PDF is the opposite — brand colour in every subhead and callout,
+none of it "colour as the only means" — so flagging all of it would bury
+the reviewer, which is the failure being avoided rather than an edge case
+of it. This flags only colour used *inline*: a run differing from the rest
+of its own line, at the same size, with no weight to carry it. A coloured
+heading is set apart by being a heading.
+
+Measured on the real infographic, which has brand colour everywhere: **one
+finding**, `@vaequity`, a handle coloured differently from the words beside
+it. That was the risk and it did not materialise.
+
 ## 2026-09-25 — 1.3.2, and teaching a check to keep quiet
 
 Meaningful Sequence is checked for a PDF. **A PDF now needs a person for

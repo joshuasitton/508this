@@ -228,8 +228,16 @@ export const PDF_COVERAGE: Record<string, CoverageInfo> = {
     remark:
       'The tag tree’s reading order is compared with where each block sits on the rendered page. A page laid out in columns, where the order is a judgement about the layout, is reported for a person instead.',
   },
-  '1.3.3': { coverage: 'reviewer', remark: 'A reviewer confirms no instruction relies on shape, size, position or sound alone.' },
-  '1.4.1': { coverage: 'reviewer', remark: 'A reviewer confirms colour is never the only way information is conveyed.' },
+  '1.3.3': {
+    coverage: 'reviewer',
+    remark:
+      'A reviewer confirms no instruction relies on shape, size, position or sound alone; the screen flags every sentence that names one.',
+  },
+  '1.4.1': {
+    coverage: 'reviewer',
+    remark:
+      'A reviewer confirms colour is never the only way information is conveyed; the screen flags colour words in instructions and colour used as emphasis inside a line.',
+  },
   '1.4.2': { coverage: 'static', remark: PDF_MEDIA },
   '1.4.3': {
     coverage: 'checked',

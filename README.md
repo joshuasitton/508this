@@ -336,7 +336,9 @@ can be checked for; a PDF is not the same document. A `.docx` names its text
 colour in an attribute; a PDF paints with operators in a content stream and
 the background is whatever was drawn underneath.
 
-**Four criteria need a person for a PDF, the same four as for a Word file.** That
+**Four criteria need a person for a PDF, the same four as for a Word file** —
+and for two of them the screen now finds the sentences, as it always did for
+Word. That
 is the honest count, and it is the whole reason `ContentKind` is `'web' |
 'docx' | 'pdf'` rather than `'web' | 'document'`: the format decides what the
 service may claim. Reporting a PDF against the Word coverage table would
@@ -399,6 +401,32 @@ And an untagged PDF has no reading order to be wrong, which would have made
 it pass — so it is a blocking finding saying exactly that. Same for a tagged
 document whose tags cannot be matched to the page: escalated, not passed
 for want of evidence.
+
+#### Flagging is not checking, and both are worth having
+
+1.3.3 and 1.4.1 stay reviewer criteria, and should. "No instruction relies
+on shape, size, position or sound" and "colour is never the only way
+information is conveyed" are judgements about meaning, and a machine
+claiming them would be claiming to have understood the document.
+
+What a machine can do is narrow the reading, which the Word path has always
+done and the PDF path never did — so the same criterion meant *confirm
+these three sentences* for a `.docx` and *read the whole document* for a
+PDF. `pdfSignals.ts` closes that, over the same `phrases.ts`: nothing new
+is judged, the Word path's reach is applied to text that had to be drawn
+before it could be read.
+
+**Colour as emphasis needed a narrower rule than Word's.** Word flags a
+coloured run among plain ones, which is sharp because a `.docx` is mostly
+plain with occasional colour. **A designed PDF is the opposite** — brand
+colour in every subhead, callout and pull quote, none of it "colour as the
+only means". So this flags only colour used *inline*: a run that differs
+from the rest of its own line, at the same size, with no weight to carry
+it. That is emphasis mid-sentence, which is what the criterion is about. A
+coloured heading is set apart by being a heading.
+
+Measured on the real infographic — a document with brand colour
+everywhere — it produces exactly one row.
 
 Two things this got wrong before it got them right, both caught by running
 it on real documents rather than by reasoning about the code: a catalogue's
