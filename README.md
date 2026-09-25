@@ -1345,10 +1345,31 @@ document, a reviewer works through it over a fortnight — and a clock started
 at upload deletes the file in the middle of the job. Download is the only
 moment the service can be sure they have what they came for.
 
-The cost is real and is named rather than hidden: **a document nobody ever
-downloads has no deletion date.** Whether an outer limit should also run
-from upload is the Chairman's to decide, and `NEVER_DOWNLOADED` says so
-where somebody will read it.
+That left a real cost, named rather than hidden: a document nobody ever
+downloaded had no deletion date at all. **The Chairman closed it on
+25 September — 72 hours to collect, and then it goes.**
+
+The two clocks sit alongside each other rather than replacing one another,
+so a customer who does download still has seven days to fetch the file
+again if they lose it:
+
+| The job | When the files go |
+|---|---|
+| downloaded | seven days after the download |
+| remediated, not downloaded | 72 hours after it became collectable |
+| nobody has touched it | 72 hours after upload |
+| **a reviewer is working on it** | **no clock yet** |
+
+**That last row is the one worth defending**, and it is why this is not
+simply "72 hours from upload". The reasoning at the top of this section
+still holds: a review takes as long as it takes, and a clock from upload
+deletes the document in the middle of one. `reviewer` is set the first time
+a person decides anything, which makes it exactly the signal for *somebody
+is working on this*; the 72 hours start when there is something to collect.
+
+`dueAt` in `retention.ts` is the single place that answers "when do these
+files go", so the sweep, the job page and the report cannot disagree about
+it.
 
 `npm run sweep` deletes what is due. A command rather than a timer, because
 nothing here has a scheduler yet and a deletion policy that depends on a
@@ -1648,9 +1669,11 @@ an error report, ever.** `/store/` is gitignored as a whole folder, so no
 real agency PDF can become a "test fixture" with a commit hash.
 
 **Documents are deleted seven days after the customer downloads their
-package.** A deliverable that is downloaded once does not need a month at
-rest, and the seven days exist only so a customer who loses the file does not
-have to be re-reviewed from scratch.
+package, and 72 hours after it becomes collectable if they never do.** A
+deliverable that is downloaded once does not need a month at rest, and the
+seven days exist only so a customer who loses the file does not have to be
+re-reviewed from scratch. A document nobody has begun reviewing goes 72
+hours after upload; nothing is deleted while a reviewer is working on it.
 
 **The job record is scrubbed at delivery.** This is the part that is easy to
 miss: the record is *not* free of document content. The Word detector writes

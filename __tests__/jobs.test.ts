@@ -275,7 +275,10 @@ test('the sweep removes the document and keeps the record', async () => {
   const delivered = await markDelivered(made.id);
   assert.ok(delivered?.deleteAfter);
 
-  assert.deepEqual(await sweepExpired(Date.now()), [], 'nothing is due yet');
+  // About this job, not the whole store: the sweep is global, and since
+  // the collection clock landed an old fixture elsewhere in this file is
+  // legitimately past due.
+  assert.ok(!(await sweepExpired(Date.now())).includes(made.id), 'nothing is due yet for this job');
   assert.ok(await getJobFile(made.id, 'original'), 'and the file is still there');
 
   const after = Date.parse(delivered.deleteAfter) + 1;

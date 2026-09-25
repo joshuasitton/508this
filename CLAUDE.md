@@ -155,10 +155,14 @@ npm run sweep         # delete the documents whose retention window has run out
   open. The authentication matters as much as the secrecy: a job record
   decides who may open a document. No key means plaintext in development and
   a refusal in production; a blob written before a key existed still opens.
-- **The retention clock starts at download, not at upload**, and taking the
-  delivered file also scrubs the record. `RETENTION_DAYS = 7`. A document
-  nobody downloads has no deletion date — a named gap, not an oversight.
-  `npm run sweep` deletes what is due; **the record outlives the file.**
+- **`dueAt` in `retention.ts` is the only thing that decides when a job's
+  files go**, so the sweep, the job page and the report cannot disagree.
+  Downloaded → seven days from the download (`RETENTION_DAYS`). Remediated
+  and uncollected → 72 hours (`COLLECT_HOURS`). Untouched → 72 hours from
+  upload. **A reviewer working on it → no clock at all**, because a review
+  takes as long as it takes and a clock from upload deletes the document in
+  the middle of one. `npm run sweep` deletes what is due; **the record
+  outlives the file.**
 - **The detectors quote the document inside curly quotes, and that is
   load-bearing.** `scrubText` finds the customer's words by them. A detector
   that quotes with straight quotes puts a sentence where the scrub cannot
@@ -167,7 +171,8 @@ npm run sweep         # delete the documents whose retention window has run out
   Nothing about a document's contents goes into a log, an analytics event or
   an error report. The Chairman settled the rest on 21 September 2026
   (`docs/leadership-standup.md`), and these are the lines code must hold:
-  documents are deleted seven days after the customer downloads the package;
+  documents are deleted seven days after the customer downloads the package
+  and 72 hours after it becomes collectable if they never do (25 September);
   **the job record is scrubbed of its quotations at delivery**, because the
   Word detector puts the customer's own sentences in every finding and a
   record full of them is retention by another name; a single figure's image

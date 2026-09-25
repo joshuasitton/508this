@@ -8,6 +8,54 @@ for. Where an entry has since been overtaken, `docs/build-state.md` says so.
 
 ---
 
+## 2026-09-25 — retention, decided
+
+### What the Chairman said
+
+Give 72 hours to download and then delete. Asked how it meets the existing
+rule: alongside it, not replacing it. Asked about an assessment nobody
+remediates: the same 72 hours, from upload.
+
+### Done
+
+The gap `retention.ts` has named since the policy was written is closed. A
+document nobody downloads no longer lives forever.
+
+| The job | When the files go |
+|---|---|
+| downloaded | seven days after the download |
+| remediated, not collected | 72 hours |
+| nobody has touched it | 72 hours after upload |
+| a reviewer is working on it | no clock yet |
+
+### The one thing engineering decided, not the Chairman
+
+**That last row.** The instruction, read literally, would delete a document
+72 hours after upload whether or not a reviewer was part-way through
+deciding its findings — and that is the precise failure the 21 September
+reasoning was written to prevent, still at the top of the file: *a clock
+that started at upload deletes the file in the middle of the job.*
+
+So nothing is deleted while a reviewer has it. `reviewer` is set the first
+time a person decides anything, which makes it the signal; the 72 hours
+start when there is something to collect. **The Chairman should overrule
+this if he meant the harder line** — it is the difference between losing a
+fortnight's review work and not.
+
+### What the customer is told
+
+The page says it plainly and names the date: *"deleted on 28 September 2026,
+72 hours after you uploaded it, unless a review starts before then."* Once a
+reviewer is named it changes to *"stays here while it is being reviewed."*
+Both read on the running app rather than asserted.
+
+### Still with the Chairman
+
+The four prices. The first live drafted description. The deployment. And
+whether the reviewer exemption above is what he meant.
+
+---
+
 ## 2026-09-25 — flagging, which is not checking, and is worth having anyway
 
 ### What the Chairman said
