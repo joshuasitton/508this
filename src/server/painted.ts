@@ -22,6 +22,8 @@
  */
 
 import { contrastFindings, languageFindings, type PaintedRun, type TextBlock } from '@/domain/pdfPainted';
+import { sequenceFindings, type PageSequence, type PlacedBlock } from '@/domain/pdfSequence';
+import type { MarkedRef } from '@/domain/pdfDetect';
 import type { Finding } from '@/domain/findings';
 
 /**
@@ -58,9 +60,17 @@ export interface Painted {
  * because the inspector fell over is a worse outcome than a conformance
  * statement with two criteria still owed to a person.
  */
-export async function inspectPainted(pdf: Uint8Array, documentLanguage: string, markedLanguages: readonly string[]): Promise<Painted> {
+export interface Inspecting {
+  documentLanguage: string;
+  markedLanguages: readonly string[];
+  /** The tag tree's marked-content order, for 1.3.2. */
+  reading: readonly MarkedRef[];
+  tagged: boolean;
+}
+
+export async function inspectPainted(pdf: Uint8Array, about: Inspecting): Promise<Painted> {
   try {
-    return await withTimeout(read(pdf, documentLanguage, markedLanguages), TIMEOUT_MS);
+    return await withTimeout(read(pdf, about), TIMEOUT_MS);
   } catch {
     // Not inspected, and deliberately not described: whatever the error
     // carries, a moment ago it was carrying a customer's document.
@@ -68,7 +78,7 @@ export async function inspectPainted(pdf: Uint8Array, documentLanguage: string, 
   }
 }
 
-async function read(pdf: Uint8Array, documentLanguage: string, markedLanguages: readonly string[]): Promise<Painted> {
+async function read(pdf: Uint8Array, about: Inspecting): Promise<Painted> {
   const { createCanvas } = await import('@napi-rs/canvas');
   const lib = await import('pdfjs-dist/legacy/build/pdf.mjs');
 
@@ -83,6 +93,11 @@ async function read(pdf: Uint8Array, documentLanguage: string, markedLanguages: 
 
   const runs: PaintedRun[] = [];
   const blocks: TextBlock[] = [];
+  const sequences: PageSequence[] = [];
+
+  // Where each marked-content id sits in the tag tree's reading order.
+  const order = new Map<string, number>();
+  about.reading.forEach((ref, at) => order.set(`${ref.page}:${ref.mcid}`, at));
 
   try {
     const pages = Math.min(doc.numPages, MAX_PAGES);
@@ -108,20 +123,46 @@ async function read(pdf: Uint8Array, documentLanguage: string, markedLanguages: 
       }).promise;
 
       const pixels = context.getImageData(0, 0, width, height).data;
-      const content = await page.getTextContent();
+      // Marked content is asked for so that each run of text can be tied
+      // back to the tag tree; the markers carry no `str`, so everything
+      // below that reads text skips them as it always did.
+      const content = await page.getTextContent({ includeMarkedContent: true });
 
       const words: string[] = [];
+      const boxes = new Map<number, PlacedBlock>();
+      const open: Array<number | null> = [];
+
       for (const item of content.items) {
+        if ('type' in item && typeof item.type === 'string') {
+          if (item.type === 'endMarkedContent') open.pop();
+          else open.push(mcidOf((item as { id?: string | null }).id));
+          continue;
+        }
         if (!('str' in item) || !item.str.trim()) continue;
         words.push(item.str);
+
         const sample = sampleRun(item, viewport, pixels, width, height);
         if (sample) runs.push({ ...sample, page: number });
+
+        // The innermost marked content is the one the stream is in: a Span
+        // inside a P is tagged by the Span.
+        const mcid = [...open].reverse().find((id) => id !== null) ?? null;
+        if (mcid === null) continue;
+        const at = order.get(`${number}:${mcid}`);
+        if (at === undefined) continue;
+        place(boxes, mcid, at, item, viewport, width, height);
       }
+
       if (words.length) blocks.push({ page: number, text: words.join(' ') });
+      if (boxes.size) sequences.push({ page: number, width, blocks: [...boxes.values()] });
     }
 
     return {
-      findings: [...contrastFindings(runs), ...languageFindings(blocks, documentLanguage, markedLanguages)],
+      findings: [
+        ...contrastFindings(runs),
+        ...languageFindings(blocks, about.documentLanguage, about.markedLanguages),
+        ...sequenceFindings(sequences, about.tagged),
+      ],
       pages: Math.min(doc.numPages, MAX_PAGES),
     };
   } finally {
@@ -132,6 +173,55 @@ async function read(pdf: Uint8Array, documentLanguage: string, markedLanguages: 
 }
 
 type TextItem = { str: string; transform: number[]; width: number; height: number; fontName?: string };
+
+/** pdf.js names marked content `p<page object>R_mc<id>`; the id is the tail. */
+function mcidOf(id: string | null | undefined): number | null {
+  const found = /_mc(\d+)$/.exec(id ?? '');
+  return found ? Number(found[1]) : null;
+}
+
+/** Grow this marked content's box to hold one more run of text. */
+function place(
+  boxes: Map<number, PlacedBlock>,
+  mcid: number,
+  at: number,
+  item: TextItem,
+  viewport: { convertToViewportPoint(x: number, y: number): number[] },
+  width: number,
+  height: number,
+): void {
+  const box = deviceBox(item, viewport, width, height);
+  if (!box) return;
+  const existing = boxes.get(mcid);
+  if (!existing) {
+    boxes.set(mcid, { order: at, text: item.str, ...box });
+    return;
+  }
+  existing.text = `${existing.text} ${item.str}`;
+  existing.top = Math.min(existing.top, box.top);
+  existing.bottom = Math.max(existing.bottom, box.bottom);
+  existing.left = Math.min(existing.left, box.left);
+  existing.right = Math.max(existing.right, box.right);
+}
+
+function deviceBox(
+  item: TextItem,
+  viewport: { convertToViewportPoint(x: number, y: number): number[] },
+  width: number,
+  height: number,
+): { top: number; bottom: number; left: number; right: number } | null {
+  const [, , , scaleY, x, y] = item.transform;
+  const points = Math.abs(scaleY ?? 0);
+  if (!points) return null;
+  const [ax, ay] = viewport.convertToViewportPoint(x ?? 0, y ?? 0);
+  const [bx, by] = viewport.convertToViewportPoint((x ?? 0) + (item.width || 1), (y ?? 0) + points);
+  return {
+    left: Math.max(0, Math.min(ax ?? 0, bx ?? 0)),
+    right: Math.min(width, Math.max(ax ?? 0, bx ?? 0)),
+    top: Math.max(0, Math.min(ay ?? 0, by ?? 0)),
+    bottom: Math.min(height, Math.max(ay ?? 0, by ?? 0)),
+  };
+}
 
 /**
  * The colours in and around one run of text.

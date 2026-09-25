@@ -8,6 +8,58 @@ for. Where an entry has since been overtaken, `docs/build-state.md` says so.
 
 ---
 
+## 2026-09-25 — 1.3.2, and a PDF that costs what a Word file costs
+
+### What the Chairman said
+
+Do 1.3.2 next.
+
+### Done
+
+Meaningful Sequence is checked for a PDF. **A PDF now needs a person for
+four criteria, which is the same four a Word document needs.** The format
+penalty this service has carried since the coverage tables split is gone:
+1.3.3, 1.4.1, 1.4.5 and 2.4.6, either way.
+
+That is the third criterion the renderer paid for. The dependency was taken
+on 22 September to draw figures for the drafting feature; it has since made
+contrast, language of parts and reading order measurable, none of which was
+the argument for it.
+
+### The decision worth defending
+
+**A check that cries wolf is worse than no check.** The obvious build sorts
+blocks down the page and calls any difference a failure — and fails every
+correctly tagged two-column document in the process. The reviewer learns to
+click past the row, and then misses the real one, and we have made the
+product worse while reporting a higher automation rate.
+
+So it claims only an inversion no layout could justify, and hands a
+multi-column page to a person with the reason named. Superscripts, footnote
+markers and table cells tagged right to left all pass, deliberately, each
+with a test.
+
+Security and product both asked the same question: what stops this passing
+something it never checked? Two answers, both built. An untagged PDF has no
+reading order to be wrong, so it is a blocking finding rather than a pass.
+And a tagged document whose tags cannot be matched to the page is escalated
+rather than passed for want of evidence.
+
+### Commercial consequence
+
+The certifiable tier was costed against seven reviewer criteria for a PDF.
+It is four. **PDF and Word now cost the same to certify**, which was not
+true when the prices were drawn up and which removes the reason to price
+them apart.
+
+### Still with the Chairman
+
+The four prices, now against a materially cheaper document. What happens to
+a document nobody downloads. The first live drafted description, which has
+still never run. And the deployment.
+
+---
+
 ## 2026-09-25 — taking two criteria off the reviewer
 
 ### What the Chairman asked

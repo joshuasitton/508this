@@ -19,7 +19,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { detectDocx } from '@/domain/docx';
-import { detectPdf, readPdfFacts, type PdfFacts } from '@/domain/pdfDetect';
+import { detectPdf, readPdfFacts, readingOrder, type MarkedRef, type PdfFacts } from '@/domain/pdfDetect';
 import { triagePdf, type Tier } from '@/domain/triage';
 import { applyPdfDecisions, remediatePdf } from '@/domain/pdfRemediate';
 import type { PdfValue } from '@/domain/pdf';
@@ -57,12 +57,19 @@ function keyFor(id: string, name: string): string {
  * settled once, at intake, and stored on the record rather than recomputed
  * by whoever needs it next.
  */
-function detect(format: Format, bytes: Uint8Array): { findings: Finding[]; tier?: Tier; facts?: PdfFacts } {
+function detect(format: Format, bytes: Uint8Array): {
+  findings: Finding[];
+  tier?: Tier;
+  facts?: PdfFacts;
+  reading?: MarkedRef[];
+} {
   if (format !== 'pdf') return { findings: detectDocx(readDocxParts(bytes)) };
   const doc = readPdf(bytes);
   const findings = detectPdf(doc);
   const facts = readPdfFacts(doc);
-  return { findings, tier: triagePdf(facts, findings).tier, facts };
+  // The tag tree's marked-content order, read here so the document is
+  // parsed once: 1.3.2 compares it against where the page puts each block.
+  return { findings, tier: triagePdf(facts, findings).tier, facts, reading: readingOrder(doc) };
 }
 
 /**
@@ -74,10 +81,15 @@ function detect(format: Format, bytes: Uint8Array): { findings: Finding[]; tier?
  * path; a document whose ink could not be read is one where those two
  * criteria stay with the reviewer, which is where they were until today.
  */
-async function inspect(format: Format, bytes: Uint8Array, facts?: PdfFacts): Promise<Finding[]> {
+async function inspect(format: Format, bytes: Uint8Array, facts?: PdfFacts, reading: MarkedRef[] = []): Promise<Finding[]> {
   if (format !== 'pdf' || !facts) return [];
   const { inspectPainted } = await import('./painted');
-  const { findings } = await inspectPainted(bytes, facts.language || 'en', facts.markedLanguages);
+  const { findings } = await inspectPainted(bytes, {
+    documentLanguage: facts.language || 'en',
+    markedLanguages: facts.markedLanguages,
+    reading,
+    tagged: facts.tagged,
+  });
   return findings;
 }
 
@@ -94,8 +106,8 @@ export async function createJob(
 ): Promise<Job> {
   // Detect before writing anything, so a document the reader rejects is
   // never stored.
-  const { findings, tier, facts } = detect(format, bytes);
-  const painted = await inspect(format, bytes, facts);
+  const { findings, tier, facts, reading } = detect(format, bytes);
+  const painted = await inspect(format, bytes, facts, reading);
   const job: Job = {
     id: randomUUID(),
     createdAt: new Date().toISOString(),

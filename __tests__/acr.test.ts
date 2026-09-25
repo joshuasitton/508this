@@ -76,10 +76,10 @@ test('a confirmed, clean document is a complete statement', () => {
 
 test('a PDF is reported against the PDF coverage, not the Word one', () => {
   const acr = buildAcr(job({ filename: 'Infographic.pdf', format: 'pdf' }));
-  // Five, not seven: contrast and language of parts moved to checked when
-  // the renderer made them measurable. The four that remain are the ones
-  // that need a person's judgement rather than a measurement.
-  assert.equal(acr.pending, 5);
+  // Four, not seven: contrast, language of parts and meaningful sequence
+  // all moved to checked once the page could be drawn. What remains is
+  // what needs a person's judgement rather than a measurement.
+  assert.equal(acr.pending, 4);
   assert.ok(acr.facts.some((f) => f.value === 'Non-web document (PDF)'));
 
   const waiting = acr.sections
@@ -87,7 +87,7 @@ test('a PDF is reported against the PDF coverage, not the Word one', () => {
     .filter((r) => r.status === 'Needs Review')
     .map((r) => r.criterion)
     .sort();
-  assert.deepEqual(waiting, ['1.3.2', '1.3.3', '1.4.1', '1.4.5', '2.4.6']);
+  assert.deepEqual(waiting, ['1.3.3', '1.4.1', '1.4.5', '2.4.6']);
 });
 
 /**
@@ -97,9 +97,9 @@ test('a PDF is reported against the PDF coverage, not the Word one', () => {
  * these were "not measured by machine" — which was true when it was
  * written and became false on 22 September.
  */
-test('a PDF has contrast and language of parts checked, like a Word document', () => {
+test('a PDF has contrast, language of parts and sequence checked', () => {
   const rows = buildAcr(job({ filename: 'Infographic.pdf', format: 'pdf' })).sections.flatMap((s) => s.rows);
-  for (const criterion of ['1.4.3', '3.1.2']) {
+  for (const criterion of ['1.4.3', '3.1.2', '1.3.2']) {
     const row = rows.find((r) => r.criterion === criterion)!;
     assert.equal(row.status, 'Supports', `${criterion} should not wait on a person`);
     assert.ok(!/content-stream operators/.test(row.remarks), 'the stale reason is gone');
