@@ -228,8 +228,9 @@ export const PDF_COVERAGE: Record<string, CoverageInfo> = {
   '1.4.1': { coverage: 'reviewer', remark: 'A reviewer confirms colour is never the only way information is conveyed.' },
   '1.4.2': { coverage: 'static', remark: PDF_MEDIA },
   '1.4.3': {
-    coverage: 'reviewer',
-    remark: 'A reviewer confirms the contrast of text against its background. A PDF paints text with content-stream operators, so this is not measured by machine.',
+    coverage: 'checked',
+    remark:
+      'Every run of text is measured against the colour painted behind it, off the rendered page. Text on a photograph, a gradient or a coloured edge is not measured but reported, for a person to judge.',
   },
   '1.4.4': { coverage: 'static', remark: 'The PDF has a real text layer, which reflows and scales in a reader.' },
   '1.4.5': { coverage: 'reviewer', remark: 'A reviewer confirms no image is used in place of text.' },
@@ -246,7 +247,10 @@ export const PDF_COVERAGE: Record<string, CoverageInfo> = {
   '2.4.6': { coverage: 'reviewer', remark: 'A reviewer confirms headings describe their sections.' },
   '2.4.7': { coverage: 'static', remark: PDF_STATIC_INTERACTIVE },
   '3.1.1': { coverage: 'checked', remark: 'The PDF declares its language.' },
-  '3.1.2': { coverage: 'reviewer', remark: 'A reviewer confirms passages in another language are marked.' },
+  '3.1.2': {
+    coverage: 'checked',
+    remark: 'Each page is read for passages in another language, and checked against the languages the document marks.',
+  },
   '3.2.1': { coverage: 'static', remark: PDF_STATIC_INTERACTIVE },
   '3.2.2': { coverage: 'static', remark: PDF_FORMS },
   '3.2.3': { coverage: 'static', remark: 'Not required for documents.' },

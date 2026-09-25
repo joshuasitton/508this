@@ -183,6 +183,12 @@ npm run sweep         # delete the documents whose retention window has run out
   a CUI document in production merges before that exists. It exists:
   `src/domain/account.ts`, `session.ts`, `audit.ts`, `viewer.ts` and their
   server modules.
+- **A PDF answers 1.4.3 and 3.1.2 by measurement, not by a reviewer**, and
+  the measuring needs the page drawn — `src/domain/pdfPainted.ts` judges,
+  `src/server/painted.ts` samples. **Uncertainty is a finding, never a
+  silent pass**: a run that is not on one solid colour is reported as
+  unmeasurable, so "checked" still means checked. Nothing leaves the
+  machine for either, which is why both run on a document marked CUI.
 - **An audit record has no free-text field, and `auditEvent` throws on a
   subject that is not a UUID.** 800-171 wants records sufficient to trace a
   user's actions; this file's oldest rule says no document content reaches a

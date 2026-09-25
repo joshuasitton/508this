@@ -4,6 +4,47 @@ The running project-level record. Sections are dated and kept in order rather
 than rewritten, so the reasoning stays readable. Decisions live in
 `docs/leadership-standup.md`; this file says where the code stands.
 
+## 2026-09-25 — two criteria a PDF could not answer, and now can
+
+1.4.3 Contrast and 3.1.2 Language of Parts were **checked** on the Word
+path and **reviewer** on the PDF one. The difference was never the
+standard: a .docx says `<w:color w:val="767171"/>` and a PDF paints. The
+renderer taken on 22 September made the second measurable, and the
+arithmetic was already here — `contrast.ts` is pure and knows nothing about
+formats. 330 tests, green with `node_modules` moved aside.
+
+A PDF now waits on **five** reviewer criteria instead of seven.
+
+**A claim we were shipping was false.** The PDF remark for 1.4.3 read *"A
+PDF paints text with content-stream operators, so this is not measured by
+machine."* The premise is true and the conclusion stopped being true when
+the renderer landed. It was inside customers' conformance statements.
+
+**Uncertainty escalates; it never silently passes.** A conformance
+statement is worth something because "checked" means checked, and a
+heuristic that quietly says Supports for the hard cases launders a guess
+into a claim the customer sells onward. A run that is not painted on one
+solid colour becomes a finding saying so, and the reviewer decides it. The
+criterion is still fairly called checked: every run was either measured or
+handed to a person, and delivery waits on the person either way.
+
+**Nothing leaves the machine.** Contrast is arithmetic on pixels this
+process drew and discards; language detection is local n-grams. No vendor
+sees any of it, so both run on documents marked CUI — where the drafting of
+alternative text is refused outright.
+
+**Two bugs found by running it on real files, not by reasoning about it.**
+The catalogue's `/Lang` is a locale (`en-US`) and the detector answers in
+primary subtags (`en`), so every English paragraph in an English document
+looked foreign. And the first thing it reported on a real infographic was
+a grey full stop — true, useless, and the sort of row that teaches a
+reviewer to skim the queue. Text now needs two letters or digits before its
+contrast is judged. Both are pinned by tests.
+
+Verified live through the running app: 3.1.2 reads **Supports**, 1.4.3
+reads **Partially Supports — 1 open issue (page 1)**, which is the text
+painted over the hospital illustration being escalated rather than guessed.
+
 ## 2026-09-23 — AWS, and the addressing branch that had no test
 
 The Chairman chose AWS over R2, on the CUI question rather than on price.

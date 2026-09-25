@@ -19,7 +19,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { detectDocx } from '@/domain/docx';
-import { detectPdf, readPdfFacts } from '@/domain/pdfDetect';
+import { detectPdf, readPdfFacts, type PdfFacts } from '@/domain/pdfDetect';
 import { triagePdf, type Tier } from '@/domain/triage';
 import { applyPdfDecisions, remediatePdf } from '@/domain/pdfRemediate';
 import type { PdfValue } from '@/domain/pdf';
@@ -57,11 +57,28 @@ function keyFor(id: string, name: string): string {
  * settled once, at intake, and stored on the record rather than recomputed
  * by whoever needs it next.
  */
-function detect(format: Format, bytes: Uint8Array): { findings: Finding[]; tier?: Tier } {
+function detect(format: Format, bytes: Uint8Array): { findings: Finding[]; tier?: Tier; facts?: PdfFacts } {
   if (format !== 'pdf') return { findings: detectDocx(readDocxParts(bytes)) };
   const doc = readPdf(bytes);
   const findings = detectPdf(doc);
-  return { findings, tier: triagePdf(readPdfFacts(doc), findings).tier };
+  const facts = readPdfFacts(doc);
+  return { findings, tier: triagePdf(facts, findings).tier, facts };
+}
+
+/**
+ * 1.4.3 and 3.1.2 for a PDF, which need the page drawn before they can be
+ * answered at all — see `src/domain/pdfPainted.ts`.
+ *
+ * Reached through `await import` for the same reason the renderer is:
+ * `npm test` runs with nothing installed. It never throws into the upload
+ * path; a document whose ink could not be read is one where those two
+ * criteria stay with the reviewer, which is where they were until today.
+ */
+async function inspect(format: Format, bytes: Uint8Array, facts?: PdfFacts): Promise<Finding[]> {
+  if (format !== 'pdf' || !facts) return [];
+  const { inspectPainted } = await import('./painted');
+  const { findings } = await inspectPainted(bytes, facts.language || 'en', facts.markedLanguages);
+  return findings;
 }
 
 /**
@@ -77,14 +94,15 @@ export async function createJob(
 ): Promise<Job> {
   // Detect before writing anything, so a document the reader rejects is
   // never stored.
-  const { findings, tier } = detect(format, bytes);
+  const { findings, tier, facts } = detect(format, bytes);
+  const painted = await inspect(format, bytes, facts);
   const job: Job = {
     id: randomUUID(),
     createdAt: new Date().toISOString(),
     filename,
     format,
     status: 'detected',
-    findings,
+    findings: [...findings, ...painted],
   };
   if (tier) job.tier = tier;
   if (options.cui) job.cui = true;

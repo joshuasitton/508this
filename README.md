@@ -333,17 +333,54 @@ on a document with no headings.
 
 The report's honesty line had to grow. `WORD_COVERAGE` said what a Word file
 can be checked for; a PDF is not the same document. A `.docx` names its text
-colour in an attribute, so contrast is checked. A PDF paints text with
-operators in a content stream, and short of interpreting the whole graphics
-state nothing here can measure it, so for a PDF contrast is a reviewer's job
-and the statement says so in the remark.
+colour in an attribute; a PDF paints with operators in a content stream and
+the background is whatever was drawn underneath.
 
-Seven criteria need a person for a PDF against four for a Word file. That is
-the honest count, and it is the whole reason `ContentKind` is now `'web' |
+**Five criteria need a person for a PDF against four for a Word file.** That
+is the honest count, and it is the whole reason `ContentKind` is `'web' |
 'docx' | 'pdf'` rather than `'web' | 'document'`: the format decides what the
 service may claim. Reporting a PDF against the Word coverage table would
-claim seven checks that never ran, which is the same lie as saying "Supports"
-on nothing.
+claim checks that never ran, which is the same lie as saying "Supports" on
+nothing.
+
+#### It used to be seven, and the difference is the renderer
+
+Contrast and Language of Parts were reviewer criteria for a PDF because a
+PDF paints. That reasoning produced a remark which said contrast *"is not
+measured by machine"* — true when it was written, and false from the moment
+the renderer landed on 22 September. It was shipping inside customers'
+statements, which is the worst place for a wrong claim about your own
+capability to live.
+
+**If you can draw the page, the colour of ink on paper is a question about
+pixels.** `src/server/painted.ts` renders each page, takes every run of text
+from its geometry, and reads the commonest colour in the run's box as the
+paper and the colour furthest from it in luminance as the ink. The
+arithmetic was already here: `contrast.ts` is pure and has never known what
+a Word file is. Language of Parts needed even less — `language.ts` detects
+locally, so it only wanted the text.
+
+**Uncertainty is a finding, never a silent pass.** Some text genuinely
+cannot be measured: over a photograph, over a gradient, across a coloured
+edge. The version of this feature that passes those quietly reports a better
+automation rate and is worth less than nothing, because the statement's
+value is that "checked" means checked. Those runs become a finding that says
+what could not be measured and why, and the reviewer decides them. The
+criterion is still fairly called checked — every run was either measured or
+handed to a person, and delivery waits on the person either way.
+
+**Neither check sends anything anywhere.** Contrast is arithmetic on pixels
+this process drew and then discarded; language detection is n-grams in the
+domain layer. No vendor is involved, so both run on a document marked CUI —
+the first capability here that a CUI customer gets in full.
+
+Two things this got wrong before it got them right, both caught by running
+it on real documents rather than by reasoning about the code: a catalogue's
+`/Lang` is a locale and the detector answers in languages, so every English
+paragraph in an `en-US` document looked foreign; and the first thing it
+reported on a real infographic was a grey full stop. True, useless, and
+exactly the row that teaches a reviewer to skim the queue. Text now needs
+two letters or digits before its contrast is judged.
 
 ### Triage: what kind of PDF is it?
 
