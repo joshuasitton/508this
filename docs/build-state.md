@@ -4,6 +4,35 @@ The running project-level record. Sections are dated and kept in order rather
 than rewritten, so the reasoning stays readable. Decisions live in
 `docs/leadership-standup.md`; this file says where the code stands.
 
+## 2026-09-25 — the brand pass produced no code, deliberately
+
+A leadership round-table on brand identity is logged in
+`docs/leadership-standup.md`. **No code changed.** The pass produced three
+costed directions and a recommendation; adopting one is the Chairman's call
+and is a one-commit change for the palette, a little more for a mark.
+
+Two things were measured rather than argued, and both are reusable:
+
+- **The status palette has claimed three hues** — `--fail` 356°, `--wait` 36°,
+  `--pass` 147°. A brand accent near any of them reads as a verdict. The
+  available band is about 195°–270°. This killed a teal candidate at 185°, 38°
+  from pass-green, on evidence rather than preference.
+- **Contrast cannot break the tie.** Four candidate accents were run through
+  `contrast.ts` against all three surfaces in both schemes plus the button
+  label; all four clear 4.5:1, the worst pair at 5.78:1. The decision has to be
+  made on meaning.
+
+**A correction.** The entry logged earlier today said brand should be settled
+"before the App Store listing." There is no App Store listing — 508This is a
+web service on Vercel, and that sentence was carried over from another product.
+The standup entry for the earlier round-table is left as written, per the
+convention in that file; the corrected deadline is the first paid conformance
+statement, because a mark embedded in a delivered .docx cannot be recalled from
+a customer's filing system.
+
+The gap this exposed and did not close: there is still no `public/` directory,
+so the browser tab has shown a blank page icon since founding.
+
 ## 2026-09-25 — the interface
 
 The Chairman asked for the UI to be more engaging and modern. It is, and the
