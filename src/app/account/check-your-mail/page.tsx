@@ -24,7 +24,7 @@ export default function CheckYourMail() {
   const via = transport();
 
   return (
-    <>
+    <div className={styles.page}>
       <h1>Check your mail</h1>
       <p className={styles.lede}>
         If that address can have an account, there is now a message on the way to it.
@@ -51,6 +51,6 @@ export default function CheckYourMail() {
         <Link href="/account/forgot">ask for one here</Link>. If you did not, you can{' '}
         <Link href="/account/sign-in">sign in</Link> once the account is set up.
       </p>
-    </>
+    </div>
   );
 }

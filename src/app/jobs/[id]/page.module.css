@@ -1,157 +1,207 @@
+.head {
+  margin-bottom: var(--s-5);
+}
+
 .kicker {
   color: var(--muted);
-  font-size: 0.9rem;
-  margin: 0;
+  font-size: var(--step--1);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin: 0 0 var(--s-2);
 }
 
 .title {
-  font-size: clamp(1.5rem, 3vw, 2.25rem);
-  line-height: 1.2;
-  margin: 0 0 0.5rem;
+  margin: 0 0 var(--s-2);
   overflow-wrap: anywhere;
 }
 
 .status {
   color: var(--muted);
-  margin: 0 0 2rem;
+  margin: 0;
 }
 
+/* The reading column. Its sections are separated by space rather than rules;
+   the cards already have edges, and a rule between two bordered things is a
+   third line nobody asked for. */
+.column {
+  display: grid;
+  /* `minmax(0, 1fr)` and not the implicit `auto`: an auto track sizes to its
+     widest child, so one table wider than a phone dragged every section on
+     the page out with it. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--s-6);
+  align-content: start;
+}
+
+.sectionTitle {
+  font-size: var(--step-2);
+  margin: 0 0 var(--s-3);
+}
+
+/* ---- The verdict ------------------------------------------------------- */
+
+/*
+ * The verdict is the page. It gets the one card with a coloured edge and the
+ * only set of numbers set large, because everything below it is evidence for
+ * this and a customer who reads nothing else should still leave knowing it.
+ */
 .verdict,
 .verdictGood {
-  border-left: 5px solid var(--foreground);
-  padding: 1rem 1.25rem;
-  margin: 0 0 3rem;
-  max-width: 70ch;
+  padding: var(--s-5);
+  border-top: 4px solid var(--fail);
+  box-shadow: var(--shadow-lift);
 }
 
 .verdictGood {
-  border-left-color: var(--accent);
+  border-top-color: var(--pass);
 }
 
 .verdictTitle {
-  font-size: 1.5rem;
-  margin: 0 0 0.5rem;
+  font-size: var(--step-3);
+  margin: var(--s-3) 0 var(--s-2);
 }
 
 .verdictDetail {
   margin: 0;
+  max-width: 60ch;
+  color: var(--muted);
 }
 
-.actions {
-  margin: 0 0 3rem;
-  max-width: 70ch;
-}
-
-.actionsTitle {
-  font-size: 1.25rem;
-  margin: 0 0 0.75rem;
-}
-
-.actionForm {
+.verdictStats {
   display: grid;
-  gap: 0.75rem;
-  justify-items: start;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: var(--s-4);
+  margin: var(--s-5) 0 0;
+  padding-top: var(--s-4);
+  border-top: 1px solid var(--rule);
 }
 
-.button {
-  display: inline-block;
-  min-height: 44px;
-  padding: 0.6rem 1.25rem;
-  font: inherit;
+.verdictStats > div {
+  display: grid;
+  gap: var(--s-1);
+}
+
+/* ---- Price ------------------------------------------------------------- */
+
+/*
+ * The price and the sentence saying what it buys are one block on purpose.
+ * `src/domain/pricing.ts` refuses to hand back a number without its promise,
+ * and a layout that put the numbers in one column and the caveats somewhere
+ * below would undo that in a stylesheet.
+ */
+.promise {
+  margin: 0 0 var(--s-4);
+  max-width: var(--prose);
+}
+
+.offerList {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--s-4);
+  display: grid;
+  gap: var(--s-3);
+}
+
+.offer,
+.offerOut {
+  padding: var(--s-4) var(--s-5);
+  border-left: 4px solid var(--accent);
+}
+
+/*
+ * An offer the service will not sell is marked at its edge and not in its
+ * prose. The sentence explaining why is the most honest thing on the page,
+ * and greying it out would make the one paragraph a customer most needs to
+ * read look like the one they can skip.
+ */
+.offerOut {
+  border-left-color: var(--off);
+}
+
+.offerOut .price {
+  color: var(--muted);
+  font-weight: 400;
+  font-size: var(--step-0);
+}
+
+.offerTitle {
+  font-size: var(--step-1);
+  margin: 0 0 var(--s-2);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-3);
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.price {
+  font-family: var(--font-serif);
+  font-size: var(--step-2);
+  font-variant-numeric: tabular-nums;
   font-weight: 600;
-  color: var(--background);
-  background: var(--accent);
-  border: 2px solid var(--accent);
-  border-radius: 4px;
-  cursor: pointer;
-  text-decoration: none;
 }
 
-.button:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.actionNote {
+.offerBody {
   margin: 0;
   color: var(--muted);
 }
 
-.downloads {
-  list-style: none;
-  padding: 0;
-  margin: 0 0 1rem;
-  display: grid;
-  gap: 0.75rem;
+.caveat {
+  margin: var(--s-3) 0 0;
+  font-weight: 600;
 }
 
-.changes {
-  padding-left: 1.25rem;
-  margin: 0.5rem 0 0;
-}
-
-.changes li {
-  margin-bottom: 0.4rem;
-}
+/* ---- What we found ----------------------------------------------------- */
 
 .group {
-  padding: 1.25rem 0 1.5rem;
-  border-top: 1px solid var(--rule);
-  max-width: 80ch;
+  padding: var(--s-5);
+  margin-bottom: var(--s-4);
+}
+
+.groupHead {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2) var(--s-4);
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: var(--s-2);
 }
 
 .groupTitle {
-  font-size: 1.25rem;
-  margin: 0 0 0.15rem;
-}
-
-.count {
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: var(--muted);
-  margin: 0 0 0.75rem;
+  font-size: var(--step-2);
+  margin: 0;
 }
 
 .why {
   color: var(--muted);
-  margin: 0 0 1rem;
+  margin: 0 0 var(--s-4);
+  max-width: var(--prose);
 }
 
 .places {
   list-style: none;
   padding: 0;
-  margin: 0 0 1rem;
+  margin: 0 0 var(--s-4);
 }
 
 .place,
 .placeFixed {
   display: grid;
-  grid-template-columns: 5.5rem 1fr;
-  gap: 0.5rem;
-  padding: 0.6rem 0;
+  grid-template-columns: 7rem 1fr;
+  gap: var(--s-3);
+  padding: var(--s-3) 0;
   border-top: 1px solid var(--rule);
+  align-items: start;
 }
 
-.placeFixed {
+.placeFixed .placeBody {
   color: var(--muted);
-}
-
-.state {
-  font-size: 0.8rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  border: 1px solid currentColor;
-  border-radius: 3px;
-  padding: 0.1rem 0.4rem;
-  align-self: start;
-  justify-self: start;
-  margin-top: 0.15rem;
 }
 
 .placeBody {
   display: grid;
-  gap: 0.15rem;
+  gap: var(--s-1);
 }
 
 .description {
@@ -160,29 +210,36 @@
 
 .fix {
   margin: 0;
-  padding: 0.75rem 1rem;
-  border-left: 3px solid var(--accent);
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-sm);
+  background: var(--sunken);
 }
+
+/* ---- Criteria ---------------------------------------------------------- */
 
 .note,
 .footnote {
   color: var(--muted);
-  max-width: 70ch;
+  max-width: var(--prose);
 }
 
 .note {
-  margin: 0 0 1rem;
+  margin: 0 0 var(--s-4);
 }
 
 .footnote {
-  font-size: 0.9rem;
-  margin: 1.5rem 0 3rem;
+  font-size: var(--step--1);
+  margin: var(--s-4) 0 0;
+}
+
+.tableWrap {
+  overflow-x: auto;
+  margin-bottom: var(--s-4);
 }
 
 .table {
   width: 100%;
   border-collapse: collapse;
-  margin-bottom: 1.5rem;
 }
 
 .table th,
@@ -196,7 +253,10 @@
 .table thead th {
   color: var(--muted);
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: var(--step--1);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  border-bottom-color: var(--edge);
 }
 
 .table tbody th {
@@ -208,17 +268,31 @@
   white-space: nowrap;
 }
 
+.details {
+  border-radius: var(--r);
+  margin-bottom: var(--s-3);
+  overflow: hidden;
+}
+
 .details summary {
   cursor: pointer;
   font-weight: 600;
-  padding: 0.5rem 0;
+  padding: var(--s-3) var(--s-4);
+}
+
+.details summary:hover {
+  background: var(--sunken);
+}
+
+.details > *:not(summary) {
+  padding: 0 var(--s-4) var(--s-4);
 }
 
 .metList {
   columns: 2;
-  column-gap: 2rem;
+  column-gap: var(--s-6);
+  margin: 0;
   padding-left: 1.25rem;
-  margin: 0.5rem 0 0;
 }
 
 .metList li {
@@ -226,24 +300,103 @@
   padding: 0.15rem 0;
 }
 
+.changes {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.changes li {
+  margin-bottom: var(--s-2);
+}
+
 .muted {
   color: var(--muted);
 }
 
 .next {
-  padding-left: 1.5rem;
-  max-width: 70ch;
+  padding-left: 1.25rem;
+  max-width: var(--prose);
+  margin: 0;
 }
 
 .next li {
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--s-2);
+}
+
+/* ---- The rail ---------------------------------------------------------- */
+
+.railCard {
+  padding: var(--s-5);
+}
+
+.railTitle {
+  font-size: var(--step-1);
+  font-family: var(--font-sans);
+  font-weight: 600;
+  letter-spacing: 0;
+  margin: 0 0 var(--s-3);
+}
+
+.actionForm {
+  display: grid;
+  gap: var(--s-3);
+}
+
+.actionForm :global(.btn) {
+  width: 100%;
+}
+
+.actionNote {
+  margin: 0 0 var(--s-3);
+  color: var(--muted);
+  font-size: var(--step--1);
+}
+
+.actionNote:last-child {
+  margin-bottom: 0;
+}
+
+/*
+ * Something the customer has to read before they act on it. It is tinted
+ * rather than bolded alone, and it keeps the word "starts the countdown" in
+ * the sentence — the tint is a second signal, never the only one.
+ */
+.warn {
+  margin: 0 0 var(--s-3);
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-sm);
+  border-left: 4px solid var(--wait);
+  background: var(--wait-tint);
+  color: var(--wait);
+  font-size: var(--step--1);
+}
+
+.downloads {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: var(--s-4);
+}
+
+.downloads li {
+  display: grid;
+  gap: var(--s-1);
+}
+
+.downloads :global(.btn) {
+  width: 100%;
+}
+
+.downloads .muted {
+  font-size: var(--step--1);
 }
 
 @media (max-width: 40rem) {
   .place,
   .placeFixed {
     grid-template-columns: 1fr;
-    gap: 0.25rem;
+    gap: var(--s-1);
   }
 
   .metList {
@@ -258,75 +411,6 @@
 
   .table th,
   .table td {
-    padding-right: 0.5rem;
+    padding-right: var(--s-2);
   }
-}
-
-/*
- * The price and the sentence saying what it buys are one block on purpose.
- * `src/domain/pricing.ts` refuses to hand back a number without its promise,
- * and a layout that put the numbers in one column and the caveats somewhere
- * below would undo that in a stylesheet.
- */
-.offers {
-  margin: 0 0 3rem;
-  max-width: 70ch;
-}
-
-.promise {
-  margin: 0 0 1.25rem;
-}
-
-.offerList {
-  list-style: none;
-  padding: 0;
-  margin: 0 0 1rem;
-  display: grid;
-  gap: 1rem;
-}
-
-.offer,
-.offerOut {
-  border: 1px solid var(--rule);
-  border-left-width: 5px;
-  padding: 0.9rem 1.1rem;
-}
-
-/*
- * An offer the service will not sell is marked at its edge and not in its
- * prose. The sentence explaining why is the most honest thing on the page,
- * and greying it out would make the one paragraph a customer most needs to
- * read look like the one they can skip.
- */
-.offerOut {
-  border-left-color: var(--muted);
-}
-
-.offerOut .price {
-  color: var(--muted);
-  font-weight: 400;
-}
-
-.offerTitle {
-  font-size: 1.05rem;
-  margin: 0 0 0.4rem;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  align-items: baseline;
-  justify-content: space-between;
-}
-
-.price {
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-}
-
-.offerBody {
-  margin: 0;
-}
-
-.caveat {
-  margin: 0.6rem 0 0;
-  font-weight: 600;
 }

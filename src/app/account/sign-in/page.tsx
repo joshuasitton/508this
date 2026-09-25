@@ -27,7 +27,7 @@ export default async function SignIn({
   const message = describeProblem(problem);
 
   return (
-    <>
+    <div className={styles.page}>
       <h1>Sign in</h1>
       <p className={styles.lede}>
         An account is what puts a name on a conformance statement, and what a document marked Controlled
@@ -78,6 +78,6 @@ export default async function SignIn({
       <p className={styles.note}>
         <Link href="/account/forgot">Forgotten your passphrase?</Link>
       </p>
-    </>
+    </div>
   );
 }

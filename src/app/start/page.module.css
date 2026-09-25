@@ -1,21 +1,38 @@
 .lede {
   color: var(--muted);
-  max-width: 60ch;
-  margin: 0 0 1.5rem;
+  font-size: var(--step-1);
+  max-width: 52ch;
+  margin: var(--s-3) 0 var(--s-5);
 }
 
+/*
+ * A refusal is not a decoration. It gets the fail ink and the tint behind it,
+ * so it cannot be mistaken for the hint text it sits above — and it keeps the
+ * heavy left edge, because the colour is never allowed to be the only thing
+ * saying this one is different.
+ */
 .problem {
-  border-left: 4px solid var(--accent);
-  padding: 0.75rem 1rem;
-  margin: 0 0 1.5rem;
-  max-width: 60ch;
+  border: 1px solid color-mix(in srgb, var(--fail) 35%, transparent);
+  border-left: 5px solid var(--fail);
+  border-radius: var(--r-sm);
+  background: var(--fail-tint);
+  color: var(--fail);
+  font-weight: 500;
+  padding: var(--s-3) var(--s-4);
+  margin: 0 0 var(--s-5);
+  max-width: var(--prose);
 }
 
 .form {
-  display: grid;
-  gap: 0.5rem;
   max-width: 40rem;
-  margin-bottom: 2rem;
+  margin-bottom: var(--s-5);
+  overflow: hidden;
+}
+
+.formBody {
+  display: grid;
+  gap: var(--s-2);
+  padding: var(--s-5);
 }
 
 .label {
@@ -24,54 +41,97 @@
 
 .hint {
   color: var(--muted);
-  font-size: 0.9rem;
-  margin: 0;
+  font-size: var(--step--1);
+  margin: 0 0 var(--s-1);
 }
 
+/*
+ * A file input cannot be restyled far without replacing it, and replacing it
+ * costs the keyboard and screen-reader behaviour the browser gives away. So
+ * it keeps its own button and gets a well to sit in.
+ */
 .file {
-  padding: 0.75rem;
-  border: 1px solid var(--rule);
-  border-radius: 4px;
-  background: var(--background);
+  padding: var(--s-3);
+  border: 1px dashed var(--edge);
+  border-radius: var(--r-sm);
+  background: var(--sunken);
   color: var(--foreground);
   min-height: 44px;
 }
 
-.button {
-  justify-self: start;
-  margin-top: 0.5rem;
-  min-height: 44px;
-  padding: 0.6rem 1.25rem;
-  font: inherit;
-  font-weight: 600;
-  color: var(--background);
-  background: var(--accent);
-  border: 2px solid var(--accent);
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.note {
-  color: var(--muted);
-  font-size: 0.9rem;
-  max-width: 60ch;
-}
-
 .declare {
-  margin: 1.25rem 0 0;
-  max-width: 60ch;
+  margin-top: var(--s-4);
+  padding: var(--s-4);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-sm);
+  background: var(--sunken);
 }
 
-.declare label {
+.declareLabel {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--s-2);
   align-items: baseline;
-  font-weight: 500;
+  font-weight: 600;
+}
+
+.declareLabel input {
+  width: 1.05rem;
+  height: 1.05rem;
+  accent-color: var(--accent);
 }
 
 .declareNote {
   display: block;
-  margin-top: 0.4rem;
+  margin-top: var(--s-2);
   color: var(--muted);
-  font-size: 0.9rem;
+  font-size: var(--step--1);
+}
+
+/* The action bar is a band rather than a loose button, so the form has an
+   obvious bottom and the primary action an obvious home. */
+.formFoot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-3) var(--s-4);
+  padding: var(--s-4) var(--s-5);
+  border-top: 1px solid var(--rule);
+  background: var(--sunken);
+}
+
+.formFootNote {
+  color: var(--muted);
+  font-size: var(--step--1);
+}
+
+.handling {
+  padding: var(--s-5);
+}
+
+.handlingTitle {
+  margin: 0 0 var(--s-3);
+  font-size: var(--step-1);
+  font-family: var(--font-sans);
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.handlingList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: var(--s-3);
+  font-size: var(--step--1);
+  color: var(--muted);
+}
+
+.handlingList li {
+  padding-left: var(--s-4);
+  border-left: 2px solid var(--rule);
+}
+
+.handlingList strong {
+  color: var(--foreground);
+  font-weight: 600;
 }

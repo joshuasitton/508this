@@ -19,7 +19,7 @@ export const metadata: Metadata = { title: 'Not found' };
  */
 export default function NotFound() {
   return (
-    <>
+    <div className="prose">
       <h1>Not found</h1>
       <p>
         There is nothing here for you. Either this page does not exist, or it belongs to a document that is not
@@ -34,8 +34,10 @@ export default function NotFound() {
         <Link href="/account/sign-in">sign in again</Link>.
       </p>
       <p>
-        <Link href="/start">Check a document</Link>
+        <Link href="/start" className="btn btn-primary">
+          Check a document
+        </Link>
       </p>
-    </>
+    </div>
   );
 }

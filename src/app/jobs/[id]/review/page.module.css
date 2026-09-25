@@ -1,38 +1,53 @@
+/*
+ * The reviewer's workbench. It is the screen a person works down for twenty
+ * minutes at a time, so it is built as a stack of cards rather than a stream
+ * of hairline-separated blocks: a finding and the box you answer it in should
+ * obviously belong together, and the boundary between one finding and the
+ * next should be unmissable when you look up from typing.
+ */
+/* Not a kicker in the typographic sense — it holds the link back to the
+   report, and setting a link in small caps makes it look like a label. */
 .kicker {
-  margin: 0 0 1rem;
+  font-size: var(--step--1);
+  margin: 0 0 var(--s-3);
 }
 
 .title {
-  font-size: clamp(1.5rem, 3vw, 2.25rem);
-  margin: 0 0 0.5rem;
+  font-size: var(--step-3);
+  margin: 0 0 var(--s-2);
   overflow-wrap: anywhere;
 }
 
 .status {
   color: var(--muted);
-  margin: 0 0 1.5rem;
+  margin: 0 0 var(--s-5);
 }
 
 .problem {
-  border-left: 4px solid var(--accent);
-  padding: 0.75rem 1rem;
-  margin: 0 0 1.5rem;
-  max-width: 60ch;
+  border: 1px solid color-mix(in srgb, var(--fail) 35%, transparent);
+  border-left: 5px solid var(--fail);
+  border-radius: var(--r-sm);
+  background: var(--fail-tint);
+  color: var(--fail);
+  font-weight: 500;
+  padding: var(--s-3) var(--s-4);
+  margin: 0 0 var(--s-5);
+  max-width: var(--prose);
 }
 
 .note {
   color: var(--muted);
-  max-width: 70ch;
-  margin: 0 0 1rem;
+  max-width: var(--prose);
+  margin: 0 0 var(--s-4);
 }
 
 .h2 {
-  font-size: 1.35rem;
-  margin: 2rem 0 0.75rem;
+  font-size: var(--step-2);
+  margin: var(--s-6) 0 var(--s-3);
 }
 
 .who {
-  max-width: 70ch;
+  max-width: var(--prose);
 }
 
 /*
@@ -50,129 +65,125 @@
 }
 
 .item {
-  border-top: 1px solid var(--rule);
-  padding: 1.25rem 0 1.5rem;
-  max-width: 80ch;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--r);
+  box-shadow: var(--shadow);
+  padding: var(--s-5);
+  margin-bottom: var(--s-4);
+  max-width: 62rem;
 }
 
 .itemTitle {
-  font-size: 1.15rem;
-  margin: 0 0 0.5rem;
+  font-size: var(--step-2);
+  margin: 0 0 var(--s-2);
 }
 
 .place {
-  margin: 0 0 0.5rem;
+  margin: 0 0 var(--s-2);
+  font-weight: 600;
 }
 
 .why {
   color: var(--muted);
-  margin: 0 0 1rem;
+  margin: 0 0 var(--s-4);
 }
 
 .forms {
   display: grid;
-  gap: 1rem;
+  gap: var(--s-4);
 }
 
 .form {
   display: grid;
-  gap: 0.5rem;
+  gap: var(--s-3);
   justify-items: start;
-  margin-bottom: 1rem;
+  margin-bottom: var(--s-4);
 }
 
 .field {
   display: grid;
-  gap: 0.25rem;
+  gap: var(--s-1);
   width: 100%;
 }
 
 .field span,
 .nameField span {
   font-weight: 600;
-  font-size: 0.95rem;
+  font-size: var(--step--1);
 }
 
 .input,
 .textarea {
-  font: inherit;
-  padding: 0.5rem 0.6rem;
-  border: 1px solid var(--rule);
-  border-radius: 4px;
-  background: var(--background);
-  color: var(--foreground);
-  min-height: 44px;
-  width: 100%;
+  composes: field from global;
   max-width: 60ch;
 }
 
 .textarea {
   resize: vertical;
+  min-height: 6rem;
+  line-height: 1.55;
 }
 
 .identify {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: 0.75rem;
-  margin: 0.75rem 0 0;
+  gap: var(--s-3);
+  margin: var(--s-3) 0 0;
 }
 
 .swap {
-  margin-top: 1rem;
-  font-size: 0.95rem;
+  margin-top: var(--s-4);
+  font-size: var(--step--1);
 }
 
 .swap summary {
   cursor: pointer;
 }
 
+/*
+ * The gate: what this screen will not let you do yet, and why. A well rather
+ * than a rule, because it is a state of the page and not a paragraph of it.
+ */
 .gate {
-  border-left: 4px solid var(--rule);
-  padding: 0.5rem 0 0.5rem 0.9rem;
-  margin: 0 0 1.25rem;
+  padding: var(--s-4);
+  border-radius: var(--r-sm);
+  background: var(--sunken);
+  border: 1px solid var(--rule);
+  margin: 0 0 var(--s-5);
   color: var(--muted);
+  max-width: var(--prose);
 }
 
 .nameField {
   display: grid;
-  gap: 0.25rem;
+  gap: var(--s-1);
 }
 
-.button,
-.secondary,
+.button {
+  composes: btn btn-primary from global;
+}
+
+.secondary {
+  composes: btn btn-quiet from global;
+}
+
 .linkButton {
   font: inherit;
   font-weight: 600;
   min-height: 44px;
-  padding: 0.5rem 1.1rem;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.button {
-  color: var(--background);
-  background: var(--accent);
-  border: 2px solid var(--accent);
-}
-
-.button:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.secondary {
-  color: var(--accent);
-  background: var(--background);
-  border: 2px solid var(--accent);
-}
-
-.linkButton {
   color: var(--accent);
   background: none;
   border: none;
+  cursor: pointer;
   text-decoration: underline;
-  padding-inline: 0.25rem;
+  text-underline-offset: 0.18em;
+  padding-inline: var(--s-1);
+}
+
+.linkButton:hover {
+  color: var(--accent-strong);
 }
 
 .criteria,
@@ -180,41 +191,48 @@
   list-style: none;
   padding: 0;
   margin: 0;
-  max-width: 80ch;
+  max-width: 62rem;
 }
 
 .criterion,
 .decidedItem {
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 0.75rem 1.5rem;
+  gap: var(--s-3) var(--s-5);
   align-items: start;
-  padding: 0.85rem 0;
-  border-top: 1px solid var(--rule);
+  padding: var(--s-4);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  margin-bottom: var(--s-2);
 }
 
 .remark {
   display: block;
   color: var(--muted);
-  font-size: 0.95rem;
+  font-size: var(--step--1);
 }
 
 .inline {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: var(--s-2);
   align-items: center;
 }
 
 .confirmed {
   font-weight: 600;
+  color: var(--pass);
 }
 
 .done {
-  margin-top: 2.5rem;
-  padding: 1rem 1.25rem;
-  border-left: 5px solid var(--accent);
-  max-width: 70ch;
+  margin-top: var(--s-6);
+  padding: var(--s-4) var(--s-5);
+  border-radius: var(--r);
+  border: 1px solid color-mix(in srgb, var(--pass) 35%, transparent);
+  border-left: 5px solid var(--pass);
+  background: var(--pass-tint);
+  max-width: var(--prose);
 }
 
 @media (max-width: 40rem) {
@@ -227,13 +245,17 @@
 /*
  * A drafted description is marked as one. A reviewer reading a box that was
  * empty a moment ago should never have to wonder whether a person wrote it.
+ * It gets the waiting tint, which is what that colour means everywhere here:
+ * not wrong, not yet decided.
  */
 .drafted {
-  margin: 0 0 0.5rem;
-  padding: 0.4rem 0.75rem;
-  border-left: 4px solid var(--rule);
-  color: var(--muted);
-  font-size: 0.9rem;
+  margin: 0 0 var(--s-2);
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-sm);
+  border-left: 4px solid var(--wait);
+  background: var(--wait-tint);
+  color: var(--wait);
+  font-size: var(--step--1);
 }
 
 /*
@@ -243,7 +265,7 @@
  * screen that fights them.
  */
 .figure {
-  margin: 0 0 1rem;
+  margin: 0 0 var(--s-4);
 }
 
 .figureImage {
@@ -253,13 +275,17 @@
   width: auto;
   height: auto;
   border: 1px solid var(--rule);
+  border-radius: var(--r-sm);
+  /* The page may be dark; a figure drawn in black ink on nothing is not. */
   background: #fff;
 }
 
 .noFigure {
-  margin: 0 0 1rem;
-  padding: 0.4rem 0.75rem;
-  border-left: 4px solid var(--rule);
+  margin: 0 0 var(--s-4);
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-sm);
+  border-left: 4px solid var(--edge);
+  background: var(--sunken);
   color: var(--muted);
-  font-size: 0.9rem;
+  font-size: var(--step--1);
 }

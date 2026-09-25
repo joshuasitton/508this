@@ -26,7 +26,7 @@ export default async function Forgot({ searchParams }: { searchParams: Promise<{
   const via = transport();
 
   return (
-    <>
+    <div className={styles.page}>
       <h1>Forgotten passphrase</h1>
 
       {sent ? (
@@ -73,6 +73,6 @@ export default async function Forgot({ searchParams }: { searchParams: Promise<{
           </p>
         </>
       )}
-    </>
+    </div>
   );
 }

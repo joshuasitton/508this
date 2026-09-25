@@ -4,6 +4,63 @@ The running project-level record. Sections are dated and kept in order rather
 than rewritten, so the reasoning stays readable. Decisions live in
 `docs/leadership-standup.md`; this file says where the code stands.
 
+## 2026-09-25 — the interface
+
+The Chairman asked for the UI to be more engaging and modern. It is, and the
+way it got there is worth writing down, because "make it look better" is the
+kind of instruction that usually produces a stylesheet nobody can audit.
+
+**The real defect was not that it was plain.** Every block of text capped
+itself at 60–80 characters inside a 68rem frame, so the right third of every
+page was permanently empty — which reads as a layout that failed to load, not
+as restraint. The job page had a second symptom of the same thing: the
+remediate button sat at the top with four screens of evidence between it and
+the reason for pressing it.
+
+Both are fixed by a second column. The rail carries what a customer *does* —
+the button, the downloads, the retention clock — and stays on screen while
+they work down the findings.
+
+**The palette is now enforced rather than annotated.** `tokens.test.ts` was a
+test that recomputed three ratios; it now parses every colour token in
+`globals.css`, recomputes each stated ratio with the same `contrast.ts` the
+detectors use, measures every ink against every surface rather than only the
+one named, and **fails on a colour that carries no annotation at all**. That
+last clause is the point: a stale ratio was already catchable, but a colour
+that had never been measured once was not.
+
+**Four status colours, because the domain has four states.** Met, open,
+waiting on a person, exempt — and the same four for a finding: `Fixed`,
+`Blocking`, `Open`, `Dismissed`. Mapped one to one, so a dismissed finding is
+not red and an open one is not either. No badge is ever only a colour: each
+carries its word and a shape, because 1.4.1 is on the list this product sells.
+
+**One live accessibility bug fixed in passing.** `.button:disabled` was
+`opacity: 0.55`, which took a primary button's label from 6.7:1 to about 3:1.
+A contrast failure in a contrast checker. Disabled controls are repainted now,
+not faded, in a pair the token test measures.
+
+**Two overflows found by measurement, not by looking.** A browser driven at
+390px was asked whether the document scrolled sideways. The reading column was
+a CSS grid with an implicit `auto` track, which sizes to its widest child — so
+one wide table dragged every section on the page out with it. And small caps
+on the conformance statement's column headings set a floor the table could not
+go under. Both fixed; all six screens are clean at phone width.
+
+Source Serif 4 for headings, Inter for the rest, both self-hosted by
+`next/font` so no visitor's browser is introduced to a font CDN on the way in.
+That adds a build-time fetch from Google, which was weighed: the build already
+needs the network for `npm ci`, and `npm test` still runs with `node_modules`
+deleted, which is the invariant that actually matters.
+
+The conformance statement stayed a document. It is set as a sheet of paper and
+the print stylesheet drops the frame, the tint and the toolbar — a contracting
+officer files it beside other people's VPATs.
+
+367 tests, green with `node_modules` moved aside; typecheck, lint and build
+clean. Every screen read off the running app at 1280px, at 390px and in dark
+mode.
+
 ## 2026-09-25 — the second clock
 
 72 hours to collect, then the files go. `retention.ts` had named this as its

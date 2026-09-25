@@ -1,60 +1,76 @@
-.lede {
-  color: var(--muted);
-  max-width: 60ch;
-  margin: 0 0 1.5rem;
+/*
+ * The account pages are a single narrow column, centred. They have one job
+ * and no second column worth filling; a sign-in form pinned to the left edge
+ * of a 76rem frame just looks like the rest of the page failed to load.
+ */
+.page {
+  max-width: 30rem;
+  margin-inline: auto;
 }
 
+.page h1 {
+  margin: 0 0 var(--s-3);
+}
+
+.lede {
+  color: var(--muted);
+  max-width: 44ch;
+  margin: 0 0 var(--s-5);
+}
+
+/*
+ * A refusal gets the fail ink and a tint, and keeps a heavy left edge so the
+ * colour is never the only thing marking it out.
+ */
 .problem {
-  border-left: 4px solid var(--accent);
-  padding: 0.75rem 1rem;
-  margin: 0 0 1.5rem;
-  max-width: 60ch;
+  border: 1px solid color-mix(in srgb, var(--fail) 35%, transparent);
+  border-left: 5px solid var(--fail);
+  border-radius: var(--r-sm);
+  background: var(--fail-tint);
+  color: var(--fail);
+  font-weight: 500;
+  padding: var(--s-3) var(--s-4);
+  margin: 0 0 var(--s-5);
 }
 
 .form {
   display: grid;
-  gap: 0.5rem;
-  max-width: 34rem;
-  margin-bottom: 2rem;
+  gap: var(--s-2);
+  padding: var(--s-5);
+  margin-bottom: var(--s-5);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--r);
+  box-shadow: var(--shadow);
 }
 
 .label {
   font-weight: 600;
-  margin-top: 0.75rem;
+  margin-top: var(--s-3);
+}
+
+.label:first-child {
+  margin-top: 0;
 }
 
 .hint {
   color: var(--muted);
-  font-size: 0.9rem;
+  font-size: var(--step--1);
   margin: 0;
 }
 
 .field {
-  padding: 0.75rem;
-  border: 1px solid var(--rule);
-  border-radius: 4px;
-  background: var(--background);
-  color: var(--foreground);
-  font: inherit;
-  min-height: 44px;
+  composes: field from global;
 }
 
 .button {
-  justify-self: start;
-  margin-top: 1rem;
-  min-height: 44px;
-  padding: 0.6rem 1.25rem;
-  font: inherit;
-  font-weight: 600;
-  color: var(--background);
-  background: var(--accent);
-  border: 2px solid var(--accent);
-  border-radius: 4px;
-  cursor: pointer;
+  composes: btn btn-primary from global;
+  margin-top: var(--s-4);
+  width: 100%;
 }
 
 .note {
   color: var(--muted);
-  font-size: 0.9rem;
-  max-width: 60ch;
+  font-size: var(--step--1);
+  margin: 0 0 var(--s-2);
 }

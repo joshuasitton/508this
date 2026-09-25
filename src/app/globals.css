@@ -1,26 +1,126 @@
 /*
- * Design tokens. Every colour pair used for text on a background is chosen to
- * meet WCAG 2.0 1.4.3 at 4.5:1 or better in both schemes; the ratio is noted
- * next to each so the next change can be checked without a tool.
+ * Design tokens.
+ *
+ * Two rules govern this file, and `__tests__/tokens.test.ts` enforces both.
+ *
+ * 1. Every colour token is annotated. A colour meant to carry text says which
+ *    surface it sits on and what the ratio is — "6.4:1 on --background" — and
+ *    the test recomputes it with the same code the PDF detector uses. A colour
+ *    that is itself a surface says `surface`. A colour that only draws a
+ *    boundary says `boundary` and the ratio it reaches.
+ * 2. A new colour with no annotation fails the test. That is the point: this
+ *    product sells 1.4.3 Contrast, and the one place it could be broken
+ *    silently is a stylesheet nobody re-measures.
+ *
+ * The ratios below are measured, not estimated. Light and dark are held to
+ * the same bar; a dark scheme that quietly drops to 3:1 is the usual way this
+ * goes wrong, because on a black background everything *looks* legible.
  */
 :root {
-  --background: #ffffff;
-  --foreground: #1a1a1a; /* 17.4:1 on background */
-  --muted: #4d4d4d; /* 8.5:1 on background */
-  --accent: #0b5cad; /* 6.7:1 on background */
-  --rule: #d9d9d9;
-  --focus: #0b5cad;
-  --measure: 68rem;
+  /* Surfaces, in the order they stack: the page, the cards on it, the wells
+     cut into those. The page is not white — white pages give a raised card
+     nothing to be raised against, which is why the old layout read flat. */
+  --background: #f6f7f9; /* surface */
+  --surface: #ffffff; /* surface */
+  --sunken: #eceff3; /* surface */
+
+  --foreground: #14171a; /* 16.8:1 on --background */
+  --muted: #545b63; /* 6.4:1 on --background */
+  --accent: #0b5cad; /* 6.2:1 on --background */
+  --accent-strong: #08417a; /* 9.6:1 on --background */
+  --on-accent: #ffffff; /* 6.7:1 on --accent */
+
+  /*
+   * Status. Four states, because the domain has four: a criterion is met, has
+   * something open against it, waits on a person, or is exempt under E205.4.
+   *
+   * Each is an ink and a tint it is legible on. None of them is ever the only
+   * signal — 1.4.1 is a criterion this product sells, and a badge that said
+   * "open" only by being red would fail the audit it is reporting. Every badge
+   * carries its word, and `.badge::before` carries a shape as well.
+   */
+  --pass: #1c6b3f; /* 6.1:1 on --background */
+  --pass-tint: #e9f5ee; /* surface */
+  --fail: #a3232b; /* 6.9:1 on --background */
+  --fail-tint: #fbeced; /* surface */
+  --wait: #8a5200; /* 6:1 on --background */
+  --wait-tint: #fbf1e2; /* surface */
+  --off: #545b63; /* 6.4:1 on --background */
+  --off-tint: #eceff3; /* surface */
+
+  /* A hairline between rows, and an edge a form field is drawn with. The
+     hairline is decoration; the field edge has to be seen to be aimed at, so
+     it is held to 3:1 even though WCAG 2.0 — which is what 508 incorporates —
+     does not have 1.4.11 to ask for it. */
+  --rule: #dfe3e8; /* boundary 1.2:1 on --background */
+  --edge: #878f97; /* boundary 3.1:1 on --background */
+  --focus: #0b5cad; /* boundary 6.2:1 on --background */
+
+  --shadow: 0 1px 2px rgb(20 23 26 / 6%), 0 10px 28px -16px rgb(20 23 26 / 28%);
+  --shadow-lift: 0 2px 4px rgb(20 23 26 / 7%), 0 18px 40px -20px rgb(20 23 26 / 32%);
+
+  /* A fifth-scale of type, so a heading and a footnote are chosen from a
+     scale rather than nudged until they look right. */
+  --step--1: 0.875rem;
+  --step-0: 1rem;
+  --step-1: 1.0625rem;
+  --step-2: clamp(1.2rem, 1.08rem + 0.6vw, 1.5rem);
+  --step-3: clamp(1.45rem, 1.2rem + 1.2vw, 2rem);
+  --step-4: clamp(2rem, 1.45rem + 2.6vw, 3.25rem);
+
+  --s-1: 0.25rem;
+  --s-2: 0.5rem;
+  --s-3: 0.75rem;
+  --s-4: 1rem;
+  --s-5: 1.5rem;
+  --s-6: 2.5rem;
+  --s-7: 4rem;
+
+  --r-sm: 6px;
+  --r: 10px;
+  --r-lg: 18px;
+  --r-pill: 999px;
+
+  /* The shell is wider than the text inside it on purpose: the extra column
+     holds the summary rail. The old layout had the same 68rem frame with
+     nothing but air in the right third, which is why it read unfinished. */
+  --measure: 76rem;
+  --prose: 68ch;
+
+  --font-sans: var(--font-inter), system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-serif: var(--font-source-serif), Georgia, 'Times New Roman', serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #101214;
-    --foreground: #ececec; /* 15.9:1 on background */
-    --muted: #b8b8b8; /* 9.5:1 on background */
-    --accent: #7db6ff; /* 8.9:1 on background */
-    --rule: #333739;
-    --focus: #7db6ff;
+    --background: #0e1114; /* surface */
+    --surface: #171b20; /* surface */
+    --sunken: #090b0d; /* surface */
+
+    --foreground: #e9edf1; /* 16.1:1 on --background */
+    --muted: #a8b2bd; /* 8.8:1 on --background */
+    --accent: #7db6ff; /* 9:1 on --background */
+    --accent-strong: #a9cdff; /* 11.6:1 on --background */
+    --on-accent: #0e1114; /* 9:1 on --accent */
+
+    --pass: #6fd79b; /* 10.7:1 on --background */
+    --pass-tint: #10261b; /* surface */
+    --fail: #ff9ba1; /* 9.4:1 on --background */
+    --fail-tint: #2c1417; /* surface */
+    --wait: #e9bd6a; /* 10.8:1 on --background */
+    --wait-tint: #291d0b; /* surface */
+    --off: #a8b2bd; /* 8.8:1 on --background */
+    --off-tint: #1c2128; /* surface */
+
+    --rule: #272d34; /* boundary 1.4:1 on --background */
+    --edge: #6b747d; /* boundary 4:1 on --background */
+    --focus: #7db6ff; /* boundary 9:1 on --background */
+
+    /* A shadow on a dark page is invisible; depth there comes from the
+       surface being lighter than the page, so the card keeps its border. */
+    --shadow: none;
+    --shadow-lift: none;
   }
 }
 
@@ -30,74 +130,131 @@
 
 html {
   color-scheme: light dark;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
   margin: 0;
   color: var(--foreground);
   background: var(--background);
-  font-family:
-    system-ui,
-    -apple-system,
-    'Segoe UI',
-    Roboto,
-    sans-serif;
-  line-height: 1.5;
+  font-family: var(--font-sans);
+  font-size: var(--step-0);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/*
+ * Headings are set in a serif. The product's claim is that a document conforms
+ * to a federal standard, and a serif says "standard" where the house sans of
+ * every other SaaS says "app". Body copy stays in the sans, because that is
+ * what is actually being read at length.
+ */
+h1,
+h2,
+h3,
+.serif {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  line-height: 1.18;
+  text-wrap: balance;
+}
+
+/* The top of the scale belongs to the landing page's one headline. Every
+   other h1 names a screen, and a screen name set at 3.25rem is shouting. */
+h1 {
+  font-size: var(--step-3);
+}
+
+h2 {
+  font-size: var(--step-3);
+}
+
+h3 {
+  font-size: var(--step-2);
+}
+
+p {
+  text-wrap: pretty;
 }
 
 /* 2.4.7 Focus Visible: one ring, everywhere, never removed. */
 :focus-visible {
   outline: 3px solid var(--focus);
   outline-offset: 2px;
+  border-radius: 2px;
 }
 
 a {
   color: var(--accent);
+  text-underline-offset: 0.18em;
+}
+
+a:hover {
+  color: var(--accent-strong);
 }
 
 .skip-link {
   position: absolute;
-  left: 1rem;
+  left: var(--s-4);
   top: -100%;
-  padding: 0.5rem 1rem;
-  background: var(--background);
+  padding: var(--s-2) var(--s-4);
+  border-radius: var(--r-sm);
+  background: var(--surface);
   color: var(--accent);
   border: 2px solid var(--accent);
-  z-index: 1;
+  z-index: 10;
 }
 
 .skip-link:focus {
-  top: 1rem;
+  top: var(--s-4);
 }
 
-.site-header,
-.site-footer,
-main {
-  max-width: var(--measure);
-  margin-inline: auto;
-  padding-inline: 1rem;
-}
+/* ---- Shell ------------------------------------------------------------- */
 
 .site-header {
-  padding-block: 1rem;
+  position: sticky;
+  top: 0;
+  z-index: 5;
   border-bottom: 1px solid var(--rule);
+  /* A sticky bar over scrolling text has to be opaque about being a bar. The
+     solid colour runs first so a browser without backdrop-filter gets an
+     opaque bar rather than text sliding under text. */
+  background: var(--background);
+}
+
+@supports (backdrop-filter: blur(1px)) {
+  .site-header {
+    background: color-mix(in srgb, var(--background) 82%, transparent);
+    backdrop-filter: saturate(1.6) blur(12px);
+  }
+}
+
+.site-bar {
+  max-width: var(--measure);
+  margin-inline: auto;
+  padding: var(--s-3) var(--s-4);
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem 1.25rem;
-  align-items: baseline;
+  gap: var(--s-3) var(--s-5);
+  align-items: center;
   justify-content: space-between;
 }
 
 .site-nav {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem 1.25rem;
-  align-items: baseline;
-  font-size: 0.95rem;
+  gap: var(--s-3) var(--s-4);
+  align-items: center;
+  font-size: var(--step--1);
 }
 
 .site-who {
   color: var(--muted);
+  max-width: 24ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /*
@@ -114,17 +271,45 @@ main {
   padding: 0;
   cursor: pointer;
   text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+.site-link:hover {
+  color: var(--accent-strong);
 }
 
 .wordmark {
-  font-weight: 700;
-  font-size: 1.25rem;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: 1.3rem;
+  letter-spacing: -0.02em;
   text-decoration: none;
   color: var(--foreground);
 }
 
+/* The mark is the thing the whole product is about — a criterion number, set
+   in mono, in a chip the accent colour owns. */
+.wordmark-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 1.85rem;
+  height: 1.85rem;
+  border-radius: var(--r-sm);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
 main {
-  padding-block: 2rem 4rem;
+  max-width: var(--measure);
+  margin-inline: auto;
+  padding: var(--s-6) var(--s-4) var(--s-7);
 }
 
 /* main is focusable only as the skip link's target; it should not show a ring
@@ -134,8 +319,276 @@ main:focus {
 }
 
 .site-footer {
-  padding-block: 1.5rem;
   border-top: 1px solid var(--rule);
+  background: var(--sunken);
+}
+
+.site-footer-inner {
+  max-width: var(--measure);
+  margin-inline: auto;
+  padding: var(--s-5) var(--s-4);
   color: var(--muted);
-  font-size: 0.9rem;
+  font-size: var(--step--1);
+}
+
+.site-footer p {
+  margin: 0;
+  max-width: var(--prose);
+}
+
+/*
+ * The two-column page. The rail is where the summary, the price and the
+ * actions live; before it existed the right third of every page was empty
+ * and the page looked broken rather than spare.
+ */
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 20rem;
+  gap: var(--s-6);
+  align-items: start;
+}
+
+/*
+ * A sticky rail taller than the window would put its last button somewhere
+ * no scroll could reach — the panel stops moving and the page scrolls past
+ * it. Bounding it and letting it scroll on its own costs a scrollbar in the
+ * rare case and guarantees every control stays reachable in all of them.
+ */
+.rail {
+  position: sticky;
+  top: 5.5rem;
+  max-height: calc(100vh - 7rem);
+  overflow-y: auto;
+  display: grid;
+  gap: var(--s-4);
+  align-content: start;
+}
+
+@media (max-width: 62rem) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rail {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+}
+
+/*
+ * A short window — a laptop at 200% zoom, which 1.4.4 Resize text is about —
+ * has no room to spend a fixed band on the header.
+ */
+@media (max-height: 34rem) {
+  .site-header {
+    position: static;
+  }
+
+  .rail {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+}
+
+/* ---- Primitives -------------------------------------------------------- */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--r);
+  box-shadow: var(--shadow);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  min-height: 44px;
+  padding: 0.65rem 1.15rem;
+  font: inherit;
+  font-weight: 600;
+  border-radius: var(--r-sm);
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    transform 120ms ease;
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+/*
+ * A disabled button is repainted, not faded. Opacity would have taken the
+ * label on a primary button from 6.7:1 to about 3:1 — and "the control you
+ * cannot use is the one we made hard to read" is a poor advertisement for a
+ * contrast checker. `--muted` on `--sunken` is measured in the token test.
+ */
+.btn:disabled {
+  color: var(--muted);
+  background: var(--sunken);
+  border-color: var(--edge);
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  color: var(--on-accent);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.btn-primary:hover:not(:disabled) {
+  color: var(--on-accent);
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
+}
+
+.btn-quiet {
+  color: var(--foreground);
+  background: var(--surface);
+  border-color: var(--edge);
+}
+
+.btn-quiet:hover:not(:disabled) {
+  color: var(--foreground);
+  background: var(--sunken);
+}
+
+.field {
+  width: 100%;
+  min-height: 44px;
+  padding: 0.7rem 0.8rem;
+  font: inherit;
+  color: var(--foreground);
+  background: var(--surface);
+  border: 1px solid var(--edge);
+  border-radius: var(--r-sm);
+}
+
+.field:focus {
+  border-color: var(--accent);
+}
+
+/*
+ * A badge says its state three ways: the word, the shape before it, and the
+ * colour. Two of those survive a monochrome print and a colour-blind reader,
+ * which is what 1.4.1 asks for and what this product is in the business of
+ * asserting about other people's documents. The shape is decorative — the
+ * word beside it already carries the meaning — so it is generated content
+ * rather than anything a screen reader has to announce.
+ */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0.15rem 0.6rem 0.2rem;
+  border-radius: var(--r-pill);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  /* Enough edge to read as a chip on any of the three surfaces, not so much
+     that forty of them down a table shout. */
+  border: 1px solid color-mix(in srgb, currentColor 32%, transparent);
+}
+
+.badge::before {
+  font-size: 0.9em;
+  line-height: 1;
+}
+
+.badge-pass {
+  color: var(--pass);
+  background: var(--pass-tint);
+}
+
+.badge-pass::before {
+  content: '\2713'; /* check */
+}
+
+.badge-fail {
+  color: var(--fail);
+  background: var(--fail-tint);
+}
+
+.badge-fail::before {
+  content: '\2715'; /* cross */
+}
+
+.badge-wait {
+  color: var(--wait);
+  background: var(--wait-tint);
+}
+
+.badge-wait::before {
+  content: '\25CB'; /* hollow circle */
+}
+
+.badge-off {
+  color: var(--off);
+  background: var(--off-tint);
+}
+
+.badge-off::before {
+  content: '\2013'; /* en dash */
+}
+
+/*
+ * A number worth reading twice. Tabular figures because these sit in columns,
+ * and a proportional 1 makes a set of counts look ragged.
+ */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+  gap: var(--s-4);
+  margin: 0;
+}
+
+.stat {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.stat-value {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: var(--step-3);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.05;
+}
+
+.stat-label {
+  margin: 0;
+  font-size: var(--step--1);
+  color: var(--muted);
+  text-wrap: balance;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  font-variant-numeric: tabular-nums;
+}
+
+.prose {
+  max-width: var(--prose);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 1ms !important;
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
 }
