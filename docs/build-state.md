@@ -4,6 +4,43 @@ The running project-level record. Sections are dated and kept in order rather
 than rewritten, so the reasoning stays readable. Decisions live in
 `docs/leadership-standup.md`; this file says where the code stands.
 
+## 2026-09-25 — 1.3.2, and teaching a check to keep quiet
+
+Meaningful Sequence is checked for a PDF. **A PDF now needs a person for
+four criteria — the same four as a Word file.** 341 tests, green with
+`node_modules` moved aside.
+
+`readingOrder` in `pdfDetect.ts` walks `/K` for marked-content ids, which
+the tree walk beside it skips because it is building elements and a number
+is not one. `painted.ts` joins those ids to boxes on the drawn page, and
+`pdfSequence.ts` decides. Two independent readers agreeing was the first
+good sign: our parser found 32 marked refs on the test file and pdf.js
+reported 32 ids.
+
+**Most of the work was in what it refuses to say.** The naive version sorts
+blocks top to bottom and calls any difference a failure, which fails every
+correct two-column document. A check that cries wolf on correct documents
+is worse than none: the reviewer learns to click past it and then misses
+the real one. So it reports an inversion no layout could justify — read
+later, sitting entirely above an earlier block, clear by more than a line —
+and otherwise hands a multi-column page to a person with the column count
+named. Superscripts, footnote markers and table cells tagged right to left
+all pass, and each has a test saying so.
+
+**Two ways it could have claimed a pass it had not earned**, both closed:
+an untagged PDF has no reading order to be wrong (blocking finding saying
+so), and a tagged document whose tags cannot be matched to the page would
+otherwise pass for want of evidence (escalated).
+
+Verified live and both ways: the tagged infographic reads **Supports** —
+and that is a real pass, checked by hand, with 29 of 32 refs joined, one
+column, and the tag order tracking steadily down the page — while the
+untagged logo sheet reads **Does Not Support**.
+
+Two test expectations of mine were wrong again, not the code: a regex
+demanding a double negative, and an assertion that a document of nothing
+but bullets should pass when escalating is right.
+
 ## 2026-09-25 — two criteria a PDF could not answer, and now can
 
 1.4.3 Contrast and 3.1.2 Language of Parts were **checked** on the Word

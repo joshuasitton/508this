@@ -79,6 +79,75 @@ function name(v: PdfValue): string {
   return v instanceof PdfName ? v.name : '';
 }
 
+/** One piece of marked content, as the tag tree orders it. */
+export interface MarkedRef {
+  /** 1-based, as a reader counts pages. */
+  page: number;
+  /** The marked-content id the page's content stream uses. */
+  mcid: number;
+}
+
+/**
+ * Every marked-content id in the order the tag tree reads them.
+ *
+ * This is one of the two orders 1.3.2 compares. `readPdfFacts` skips the
+ * numbers in a `/K` array because it is building a tree of elements and a
+ * number is not one; here the numbers are the whole point.
+ *
+ * `/K` holds four kinds of thing: a number, which is a marked-content id on
+ * the element's own page; an `/MCR` dictionary, which is one on a page it
+ * names; an `/OBJR`, which is an annotation and has no text; and another
+ * element, which recurses. Document order through that walk is reading
+ * order, which is what the standard means by the sequence.
+ */
+export function readingOrder(doc: PdfDocument): MarkedRef[] {
+  const cat = doc.catalog;
+  const pageIndex = new Map<PdfDict, number>();
+  doc.pages.forEach((p, i) => pageIndex.set(p, i + 1));
+
+  const out: MarkedRef[] = [];
+  const seen = new Set<PdfDict>();
+
+  const walk = (node: PdfValue, page: number | undefined, depth: number) => {
+    if (depth > 64) return;
+    const value = doc.resolve(node);
+
+    if (typeof value === 'number') {
+      if (page) out.push({ page, mcid: value });
+      return;
+    }
+    if (Array.isArray(value)) {
+      for (const kid of value) walk(kid, page, depth);
+      return;
+    }
+    if (!(value instanceof Map)) return;
+
+    const type = doc.resolve(value.get('Type'));
+    const typeName = type instanceof PdfName ? type.name : '';
+
+    // An /MCR names its own page; an /OBJR is an annotation, with no text
+    // on the page and so no place in this sequence.
+    if (typeName === 'OBJR') return;
+    const pg = doc.resolve(value.get('Pg'));
+    const here = pg instanceof Map ? (pageIndex.get(pg) ?? page) : page;
+
+    if (typeName === 'MCR') {
+      const mcid = doc.resolve(value.get('MCID'));
+      if (typeof mcid === 'number' && here) out.push({ page: here, mcid });
+      return;
+    }
+
+    // Anything else with a /K is a structure element. Guard against a tree
+    // that points back at itself, which a malformed file can.
+    if (seen.has(value)) return;
+    seen.add(value);
+    if (value.has('K')) walk(value.get('K')!, here, depth + 1);
+  };
+
+  walk(doc.at(cat, 'StructTreeRoot', 'K'), undefined, 0);
+  return out;
+}
+
 /** Reads the facts once, so the checks below agree with each other. */
 export function readPdfFacts(doc: PdfDocument): PdfFacts {
   const cat = doc.catalog;

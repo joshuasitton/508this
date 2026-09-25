@@ -223,7 +223,11 @@ export const PDF_COVERAGE: Record<string, CoverageInfo> = {
   '1.2.4': { coverage: 'static', remark: PDF_MEDIA },
   '1.2.5': { coverage: 'static', remark: PDF_MEDIA },
   '1.3.1': { coverage: 'checked', remark: 'The PDF is tagged, its headings run in order and its tables have header cells.' },
-  '1.3.2': { coverage: 'reviewer', remark: 'A reviewer confirms the tag order matches the visual order of the page.' },
+  '1.3.2': {
+    coverage: 'checked',
+    remark:
+      'The tag tree’s reading order is compared with where each block sits on the rendered page. A page laid out in columns, where the order is a judgement about the layout, is reported for a person instead.',
+  },
   '1.3.3': { coverage: 'reviewer', remark: 'A reviewer confirms no instruction relies on shape, size, position or sound alone.' },
   '1.4.1': { coverage: 'reviewer', remark: 'A reviewer confirms colour is never the only way information is conveyed.' },
   '1.4.2': { coverage: 'static', remark: PDF_MEDIA },

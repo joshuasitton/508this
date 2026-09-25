@@ -336,7 +336,7 @@ can be checked for; a PDF is not the same document. A `.docx` names its text
 colour in an attribute; a PDF paints with operators in a content stream and
 the background is whatever was drawn underneath.
 
-**Five criteria need a person for a PDF against four for a Word file.** That
+**Four criteria need a person for a PDF, the same four as for a Word file.** That
 is the honest count, and it is the whole reason `ContentKind` is `'web' |
 'docx' | 'pdf'` rather than `'web' | 'document'`: the format decides what the
 service may claim. Reporting a PDF against the Word coverage table would
@@ -344,6 +344,11 @@ claim checks that never ran, which is the same lie as saying "Supports" on
 nothing.
 
 #### It used to be seven, and the difference is the renderer
+
+Contrast, Language of Parts and Meaningful Sequence all moved once the page
+could be drawn. The three had nothing in common except that: each needed to
+know something about the page as a reader meets it rather than as the file
+describes it.
 
 Contrast and Language of Parts were reviewer criteria for a PDF because a
 PDF paints. That reasoning produced a remark which said contrast *"is not
@@ -373,6 +378,27 @@ handed to a person, and delivery waits on the person either way.
 this process drew and then discarded; language detection is n-grams in the
 domain layer. No vendor is involved, so both run on a document marked CUI —
 the first capability here that a CUI customer gets in full.
+
+**Meaningful Sequence is the one that had to be taught restraint.** A PDF
+carries two orders — the tag tree is what a screen reader announces, the
+page is what a sighted reader follows — and 1.3.2 is that they agree.
+Comparing them is arithmetic once both are in hand: `readingOrder` walks
+`/K` for marked-content ids, and the rendered page gives each one a box.
+
+The naive version sorts every block top to bottom and calls any difference
+a failure. **On a two-column page that fails every correct document**, and a
+check that cries wolf on correct documents is worse than no check: the
+reviewer learns to click past it and then misses the real one. So it
+reports two things and nothing else — an inversion no layout could justify
+(a block read later, sitting *entirely above* an earlier one, clear by more
+than a line), and a page it will not judge, with the reason named. A
+superscript, a footnote marker, two cells of a row tagged right to left:
+all pass, because none of them is evidence of anything.
+
+And an untagged PDF has no reading order to be wrong, which would have made
+it pass — so it is a blocking finding saying exactly that. Same for a tagged
+document whose tags cannot be matched to the page: escalated, not passed
+for want of evidence.
 
 Two things this got wrong before it got them right, both caught by running
 it on real documents rather than by reasoning about the code: a catalogue's

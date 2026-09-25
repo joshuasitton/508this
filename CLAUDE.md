@@ -183,11 +183,19 @@ npm run sweep         # delete the documents whose retention window has run out
   a CUI document in production merges before that exists. It exists:
   `src/domain/account.ts`, `session.ts`, `audit.ts`, `viewer.ts` and their
   server modules.
-- **A PDF answers 1.4.3 and 3.1.2 by measurement, not by a reviewer**, and
+- **1.3.2 compares the tag tree's reading order with where each block sits
+  on the drawn page.** It reports only an *unambiguous* inversion — a block
+  read later that sits entirely above an earlier one, clear by more than a
+  line — and hands a multi-column page to a person instead, because the
+  order there depends on a layout intent no machine should infer. A check
+  that cries wolf on correct documents is worse than no check.
+- **A PDF answers 1.3.2, 1.4.3 and 3.1.2 by measurement, not by a reviewer**, and
   the measuring needs the page drawn — `src/domain/pdfPainted.ts` judges,
   `src/server/painted.ts` samples. **Uncertainty is a finding, never a
   silent pass**: a run that is not on one solid colour is reported as
-  unmeasurable, so "checked" still means checked. Nothing leaves the
+  unmeasurable, and a tagged document whose tags cannot be matched to the
+  page is reported rather than passed for want of evidence. "Checked"
+  still means checked. Nothing leaves the
   machine for either, which is why both run on a document marked CUI.
 - **An audit record has no free-text field, and `auditEvent` throws on a
   subject that is not a UUID.** 800-171 wants records sufficient to trace a
