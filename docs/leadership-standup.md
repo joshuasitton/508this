@@ -8,6 +8,77 @@ for. Where an entry has since been overtaken, `docs/build-state.md` says so.
 
 ---
 
+## 2026-09-25 — taking two criteria off the reviewer
+
+### What the Chairman asked
+
+Looking at the review queue: is there no way to address these without a
+reviewer? Then: do 1.4.3 and 3.1.2.
+
+### What the question exposed
+
+Three of the seven criteria on that screen were **already machine-checked
+for Word** and reviewer-only for PDF. Nobody had said so, because the
+review screen shows one document at a time and the asymmetry only appears
+if you read both coverage tables side by side. The Chairman found it by
+looking at the product.
+
+Worse: the PDF remark for 1.4.3 said contrast *"is not measured by
+machine."* That was true when written and stopped being true on
+22 September, when the renderer landed. **It was shipping inside customers'
+conformance statements** — a false statement about our own capability, in
+the document they hand to a federal buyer.
+
+### Done
+
+1.4.3 and 3.1.2 are checked for PDF. **A PDF now waits on five reviewer
+criteria instead of seven**, which is roughly a third of the human time in
+the certifiable tier — and the four prices still with the Chairman were
+costed against seven.
+
+### The decision worth defending
+
+**Uncertainty is a finding, not a silent pass.** Some text cannot be
+measured honestly: over a photograph, a gradient, a coloured edge. The
+tempting version of this feature passes those quietly and reports a higher
+automation rate. We escalate them instead, with a sentence saying what
+could not be measured and why.
+
+That is the whole commercial argument for the statement. It is worth
+something because "checked" means checked; a heuristic that is right most
+of the time and says Supports for the rest launders a guess into a claim
+the customer sells onward to a federal buyer. On the real test file the
+feature's first act was to escalate rather than pass, which is the
+behaviour we want to see.
+
+**Neither check sends anything to a vendor.** Contrast is arithmetic on
+pixels we drew and discarded; language detection is local. So both run on
+documents marked CUI, where the drafting of alternative text is refused.
+That is the first capability this service has added that CUI customers get
+in full.
+
+### What engineering got wrong, and how it was caught
+
+Two bugs, both found by running it on the real sample documents rather than
+by reasoning about the code: an English document reported as containing
+foreign passages, because a locale was compared against a language; and a
+grey full stop reported as a contrast failure. The second is the more
+instructive — true, useless, and precisely the sort of row that teaches a
+reviewer to stop reading the queue.
+
+### Still with the Chairman
+
+The four prices, now costed against a cheaper document. What happens to a
+document nobody downloads. And the first live drafted description, which
+still has never run.
+
+Remaining on the reviewer for a PDF: 1.3.2, 1.3.3, 1.4.1, 1.4.5 and 2.4.6.
+Engineering's read on those is unchanged — 1.3.2 is partly reachable, 1.3.3
+and 1.4.1 can have their flagging ported from Word to make the confirmation
+a glance, and 2.4.6 is a judgement that should stay with a person.
+
+---
+
 ## 2026-09-23 — decided: AWS
 
 ### What the Chairman said

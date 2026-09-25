@@ -61,6 +61,17 @@ export interface PdfFacts {
    * at without rendering the page first, which is a different product.
    */
   rasterImages: number;
+  /**
+   * Every language marked anywhere in the file: the catalogue's `/Lang`
+   * and every `/Lang` on a structure element, as primary subtags.
+   *
+   * 3.1.2 asks whether a passage in another language is marked as such.
+   * Knowing *which* passage carries a mark means joining marked-content
+   * ids to the tag tree; knowing whether the document marks a given
+   * language at all is this list, and it is enough to tell a certainly
+   * unmarked passage from one that needs a person.
+   */
+  markedLanguages: string[];
   elements: StructElement[];
 }
 
@@ -119,6 +130,20 @@ export function readPdfFacts(doc: PdfDocument): PdfFacts {
   };
   if (tagged) walk(doc.at(cat, 'StructTreeRoot', 'K'), elements, 0);
 
+  // Every /Lang in the file, as primary subtags: "en-GB" and "en" are the
+  // same language for this purpose, and the standard's question is about
+  // the language, not the locale.
+  const markedLangs = new Set<string>();
+  const collectLang = (list: StructElement[]) => {
+    for (const el of list) {
+      const tag = pdfText(doc.resolve(el.dict.get('Lang'))).trim();
+      const subtag = tag.split(/[-_]/)[0]?.toLowerCase();
+      if (subtag) markedLangs.add(subtag);
+      collectLang(el.kids);
+    }
+  };
+  collectLang(elements);
+
   const pagesWithoutText: number[] = [];
   const pagesWithGraphics: number[] = [];
   let inlineImages = 0;
@@ -137,6 +162,7 @@ export function readPdfFacts(doc: PdfDocument): PdfFacts {
     pages: doc.pages.length,
     pagesWithoutText,
     pagesWithGraphics,
+    markedLanguages: [...markedLangs].sort(),
     rasterImages: countRasterImages(doc) + inlineImages,
     elements,
   };
