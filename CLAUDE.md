@@ -189,6 +189,12 @@ npm run sweep         # delete the documents whose retention window has run out
   line — and hands a multi-column page to a person instead, because the
   order there depends on a layout intent no machine should infer. A check
   that cries wolf on correct documents is worse than no check.
+- **1.3.3 and 1.4.1 stay a reviewer's judgement, and the screen finds the
+  sentences for them** — `pdfSignals.ts`, over the same `phrases.ts` the
+  Word path uses. Colour-as-emphasis is flagged only **inline**: a run that
+  differs in colour from the rest of its own line, at the same size, with no
+  weight to carry it. A designed PDF is full of brand colour and flagging
+  all of it would bury the reviewer, which is the failure this avoids.
 - **A PDF answers 1.3.2, 1.4.3 and 3.1.2 by measurement, not by a reviewer**, and
   the measuring needs the page drawn — `src/domain/pdfPainted.ts` judges,
   `src/server/painted.ts` samples. **Uncertainty is a finding, never a
