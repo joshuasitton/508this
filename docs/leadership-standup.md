@@ -8,6 +8,69 @@ for. Where an entry has since been overtaken, `docs/build-state.md` says so.
 
 ---
 
+## 2026-09-25 — the interface
+
+### What the Chairman said
+
+"Then let's work on making the UI design more engaging and modern."
+
+### Done
+
+Design, engineering and security took it together, because a compliance
+product's interface is a security artefact as much as a marketing one.
+
+**Design.** The diagnosis was not "it is plain" — plain is correct for this
+audience. It was that the layout was broken in a way customers read without
+being able to name: text capped at 60–80 characters inside a 68rem frame, so
+a third of every page was empty. There is a second column now, and on the job
+page it carries the actions rather than more prose. The type has a scale, the
+surfaces have depth, and headings are set in a serif because the product's
+claim is that a document meets a federal standard, not that it is an app.
+
+**Engineering.** `tokens.test.ts` went from checking three ratios to enforcing
+the whole palette, including a refusal to accept a colour that carries no
+annotation. Two phone-width overflows and one live contrast failure — a
+disabled button at roughly 3:1 — were found and fixed. Details in
+`docs/build-state.md`.
+
+**Security had one objection and it was taken.** The first draft used
+`next/font/google`'s hosted delivery. It does not: `next/font` downloads at
+build and serves from our own origin, so no visitor's browser is introduced to
+a font CDN. For a service whose promise is that nothing about a customer's
+document leaves, a third-party request on the marketing page would have been a
+bad sentence to have to write in an assessment.
+
+**Marketing got the thing it has been asking for.** The landing page now
+carries the real coverage counts, computed from `criteria.ts` at render: 38
+criteria, 34 a document owes, 30 settled without a person, 4 a reviewer
+decides. The catalogue shows who settles each criterion for Word *and* for
+PDF, which is the most persuasive asset this product has and was previously
+not on the site at all. Nothing on that page is a claim the code does not make.
+
+### Decision needed — brand, properly
+
+The wordmark is now a mono `508` chip beside a serif name, and the two faces
+were chosen by engineering on the argument above. **That is a brand decision
+taken by default, and it should not stay one.** If the Chairman wants a real
+identity pass — a mark, a name treatment, a colour that is ours rather than a
+serviceable blue — it should happen before the App Store listing and before
+anything is printed, not after.
+
+Nothing here is blocked on it. The token layer means a palette swap is a
+dozen hex values and a test run.
+
+### Still with the Chairman, unchanged
+
+- **The four prices.** Costed against four reviewer criteria, not seven: PDF
+  and Word now cost the same to certify.
+- **The first live drafted description.** No `ANTHROPIC_API_KEY` has existed
+  in any environment yet.
+- **The deployment.** Bucket, IAM user, `npm run check:store`, deploy.
+- **The retention exemption** — whether "no clock while a reviewer works on
+  it" is what he meant by 72 hours. Engineering's judgement, still flagged.
+
+---
+
 ## 2026-09-25 — retention, decided
 
 ### What the Chairman said

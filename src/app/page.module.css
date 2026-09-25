@@ -1,67 +1,269 @@
+/*
+ * The hero is two columns because the page has two things to say at once:
+ * what the service does, and what it is measured against. The old one-column
+ * version left the right third of a 68rem frame permanently empty, which
+ * reads as a broken layout rather than a spare one.
+ */
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  gap: var(--s-6);
+  align-items: start;
+  padding-bottom: var(--s-7);
+}
+
+.eyebrow {
+  margin: 0 0 var(--s-3);
+  font-size: var(--step--1);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
 .hero h1 {
-  font-size: clamp(1.75rem, 4vw, 2.75rem);
-  line-height: 1.15;
-  margin: 0 0 1rem;
-  max-width: 24ch;
+  font-size: var(--step-4);
+  margin: 0 0 var(--s-4);
+  max-width: 18ch;
 }
 
 .lede {
-  font-size: 1.125rem;
+  font-size: var(--step-1);
   color: var(--muted);
-  max-width: 60ch;
-  margin: 0 0 1.5rem;
+  max-width: 54ch;
+  margin: 0 0 var(--s-5);
 }
 
-.cta {
-  display: inline-block;
-  min-height: 44px;
-  padding: 0.6rem 1.25rem;
-  margin-bottom: 3rem;
+.ctas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-3);
+  margin: 0 0 var(--s-4);
+}
+
+.reassure {
+  margin: 0;
+  max-width: 50ch;
+  font-size: var(--step--1);
+  color: var(--muted);
+}
+
+.proof {
+  padding: var(--s-5);
+}
+
+.proofTitle {
+  margin: 0 0 var(--s-4);
+  font-size: var(--step-1);
+  font-family: var(--font-sans);
   font-weight: 600;
-  color: var(--background);
-  background: var(--accent);
-  border: 2px solid var(--accent);
-  border-radius: 4px;
-  text-decoration: none;
+  letter-spacing: 0;
 }
 
-.catalogue h2 {
-  font-size: 1.5rem;
-  margin: 0 0 0.5rem;
+/*
+ * A row per figure, label then number, rather than a grid of stat blocks.
+ * Two columns of stacked labels put the numbers at different heights
+ * whenever one label wrapped and the other did not, which made a card full
+ * of counts look badly set. A row aligns them by construction — and the
+ * label reads before its number, so the visual order is the reading order.
+ */
+.proofStats {
+  margin: 0 0 var(--s-4);
 }
 
-.catalogue > p {
-  max-width: 70ch;
-  margin: 0 0 2rem;
+.proofRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-4);
+  padding: var(--s-3) 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.proofRow dt {
+  color: var(--muted);
+  font-size: var(--step--1);
+}
+
+.proofRow dd {
+  margin: 0;
+  font-size: var(--step-2);
+}
+
+.proofNote {
+  margin: 0;
+  font-size: var(--step--1);
+  color: var(--muted);
+}
+
+.sectionTitle {
+  margin: 0 0 var(--s-3);
+}
+
+/* ---- How it goes ------------------------------------------------------- */
+
+.how {
+  padding-bottom: var(--s-7);
+}
+
+.steps {
+  list-style: none;
+  counter-reset: step;
+  padding: 0;
+  margin: var(--s-5) 0 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: var(--s-4);
+}
+
+.step {
+  padding: var(--s-5);
+}
+
+.stepNumber {
+  margin: 0 0 var(--s-3);
+  display: grid;
+  place-items: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: var(--r-pill);
+  background: var(--sunken);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.stepTitle {
+  margin: 0 0 var(--s-2);
+  font-size: var(--step-1);
+}
+
+.stepBody {
+  margin: 0;
+  color: var(--muted);
+}
+
+/* ---- The catalogue ----------------------------------------------------- */
+
+.catalogueLede {
+  max-width: var(--prose);
+  margin: 0 0 var(--s-5);
+  color: var(--muted);
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2) var(--s-3);
+  margin: 0 0 var(--s-6);
+  padding: var(--s-4);
+  border: 1px solid var(--rule);
+  border-radius: var(--r);
+  /* A card, not a well: `--off-tint` and `--sunken` are the same grey, and a
+     "nothing to check" badge laid on a sunken panel disappeared into it. */
+  background: var(--surface);
+}
+
+.legendNote {
+  flex: 1 1 24rem;
+  font-size: var(--step--1);
+  color: var(--muted);
+}
+
+/* Four columns of badges do not fit a phone. Rather than let the page scroll
+   sideways, the table gets its own scroller and says so to a keyboard. */
+.tableWrap {
+  margin-bottom: var(--s-6);
+  overflow-x: auto;
 }
 
 .table {
   width: 100%;
   border-collapse: collapse;
-  margin-bottom: 2.5rem;
 }
 
-.table caption {
+.tableCaption {
   text-align: left;
-  font-weight: 700;
-  font-size: 1.125rem;
-  padding-bottom: 0.5rem;
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: var(--step-2);
+  padding-bottom: var(--s-3);
 }
 
 .table th,
 .table td {
   text-align: left;
-  padding: 0.5rem 0.75rem 0.5rem 0;
+  padding: 0.55rem 1rem 0.55rem 0;
   border-bottom: 1px solid var(--rule);
-  vertical-align: top;
+  vertical-align: middle;
 }
 
 .table thead th {
   color: var(--muted);
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: var(--step--1);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  border-bottom-color: var(--edge);
+  white-space: nowrap;
 }
 
-.table tbody th {
+.table tbody tr:hover {
+  background: var(--sunken);
+}
+
+.criterion {
   font-weight: 500;
+  min-width: 18rem;
+}
+
+.criterionId {
+  display: inline-block;
+  min-width: 3.1rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.level {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+/*
+ * An exempt row is dimmed, but its badge still says E205.4 in words. The row
+ * is not less true than the others, only less work, and the greying is the
+ * kind of thing that would fail this product's own 1.4.1 if the word were
+ * ever removed and the colour left to carry it.
+ */
+.exemptRow th,
+.exemptRow td {
+  color: var(--muted);
+}
+
+.close {
+  margin: var(--s-4) 0 0;
+}
+
+@media (max-width: 62rem) {
+  .hero {
+    grid-template-columns: minmax(0, 1fr);
+    padding-bottom: var(--s-6);
+  }
+
+  .hero h1 {
+    max-width: 22ch;
+  }
+}
+
+@media (max-width: 40rem) {
+  .proofStats {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ctas > * {
+    flex: 1 1 100%;
+  }
 }

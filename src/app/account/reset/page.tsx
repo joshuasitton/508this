@@ -30,7 +30,7 @@ export default async function Reset({
 
   if (state !== 'good') {
     return (
-      <>
+      <div className={styles.page}>
         <h1>That link does not work</h1>
         <p className={styles.problem} role="alert">
           {describeResetProblem(state)}
@@ -38,12 +38,12 @@ export default async function Reset({
         <p className={styles.note}>
           <Link href="/account/forgot">Ask for another</Link>
         </p>
-      </>
+      </div>
     );
   }
 
   return (
-    <>
+    <div className={styles.page}>
       <h1>Set a new passphrase</h1>
       <p className={styles.lede}>
         This link works once. Using it signs you out of 508This everywhere else, which is the point of resetting.
@@ -79,6 +79,6 @@ export default async function Reset({
           Set it
         </button>
       </form>
-    </>
+    </div>
   );
 }

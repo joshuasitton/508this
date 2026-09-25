@@ -24,7 +24,7 @@ export default async function SignUp({
   const message = describeProblem(problem);
 
   return (
-    <>
+    <div className={styles.page}>
       <h1>Create an account</h1>
       <p className={styles.lede}>
         Anything you have already uploaded in this browser comes with you. Nothing about those documents is sent
@@ -76,6 +76,6 @@ export default async function SignUp({
       <p className={styles.note}>
         Already have one? <Link href="/account/sign-in">Sign in</Link>.
       </p>
-    </>
+    </div>
   );
 }

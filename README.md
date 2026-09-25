@@ -1646,14 +1646,131 @@ aspiration. Concretely:
   never removed (2.4.7); real headings, tables with captions and scoped
   headers (1.3.1).
 - The colour tokens in `globals.css` carry their contrast ratio in a comment,
-  in both schemes, so a change can be checked by reading. Nothing below 4.5:1
-  is used for text (1.4.3).
+  in both schemes, and `__tests__/tokens.test.ts` recomputes every one of them
+  — so the comment cannot quietly stop being true, and a colour added without
+  one fails the suite. Nothing below 4.5:1 is used for text (1.4.3). The next
+  section is what that buys.
 - `eslint-config-next` brings the jsx-a11y rules and `npm run lint` fails on
   them. They are not to be disabled, per file or per line, without the reason
   written next to the disable.
 
 Plain CSS with tokens, no Tailwind: an auditor reading this site's styles
 should be able to find the focus ring and the contrast pairs in one file.
+
+---
+
+## The interface, and the test that stops it lying
+
+The screens were correct before they were any good to look at, and that is a
+worse place to be than it sounds. A service that sells conformance is judged
+on whether it looks like it knows what conformance is, and the first version
+of this interface had a defect a customer reads instantly without being able
+to name: every block of text capped itself at 60–80 characters inside a 68rem
+frame, so the right third of every page was permanently empty. That is not
+restraint. It reads as a layout that failed to finish loading.
+
+### Tokens are annotated, and an unannotated one fails the build
+
+`globals.css` carries the palette, and every colour in it says what it is for
+in a comment beside it — `6.4:1 on --background`, or `surface`, or
+`boundary 3.1:1 on --background`. `__tests__/tokens.test.ts` parses those, and
+does four things with them:
+
+- recomputes each stated ratio with `contrast.ts`, the same code the Word and
+  PDF detectors use on customers' documents, and fails if the comment and the
+  hex have drifted apart;
+- holds text to 4.5:1 and boundaries to 3:1;
+- measures every ink against **every** surface, not only the one named — a
+  badge sits on a card, a card sits on the page, a well is cut into the card,
+  and an ink legible on one of those is not automatically legible on the
+  others;
+- **refuses a colour that carries no annotation at all.**
+
+That last one is the useful half. A hand-written ratio goes stale the moment
+someone nudges a hex value, and the test above catches that. An unannotated
+token is the other failure: a colour that got into the product having never
+been measured once. There is no way to add one now without the suite going
+red and telling you what to write.
+
+### Four states, because the domain has four
+
+`pass`, `fail`, `wait` and `off` are not a decorative palette. They are met,
+open, waiting on a person, and exempt under E205.4 — the four things a
+criterion can be — and the same four are what a finding can be: `Fixed`,
+`Blocking`, `Open`, `Dismissed`. The mapping is one to one and written down in
+the job page, so a dismissed finding is never red (it is not a failure) and an
+open one is never red either (it is work outstanding, which is what the
+waiting tint means everywhere else in the product).
+
+**No badge is ever only a colour.** Each carries its word, and a shape before
+it. This is 1.4.1, which is on the list this service sells, and a status chip
+that said "open" by being red would fail the audit it was reporting. The
+exempt rows in the landing-page catalogue are dimmed *and* say E205.4; the
+rows still waiting on a person in the conformance statement are set in italic,
+which survives a photocopy.
+
+### The disabled button was failing 1.4.3
+
+The old `.button:disabled` was `opacity: 0.55`. On a primary button that takes
+the label from 6.7:1 to roughly 3:1 — a contrast failure, in the disabled
+state, in a contrast checker. It is repainted now rather than faded: `--muted`
+on `--sunken`, a pair the token test measures. Nothing about a control being
+unavailable requires it to be hard to read.
+
+### The rail, and the trap in it
+
+The job page has a second column now, and it holds what a customer *does* —
+the remediate button, the downloads, the retention clock — rather than more of
+what they read. That is the fix for the empty third, and it is also the fix
+for a worse problem: the button used to sit at the top with four screens of
+evidence between it and the reason for pressing it.
+
+A sticky panel taller than the window is a trap, though. It stops moving, the
+page scrolls past it, and its last control becomes unreachable by any means.
+So the rail is bounded to the viewport and scrolls itself, and it unsticks
+entirely on a short window — which is what a laptop looks like at 200% zoom,
+and 1.4.4 Resize text is also on the list.
+
+### Measured at 390px, not assumed
+
+Two overflows were found by driving a real browser at phone width and asking
+the document whether it scrolled sideways, and neither would have been caught
+by looking:
+
+- The reading column was a CSS grid with an implicit `auto` track. An `auto`
+  track sizes to its widest child, so one table wider than the screen dragged
+  *every section on the page* out with it. `minmax(0, 1fr)` fixes it, and the
+  symptom — five unrelated sections all exactly the same 2px too wide — is
+  worth recognising on sight.
+- Small caps on the conformance statement's column headings set a minimum
+  width the table could not go below. "REMARKS AND EXPLANATIONS" is wider than
+  it looks. They now apply above 40rem only.
+
+### The faces, and where they come from
+
+Headings are Source Serif 4, body and interface are Inter. A serif on a
+document-remediation service is doing a job: it says *standard* where the
+house sans of every other SaaS says *app*, and the product's whole claim is
+that a document meets a federal one.
+
+`next/font` fetches both at build time and serves them from this origin. That
+matters more here than it would elsewhere — a service whose promise is that
+nothing about a customer's document leaves should not be arranging for every
+visitor's browser to announce itself to a font CDN on the way in.
+
+It does add a build-time dependency on Google's servers, and that was weighed
+rather than ignored. It was judged acceptable because the build already
+requires the network for `npm ci`, so it adds no new *class* of fragility. The
+invariant that actually matters here is untouched: `npm test` still runs with
+`node_modules` deleted, because none of this is in the domain layer.
+
+### The statement is a document, not a screen
+
+`/jobs/[id]/report` is set as a sheet of paper — one column, one measure,
+framed and shadowed on screen. The print stylesheet drops the frame, the tint,
+the shadow and the toolbar, and forces the verdict to black on white. A
+contracting officer prints this and files it next to other people's VPATs; it
+should not arrive looking like a screenshot of a web application.
 
 ---
 
