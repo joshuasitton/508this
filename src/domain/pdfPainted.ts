@@ -86,6 +86,11 @@ export interface PaintedRun {
   background: Rgb | null;
   /** The share of sampled pixels the background colour accounts for, 0–1. */
   backgroundShare: number;
+  /** Where it sits on the drawn page, y growing downward. */
+  top: number;
+  bottom: number;
+  left: number;
+  right: number;
 }
 
 /**

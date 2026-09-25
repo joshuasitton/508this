@@ -56,6 +56,54 @@ whether the reviewer exemption above is what he meant.
 
 ---
 
+## 2026-09-25 — flagging, which is not checking, and is worth having anyway
+
+### What the Chairman said
+
+Do 1.3.3 and 1.4.1.
+
+### Done, and what "done" means here
+
+**These two keep their reviewer, deliberately.** "No instruction relies on
+shape, size, position or sound" and "colour is never the only way
+information is conveyed" are judgements about meaning. A machine claiming
+them would be claiming to have understood the document, and this company
+sells a statement whose value is that it does not do that.
+
+What changed is the reviewer's job. The Word path has flagged the candidate
+sentences since the detector was written; the PDF path never did. **The
+same criterion meant "confirm these three sentences" for a .docx and "read
+the whole document" for a PDF** — a difference nobody had noticed because
+the review screen shows one document at a time.
+
+### The judgement worth defending
+
+Word flags a coloured run among plain ones, which is a sharp signal because
+a .docx is mostly plain with occasional colour. **A designed PDF is the
+opposite.** Brand colour is in every subhead, callout and pull quote, and
+none of it is "colour as the only means of conveying information".
+
+Porting Word's rule unchanged would have produced dozens of rows per
+document and buried the reviewer — the same failure as a check that cries
+wolf, reached by a different route. So the PDF rule is narrower: colour
+used *inline*, differing from the rest of its own line, at the same size,
+with nothing else carrying the emphasis. A coloured heading is set apart by
+being a heading.
+
+Measured on the real infographic, which has brand colour on every element:
+**one finding.** That was the risk and it did not materialise.
+
+### Still with the Chairman
+
+The four prices. The first live drafted description, which has still never
+run. And the deployment.
+
+Retention is now decided and being built: 72 hours to collect, then the
+existing seven days from download for anyone who does; and an assessment
+nobody remediates loses its original 72 hours after upload.
+
+---
+
 ## 2026-09-25 — 1.3.2, and a PDF that costs what a Word file costs
 
 ### What the Chairman said

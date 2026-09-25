@@ -23,6 +23,7 @@
 
 import { contrastFindings, languageFindings, type PaintedRun, type TextBlock } from '@/domain/pdfPainted';
 import { sequenceFindings, type PageSequence, type PlacedBlock } from '@/domain/pdfSequence';
+import { colourOnlyFindings, proseFindings } from '@/domain/pdfSignals';
 import type { MarkedRef } from '@/domain/pdfDetect';
 import type { Finding } from '@/domain/findings';
 
@@ -162,6 +163,10 @@ async function read(pdf: Uint8Array, about: Inspecting): Promise<Painted> {
         ...contrastFindings(runs),
         ...languageFindings(blocks, about.documentLanguage, about.markedLanguages),
         ...sequenceFindings(sequences, about.tagged),
+        // 1.3.3 and 1.4.1 stay a reviewer's judgement; these narrow what
+        // they have to read from the whole document to a few sentences.
+        ...proseFindings(blocks),
+        ...colourOnlyFindings(runs),
       ],
       pages: Math.min(doc.numPages, MAX_PAGES),
     };
@@ -308,6 +313,10 @@ function sampleRun(
 
   return {
     text: item.str,
+    top: y0,
+    bottom: y1,
+    left: x0,
+    right: x1,
     points,
     // pdf.js names the font; the weight is in that name when it is there at
     // all. A wrong guess only moves the threshold between 4.5:1 and 3:1,

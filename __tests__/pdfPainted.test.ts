@@ -11,6 +11,10 @@ const run = (over: Partial<PaintedRun> = {}): PaintedRun => ({
   foreground: [0, 0, 0],
   background: [255, 255, 255],
   backgroundShare: 0.9,
+  top: 100,
+  bottom: 120,
+  left: 100,
+  right: 500,
   ...over,
 });
 
