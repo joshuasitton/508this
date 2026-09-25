@@ -4,6 +4,41 @@ The running project-level record. Sections are dated and kept in order rather
 than rewritten, so the reasoning stays readable. Decisions live in
 `docs/leadership-standup.md`; this file says where the code stands.
 
+## 2026-09-25 — the second clock
+
+72 hours to collect, then the files go. `retention.ts` had named this as its
+one open gap since the policy was written — a document nobody downloads had
+no clock at all — and the Chairman closed it. 345 tests.
+
+The two clocks sit alongside each other rather than replacing one another,
+so a customer who does download still has seven days to fetch the file
+again. Untouched documents go 72 hours after upload.
+
+**One refinement the literal instruction did not cover, and it matters.**
+Nothing is deleted while a reviewer is working on the document. A clock from
+upload deletes the file in the middle of a fortnight's review, which is the
+exact failure the 21 September reasoning was written to avoid and which is
+still at the top of that file. `reviewer` is set the first time a person
+decides anything, so it is precisely the signal for "somebody is working on
+this"; the 72 hours start when there is something to collect. **This is
+engineering's judgement rather than the Chairman's instruction, and it is
+flagged as such.**
+
+`dueAt` is the single place that answers when a job's files go, so the
+sweep, the job page and the report cannot drift apart. `daysLeft` returns
+null while no clock runs, which is not the same as plenty of time and should
+not be rendered as a number.
+
+A test that read `sweepExpired(now)` as `[]` started failing, and it was
+right to: a fixture record dated 17 September is genuinely past due under
+the new policy. The assertion was implicitly claiming nothing else in the
+store could ever be sweepable; it now asks about the job under test.
+
+Verified live, both states: a fresh upload reads *"deleted on 28 September
+2026, 72 hours after you uploaded it, unless a review starts before then"*,
+and naming a reviewer changes it to *"stays here while it is being
+reviewed"*.
+
 ## 2026-09-25 — 1.3.2, and teaching a check to keep quiet
 
 Meaningful Sequence is checked for a PDF. **A PDF now needs a person for

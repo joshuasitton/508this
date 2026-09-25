@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 
 import type { Job } from '../src/domain/job';
 import {
-  NEVER_DOWNLOADED,
+  COLLECT_MS,
+  POLICY,
   RETENTION_DAYS,
   RETENTION_MS,
   daysLeft,
@@ -36,17 +37,52 @@ test('the clock starts at download, and runs seven days', () => {
 });
 
 /**
- * The gap this policy has, pinned so that nobody discovers it by accident.
- * A clock that started at upload would delete the file in the middle of a
- * fortnight's review; the cost of starting it at download is that a
- * document nobody downloads has no clock at all.
+ * The gap this file used to name, closed on 25 September: 72 hours to
+ * collect, and then it goes. A document nobody downloads no longer lives
+ * forever.
  */
-test('a document nobody downloaded has no deletion date, and is not expired', () => {
-  const waiting = job();
-  assert.equal(expired(waiting, NOW + 365 * 24 * 60 * 60 * 1000), false);
-  assert.equal(daysLeft(waiting, NOW), RETENTION_DAYS);
-  assert.match(describeRetention(waiting), /countdown to deletion starts when you download/);
-  assert.ok(NEVER_DOWNLOADED.length > 40);
+test('a document nobody has touched is deleted 72 hours after upload', () => {
+  const waiting = job({ createdAt: AT });
+  assert.equal(expired(waiting, NOW + COLLECT_MS - 1), false);
+  assert.equal(expired(waiting, NOW + COLLECT_MS), true);
+  assert.match(describeRetention(waiting), /72 hours after you uploaded it/);
+});
+
+test('a remediated file nobody collected is deleted 72 hours after it was ready', () => {
+  const ready = job({ createdAt: AT, remediatedAt: AT });
+  assert.equal(expired(ready, NOW + COLLECT_MS - 1), false);
+  assert.equal(expired(ready, NOW + COLLECT_MS), true);
+  assert.match(describeRetention(ready), /Download it by/);
+  assert.match(describeRetention(ready), /deleted uncollected/);
+});
+
+/**
+ * The row worth defending, and the reason this is not simply "72 hours
+ * from upload": a review takes as long as it takes, and a clock from
+ * upload deletes the document in the middle of one.
+ */
+test('nothing is deleted while a reviewer is working on it', () => {
+  const inHand = job({ createdAt: AT, reviewer: 'J. Sitton' });
+  assert.equal(expired(inHand, NOW + 365 * 24 * 60 * 60 * 1000), false);
+  assert.match(describeRetention(inHand), /while it is being reviewed/);
+
+  // And the clock starts once there is something to collect.
+  const ready = { ...inHand, remediatedAt: AT };
+  assert.equal(expired(ready, NOW + COLLECT_MS), true);
+});
+
+test('downloading replaces the collection clock with the seven-day one', () => {
+  const collected = job({ createdAt: AT, remediatedAt: AT, deleteAfter: deleteAfter(AT) });
+  // Past the 72 hours, and still here: the download bought seven days.
+  assert.equal(expired(collected, NOW + COLLECT_MS), false);
+  assert.equal(expired(collected, NOW + RETENTION_MS), true);
+  assert.match(describeRetention(collected), new RegExp(`${RETENTION_DAYS} days after you downloaded it`));
+});
+
+test('the policy is one sentence the service can say out loud', () => {
+  assert.match(POLICY, /7 days/);
+  assert.match(POLICY, /72 hours/);
+  assert.match(POLICY, /while a reviewer is working on it/);
 });
 
 test('a downloaded document expires on the day it says it will', () => {
