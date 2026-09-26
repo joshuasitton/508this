@@ -11,7 +11,8 @@
     "lint": "eslint",
     "triage": "node --experimental-strip-types --import ./scripts/ts-resolve.mjs scripts/triage.ts",
     "sweep": "node --experimental-strip-types --import ./scripts/ts-resolve.mjs scripts/sweep.ts",
-    "check:store": "node --experimental-strip-types --import ./scripts/ts-resolve.mjs scripts/check-store.ts"
+    "check:store": "node --experimental-strip-types --import ./scripts/ts-resolve.mjs scripts/check-store.ts",
+    "mark": "node --experimental-strip-types --import ./scripts/ts-resolve.mjs scripts/mark.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.127.0",

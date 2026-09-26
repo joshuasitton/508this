@@ -26,9 +26,9 @@
 
   --foreground: #14171a; /* 16.8:1 on --background */
   --muted: #545b63; /* 6.4:1 on --background */
-  --accent: #0b5cad; /* 6.2:1 on --background */
-  --accent-strong: #08417a; /* 9.6:1 on --background */
-  --on-accent: #ffffff; /* 6.7:1 on --accent */
+  --accent: #14457e; /* 9:1 on --background */
+  --accent-strong: #0d3159; /* 12.2:1 on --background */
+  --on-accent: #ffffff; /* 9.6:1 on --accent */
 
   /*
    * Status. Four states, because the domain has four: a criterion is met, has
@@ -54,7 +54,7 @@
      does not have 1.4.11 to ask for it. */
   --rule: #dfe3e8; /* boundary 1.2:1 on --background */
   --edge: #878f97; /* boundary 3.1:1 on --background */
-  --focus: #0b5cad; /* boundary 6.2:1 on --background */
+  --focus: #14457e; /* boundary 9:1 on --background */
 
   --shadow: 0 1px 2px rgb(20 23 26 / 6%), 0 10px 28px -16px rgb(20 23 26 / 28%);
   --shadow-lift: 0 2px 4px rgb(20 23 26 / 7%), 0 18px 40px -20px rgb(20 23 26 / 32%);
@@ -100,9 +100,9 @@
 
     --foreground: #e9edf1; /* 16.1:1 on --background */
     --muted: #a8b2bd; /* 8.8:1 on --background */
-    --accent: #7db6ff; /* 9:1 on --background */
-    --accent-strong: #a9cdff; /* 11.6:1 on --background */
-    --on-accent: #0e1114; /* 9:1 on --accent */
+    --accent: #9cc4f5; /* 10.5:1 on --background */
+    --accent-strong: #c2dbfa; /* 13.4:1 on --background */
+    --on-accent: #0e1114; /* 10.5:1 on --accent */
 
     --pass: #6fd79b; /* 10.7:1 on --background */
     --pass-tint: #10261b; /* surface */
@@ -115,7 +115,7 @@
 
     --rule: #272d34; /* boundary 1.4:1 on --background */
     --edge: #6b747d; /* boundary 4:1 on --background */
-    --focus: #7db6ff; /* boundary 9:1 on --background */
+    --focus: #9cc4f5; /* boundary 10.5:1 on --background */
 
     /* A shadow on a dark page is invisible; depth there comes from the
        surface being lighter than the page, so the card keeps its border. */
@@ -290,20 +290,12 @@ a:hover {
   color: var(--foreground);
 }
 
-/* The mark is the thing the whole product is about — a criterion number, set
-   in mono, in a chip the accent colour owns. */
+/* The mark itself is drawn in `src/domain/mark.ts`; this only sizes it. */
 .wordmark-mark {
-  display: inline-grid;
-  place-items: center;
+  display: block;
   width: 1.85rem;
   height: 1.85rem;
-  border-radius: var(--r-sm);
-  background: var(--accent);
-  color: var(--on-accent);
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: 0;
+  flex: none;
 }
 
 main {
