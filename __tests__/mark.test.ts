@@ -10,7 +10,7 @@ import { markPng } from '../src/server/markPng';
  * The mark exists in three places and is defined in one. These tests are what
  * make that true rather than merely intended.
  *
- * `npm run mark` writes `src/app/icon.svg` and `public/mark.png` from
+ * `npm run mark` writes `src/app/icon.svg` and `src/server/markPng.ts` from
  * `src/domain/mark.ts`. Nothing forces anyone to run it, so the first test
  * re-derives the SVG and compares — a change to the geometry without a
  * regenerate fails here instead of shipping a favicon that disagrees with the
