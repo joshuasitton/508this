@@ -38,6 +38,9 @@ export const PRINCIPLES: readonly Principle[] = ['Perceivable', 'Operable', 'Und
 /** The VPAT 2 column names, which federal buyers read without translating. */
 export const COLUMNS = ['Criterion', 'Level', 'Conformance Level', 'Remarks and Explanations'] as const;
 
+/** The service that performed the evaluation, named in the report it produces. */
+export const EVALUATOR = '508This';
+
 export interface AcrFact {
   label: string;
   value: string;
@@ -138,6 +141,14 @@ export function buildAcr(job: Job): Acr {
     { label: 'Content type', value: contentLabel(job.format) },
     { label: 'Report date', value: reportDate(job.remediatedAt ?? job.createdAt) },
   ];
+  /*
+   * Who produced the report, which an ACR conventionally carries and this one
+   * did not. It is also the line the mark is set beside in the .docx: the
+   * Chairman's decision (standup, 26 September) was that the mark appears as
+   * the evaluator's identification and not as letterhead, and this is the
+   * difference — a fact the document owes, not a banner across page one.
+   */
+  facts.push({ label: 'Evaluated by', value: EVALUATOR });
   if (job.reviewer) facts.push({ label: 'Reviewer', value: job.reviewer });
   facts.push({ label: 'Evaluation method', value: method(job, fixed, summary.review) });
 

@@ -2,15 +2,18 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { buildAcr } from '../src/domain/acr';
-import { acrFilename, acrParts } from '../src/domain/acrDocx';
+import { acrFilename } from '../src/domain/acrDocx';
 import { detectDocx } from '../src/domain/docx';
 import { describeFinding, type Finding } from '../src/domain/findings';
 import type { Job } from '../src/domain/job';
 import { attr, child, children, find, findAll, parseXml, textOf } from '../src/domain/xml';
 import { acrDocx } from '../src/server/acr';
 import { readDocxParts } from '../src/server/docx';
+import { unzip } from '../src/server/unzip';
 
 const NOW = '2026-09-18T12:00:00Z';
+
+const describeFindings = (fs: readonly Finding[]) => fs.map(describeFinding).join('\n');
 
 function job(over: Partial<Job> = {}): Job {
   return {
@@ -42,11 +45,6 @@ const MESSY: Finding[] = [
     remediated: false,
   },
 ];
-
-function partsOf(over: Partial<Job> = {}) {
-  const acr = buildAcr(job(over));
-  return { acr, parts: acrParts(acr, NOW) };
-}
 
 /** The whole way round: model, XML, zip, unzip, parts, detector. */
 function roundTrip(over: Partial<Job> = {}) {
@@ -145,19 +143,56 @@ test('control characters in a filename are stripped rather than written', () => 
   assert.equal(textOf(find(parseXml(parts.core!), 'title')!), 'Accessibility Conformance Report — Report.docx');
 });
 
+/*
+ * Asserted against the finished archive rather than against `acrParts`,
+ * because the package is no longer all text: the domain declares the mark and
+ * the server supplies its bytes, so only the assembled .docx has both. Word
+ * refuses to open a file that promises a part it does not carry, and that is
+ * exactly the seam this now covers.
+ */
 test('every part the archive declares is a part the archive has', () => {
-  const { parts } = partsOf();
-  const types = parseXml(parts.get('[Content_Types].xml')!);
+  const entries = unzip(acrDocx(buildAcr(job()), NOW));
+  const text = (name: string) => new TextDecoder().decode(entries.get(name)!);
+
+  const types = parseXml(text('[Content_Types].xml'));
   for (const o of children(types, 'Override')) {
     const name = attr(o, 'PartName')!.replace(/^\//, '');
-    assert.ok(parts.has(name), name);
+    assert.ok(entries.has(name), name);
   }
   for (const rels of ['_rels/.rels', 'word/_rels/document.xml.rels']) {
     const base = rels === '_rels/.rels' ? '' : 'word/';
-    for (const r of children(parseXml(parts.get(rels)!), 'Relationship')) {
-      assert.ok(parts.has(base + attr(r, 'Target')!), attr(r, 'Target')!);
+    for (const r of children(parseXml(text(rels)), 'Relationship')) {
+      assert.ok(entries.has(base + attr(r, 'Target')!), attr(r, 'Target')!);
     }
   }
+});
+
+/*
+ * The report passing 508This is only evidence if the detector can see the
+ * mark at all. Strip the decorative flag out of the finished document and the
+ * detector must complain — which proves both that it is looking, and that the
+ * flag is what keeps this product's own report clean rather than luck.
+ */
+test('the mark passes only because it is marked decorative', () => {
+  const entries = unzip(acrDocx(buildAcr(job()), NOW));
+  const document = new TextDecoder().decode(entries.get('word/document.xml')!);
+  assert.match(document, /adec:decorative/, 'the mark is not marked decorative');
+
+  const stripped = document.replace(/<adec:decorative[^>]*\/>/, '');
+  const found = detectDocx({ ...readDocxParts(acrDocx(buildAcr(job()), NOW)), document: stripped });
+  const unlabelled = found.filter((f) => f.kind === 'image-alt');
+  assert.equal(unlabelled.length, 1, describeFindings(found));
+  assert.match(unlabelled[0]!.description, /no alternative text/);
+});
+
+test('the mark rides along as real bytes, declared as a PNG', () => {
+  const entries = unzip(acrDocx(buildAcr(job()), NOW));
+  const png = entries.get('word/media/mark.png');
+  assert.ok(png, 'the statement carries no mark');
+  assert.deepEqual([...png.subarray(0, 4)], [0x89, 0x50, 0x4e, 0x47], 'the mark is not a PNG');
+
+  const types = new TextDecoder().decode(entries.get('[Content_Types].xml')!);
+  assert.match(types, /Extension="png" ContentType="image\/png"/);
 });
 
 test('the same report twice is the same bytes', () => {

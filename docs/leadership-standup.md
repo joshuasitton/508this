@@ -8,6 +8,93 @@ for. Where an entry has since been overtaken, `docs/build-state.md` says so.
 
 ---
 
+## 2026-09-26 — the brand, decided
+
+### What the Chairman said
+
+"Go with A, keep the name, evaluator identification."
+
+All three questions from yesterday's round-table, answered. Nothing below was
+engineering's call.
+
+### Done
+
+**Federal navy.** `--accent` is `#14457e` and `--accent-strong` `#0d3159`,
+with the dark scheme at `#9cc4f5` / `#c2dbfa`. The token test measured every
+pair and caught one mistake on the way in: an annotation written as 13.3:1
+when the value is 13.35, which rounds to 13.4. That is the test doing exactly
+what it was built for a day earlier.
+
+**The name stays.** No code changed for this one; it is recorded so nobody
+re-opens it by accident. Marketing's argument carried — a name reads serious
+mostly by its setting, and the serif does that work.
+
+**A mark, drawn rather than typeset.** `src/domain/mark.ts` holds the geometry:
+the standard's number in a rounded tile, built from arcs and lines instead of
+glyphs. It had to be that way. The shape has to render in three places that
+cannot import each other — a favicon, a React tree, and a Word file opened on
+a machine nobody here controls — and a logo made of text depends on a font
+being installed in all three.
+
+`npm run mark` derives the two files that cannot import the geometry, and a
+test re-derives the SVG and fails if the committed one has drifted.
+
+**The raster is a bundled constant, not a file under `public/`.** This was
+going to be `public/mark.png` until the deployment question was asked:
+`public/` is served from a CDN and is not on the serverless filesystem, so the
+statement would have built fine here and found nothing to read in production.
+`public/` no longer exists; the favicon is `src/app/icon.svg`, which is what
+closes design's "the tab has shown a blank icon since founding".
+
+**The mark on the statement, as identification.** The report now carries an
+"Evaluated by" fact, and the mark is set beside that one line. It is marked
+decorative with the same `adec:decorative` extension this product tells
+customers to use — the name is in the cell already, and alternative text would
+make a screen reader say it twice.
+
+Two tests hold it: the existing round trip runs 508This's own Word detector
+over the finished file and expects nothing, and a new one strips the
+decorative flag and expects exactly one "no alternative text" finding. **The
+second is the one that matters.** Without it, the first could pass because the
+detector never saw the mark at all.
+
+One more test moved while this was built. "Every part the archive declares is
+a part the archive has" was asserting against the domain's map of XML strings,
+which no longer contains everything — the domain declares the image and the
+server supplies its bytes. It now unzips the finished .docx, which is both the
+level the invariant actually lives at and a stronger check than before.
+
+### A correction to yesterday's entry
+
+Yesterday's round-table said "an ACR **must** name who performed the
+evaluation". That is stronger than the standard supports: an ACR conventionally
+identifies its evaluator, usually under contact information, and VPAT 2 does
+not mandate a field by that name. The decision is unaffected — the fact is
+worth carrying either way — but the justification was overstated and the
+README says the accurate version.
+
+### What could not be verified, and who can
+
+The statement's XML parses under a strict parser, every declared part is
+present, the relationship resolves to real PNG bytes, and 508This's own
+detector reads the finished file. **None of that is Microsoft Word.**
+LibreOffice is installed in this container but cannot load any .docx at all,
+including Word-authored ones, so it proved nothing either way.
+
+Opening the downloaded statement once on the Chairman's Mac would close this.
+It is a minute of work and it is the only part of this change that rests on
+reasoning rather than on a check.
+
+### Still with the Chairman
+
+- The four prices.
+- The first live drafted description; no `ANTHROPIC_API_KEY` has ever existed
+  in any of these environments.
+- The deployment: bucket, IAM user, `npm run check:store`, deploy.
+- Whether "no clock while a reviewer works on it" is what he meant by 72 hours.
+
+---
+
 ## 2026-09-25 — the brand, round-table
 
 ### What the Chairman said
