@@ -27,6 +27,7 @@ npm run build         # what Vercel runs; deploying is docs/deploy.md
 npm run check:store   # prove a bucket and its credentials before deploying into it
 npm run triage -- DIR # classify a folder of PDFs; prints no document content
 npm run sweep         # delete the documents whose retention window has run out
+npm run mark          # redraw the favicon and the statement's mark from src/domain/mark.ts
 ```
 
 ## Where things are
@@ -41,6 +42,20 @@ npm run sweep         # delete the documents whose retention window has run out
 | `docs/` | project-level state and the leadership standup log |
 
 ## Invariants — do not break these silently
+
+- **The mark is defined once, in `src/domain/mark.ts`.** It is drawn as arcs
+  rather than typeset, so it does not need a font to exist — not on a
+  visitor's machine, not in the build container, and not inside a Word file
+  being opened somewhere nobody here controls. `npm run mark` regenerates
+  `src/app/icon.svg` and `src/server/markPng.ts`; a test re-derives the SVG and
+  fails if the committed file has drifted. The raster is a bundled constant
+  and not a file under `public/`, because `public/` is served from a CDN and is
+  not on the serverless filesystem.
+- **The mark inside the conformance statement is marked decorative**, with the
+  same `adec:decorative` extension this product tells customers to use. The
+  name is in the cell beside it, so alternative text would make a screen
+  reader say it twice. A test strips the flag and expects the detector to
+  complain, which is what keeps that from being an accident.
 
 - **`npm test` runs with zero dependencies installed.** Nothing under
   `src/domain/` may import React, Next or a Node API, and **no file any test

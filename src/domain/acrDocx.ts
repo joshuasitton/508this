@@ -27,11 +27,23 @@
  */
 
 import { escapeAttr, escapeText } from './xml';
-import { COLUMNS, type Acr } from './acr';
+import { COLUMNS, EVALUATOR, type Acr } from './acr';
 
 const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 const PKG_REL = 'http://schemas.openxmlformats.org/package/2006/relationships';
 const OFFICE_REL = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+
+const DRAWING = 'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing';
+const A = 'http://schemas.openxmlformats.org/drawingml/2006/main';
+const PIC = 'http://schemas.openxmlformats.org/drawingml/2006/picture';
+const DECORATIVE = 'http://schemas.microsoft.com/office/drawing/2017/decorative';
+
+/** The relationship id the mark is embedded under, and where its bytes sit. */
+export const MARK_REL = 'rId2';
+export const MARK_PART = 'word/media/mark.png';
+
+/** 16pt square, in EMU: the mark sits on the line, not above it. */
+const MARK_EMU = 16 * 12700;
 
 const LANGUAGE = 'en-US';
 const DECLARATION = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
@@ -54,9 +66,60 @@ function run(text: string, o: RunOptions = {}): string {
   return `<w:r>${rPr}<w:t xml:space="preserve">${plain(text)}</w:t></w:r>`;
 }
 
+/**
+ * The mark, inline, beside the evaluator's name.
+ *
+ * It is marked **decorative**, using the same `adec:decorative` extension this
+ * product tells customers to use — and for the same reason it would tell them
+ * to: the words "Evaluated by 508This" are in the cell already, so alternative
+ * text on the mark would make a screen reader say the name twice. The
+ * round-trip test runs 508This's own Word detector over the finished file, so
+ * getting this wrong fails the build rather than shipping a conformance
+ * report with an unlabelled image in it.
+ */
+function markRun(): string {
+  const docPr =
+    `<wp:docPr id="1" name="508This mark">` +
+    `<a:extLst xmlns:a="${A}">` +
+    '<a:ext uri="{C183D7F6-B498-43B3-948B-1728B52AA6E4}">' +
+    `<adec:decorative xmlns:adec="${DECORATIVE}" val="1"/>` +
+    '</a:ext></a:extLst></wp:docPr>';
+  const pic =
+    `<pic:pic xmlns:pic="${PIC}">` +
+    '<pic:nvPicPr><pic:cNvPr id="1" name="508This mark"/><pic:cNvPicPr/></pic:nvPicPr>' +
+    `<pic:blipFill><a:blip xmlns:r="${OFFICE_REL}" r:embed="${MARK_REL}"/>` +
+    '<a:stretch><a:fillRect/></a:stretch></pic:blipFill>' +
+    `<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${MARK_EMU}" cy="${MARK_EMU}"/></a:xfrm>` +
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>' +
+    '</pic:pic>';
+  return (
+    '<w:r><w:drawing>' +
+    `<wp:inline xmlns:wp="${DRAWING}" distT="0" distB="0" distL="0" distR="0">` +
+    `<wp:extent cx="${MARK_EMU}" cy="${MARK_EMU}"/>` +
+    docPr +
+    `<a:graphic xmlns:a="${A}"><a:graphicData uri="${PIC}">${pic}</a:graphicData></a:graphic>` +
+    '</wp:inline></w:drawing></w:r>'
+  );
+}
+
 function para(text: string, o: RunOptions & { style?: string } = {}): string {
   const pPr = o.style ? `<w:pPr><w:pStyle w:val="${escapeAttr(o.style)}"/></w:pPr>` : '';
   return `<w:p>${pPr}${text === '' ? '' : run(text, o)}</w:p>`;
+}
+
+/** A paragraph built from runs that are already XML. */
+function paraRuns(runs: string): string {
+  return `<w:p>${runs}</w:p>`;
+}
+
+/**
+ * A table cell's contents: plain text, or runs already built — the second is
+ * only used for the one cell that carries the mark.
+ */
+type Cell = string | { runs: string };
+
+function cellBody(c: Cell): string {
+  return typeof c === 'string' ? para(c) : paraRuns(c.runs);
 }
 
 function cell(width: number, body: string): string {
@@ -78,13 +141,13 @@ const BORDERS = ['top', 'left', 'bottom', 'right', 'insideH', 'insideV']
  * numbers with no name is the second most common complaint in a document
  * audit, after images with no alternative text.
  */
-function table(caption: string, widths: number[], header: string[], body: string[][]): string {
+function table(caption: string, widths: number[], header: string[], body: Cell[][]): string {
   const grid = widths.map((w) => `<w:gridCol w:w="${w}"/>`).join('');
   const head = row(
     header.map((h, i) => cell(widths[i]!, para(h, { bold: true }))).join(''),
     true,
   );
-  const rows = body.map((cells) => row(cells.map((c, i) => cell(widths[i]!, para(c))).join('')));
+  const rows = body.map((cells) => row(cells.map((c, i) => cell(widths[i]!, cellBody(c))).join('')));
   return [
     '<w:tbl>',
     '<w:tblPr>',
@@ -125,7 +188,12 @@ function documentXml(acr: Acr): string {
       'About this report',
       [2160, 7200],
       ['Item', 'Detail'],
-      acr.facts.map((f) => [f.label, f.value]),
+      acr.facts.map((f): Cell[] => [
+        f.label,
+        f.value === EVALUATOR && f.label === 'Evaluated by'
+          ? { runs: `${markRun()}${run(' ')}${run(f.value)}` }
+          : f.value,
+      ]),
     ),
   );
 
@@ -234,6 +302,7 @@ function documentRels(): string {
   return (
     `${DECLARATION}<Relationships xmlns="${PKG_REL}">` +
     `<Relationship Id="rId1" Type="${OFFICE_REL}/styles" Target="styles.xml"/>` +
+    `<Relationship Id="${MARK_REL}" Type="${OFFICE_REL}/image" Target="media/mark.png"/>` +
     '</Relationships>'
   );
 }
@@ -244,6 +313,7 @@ function contentTypes(): string {
     `${DECLARATION}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">` +
     '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
     '<Default Extension="xml" ContentType="application/xml"/>' +
+    '<Default Extension="png" ContentType="image/png"/>' +
     `<Override PartName="/word/document.xml" ContentType="${main}.document.main+xml"/>` +
     `<Override PartName="/word/styles.xml" ContentType="${main}.styles+xml"/>` +
     '<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>' +

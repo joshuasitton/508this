@@ -3,6 +3,7 @@ import { Inter, Source_Serif_4 } from 'next/font/google';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
+import { STROKE, TILE_RADIUS, VIEWBOX, digitsPath } from '@/domain/mark';
 import { getAccount } from '@/server/accounts';
 import { viewer } from '@/server/access';
 import { signOutAction } from './account/actions';
@@ -49,10 +50,28 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <header className="site-header">
           <div className="site-bar">
             <Link className="wordmark" href="/" aria-label="508This home">
-              {/* Decorative: the wordmark beside it already says the name. */}
-              <span className="wordmark-mark" aria-hidden="true">
-                508
-              </span>
+              {/*
+                Decorative, and drawn rather than typeset: the wordmark beside
+                it already says the name, and the digits are arcs so the mark
+                does not depend on a font having loaded. `src/domain/mark.ts`
+                is the only place this shape is defined.
+              */}
+              <svg
+                className="wordmark-mark"
+                viewBox={`0 0 ${VIEWBOX} ${VIEWBOX}`}
+                aria-hidden="true"
+                focusable="false"
+              >
+                <rect width={VIEWBOX} height={VIEWBOX} rx={TILE_RADIUS} fill="var(--accent)" />
+                <path
+                  d={digitsPath()}
+                  fill="none"
+                  stroke="var(--on-accent)"
+                  strokeWidth={STROKE}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
               508This
             </Link>
             <nav className="site-nav" aria-label="Account">

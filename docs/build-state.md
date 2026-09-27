@@ -4,6 +4,36 @@ The running project-level record. Sections are dated and kept in order rather
 than rewritten, so the reasoning stays readable. Decisions live in
 `docs/leadership-standup.md`; this file says where the code stands.
 
+## 2026-09-26 — the brand, built
+
+Direction A adopted, the name kept, the mark on the statement as the
+evaluator's identification. The reasoning is in `docs/leadership-standup.md`;
+this is where the code stands.
+
+- `--accent` is federal navy `#14457e` (`#9cc4f5` dark). The token test caught
+  a rounding slip in the annotation on the way in.
+- `src/domain/mark.ts` is the only definition of the mark — arcs and lines, no
+  glyphs, so it needs no font anywhere it is drawn. `npm run mark` derives
+  `src/app/icon.svg` and `src/server/markPng.ts`; a test re-derives the SVG.
+- **There is no `public/`.** The raster is a bundled constant, because
+  `public/` is served from a CDN and is not on the serverless filesystem: the
+  statement would have built here and failed in production. The favicon is
+  `src/app/icon.svg`, which closes the blank-tab gap noted yesterday.
+- The conformance statement carries an "Evaluated by" fact with the mark beside
+  it, marked decorative. A test strips the flag and expects the detector to
+  complain, so the report passing its own audit is evidence rather than luck.
+- "Every part the archive declares is a part the archive has" now asserts
+  against the finished .docx rather than the domain's string map, because the
+  package is no longer all text.
+
+374 tests, green with `node_modules` moved aside; typecheck, lint and build
+clean. The statement's XML was also parsed by a strict parser outside this
+repo, and every relationship checked to resolve to bytes that are present.
+
+**Not verified: that Microsoft Word renders it.** LibreOffice is installed in
+this container but cannot load any .docx, including Word-authored ones, so it
+settled nothing. Opening the downloaded file once on a Mac closes it.
+
 ## 2026-09-25 — the brand pass produced no code, deliberately
 
 A leadership round-table on brand identity is logged in

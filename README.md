@@ -1746,6 +1746,59 @@ by looking:
   width the table could not go below. "REMARKS AND EXPLANATIONS" is wider than
   it looks. They now apply above 40rem only.
 
+### The accent, and why it could not be green
+
+`--accent` is a federal navy at 212°, and the hue is the part that was
+decided rather than picked. The status palette had already claimed three of
+them — `--fail` at 356°, `--wait` at 36°, `--pass` at 147° — and in a product
+whose entire visual language is *met / open / waiting*, a brand colour sitting
+near any of those reads as a verdict. That leaves roughly 195°–270°, blue
+through indigo, and it is why a teal candidate at 185° was dropped: 38° from
+pass-green is close enough to be mistaken for it.
+
+Contrast could not break the remaining tie. Every candidate cleared 4.5:1 on
+every surface in both schemes, so the choice had to be made on meaning, and it
+was made by rendering each one on the running product rather than describing
+it. Indigo is the more distinctive colour and says the wrong thing: it pulls a
+standards service toward looking like an app.
+
+### The mark, which is drawn rather than typeset
+
+The mark is the standard's own number in a rounded tile, and it lives in
+`src/domain/mark.ts` as geometry — arcs and lines, not glyphs. That is the
+whole reason it is built this way: it has to render identically in a favicon,
+in a React tree, and inside a Word file being opened on a machine nobody here
+controls, and a logo made of text is a logo that depends on a font being
+installed in all three places.
+
+`npm run mark` derives the two files that cannot import the geometry — the
+favicon Next serves and the raster the statement embeds — and a test
+re-derives the SVG and fails if the committed one has drifted. The raster is a
+bundled constant rather than a file under `public/`, which is a deployment
+decision: `public/` is served from a CDN and is not on the serverless
+filesystem, so a statement built in production would have found nothing to
+read.
+
+### The mark on the statement is identification, not letterhead
+
+Sales wanted the mark on the conformance statement, because that .docx is the
+only artefact that reaches a buyer's desk. Product objected that an evidence
+document is not a place to advertise. The Chairman settled it: the mark
+appears as the **evaluator's identification**.
+
+Concretely, the report now carries an "Evaluated by" fact — which an ACR
+conventionally names and ours did not — and the mark is set beside that one
+line. A logo across the top of page one would have been letterhead. This is a
+fact the document owes, set with the artwork of whoever owes it.
+
+**It is marked decorative**, with the same `adec:decorative` extension this
+product tells customers to use, because the name is in the cell already and
+alternative text would make a screen reader announce it twice. That is not
+left to good intentions: one test runs 508This's own Word detector over the
+finished file and expects nothing, and a second strips the decorative flag and
+expects the detector to complain. The second test is the one that matters — it
+proves the first is looking.
+
 ### The faces, and where they come from
 
 Headings are Source Serif 4, body and interface are Inter. A serif on a
