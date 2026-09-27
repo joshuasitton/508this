@@ -8,6 +8,164 @@ for. Where an entry has since been overtaken, `docs/build-state.md` says so.
 
 ---
 
+## 2026-09-25 — the brand, round-table
+
+### What the Chairman said
+
+"Let's do the brand identity pass, gather input from org leadership."
+
+### A correction to this morning's entry, first
+
+This morning's entry said the brand should be settled "before the App Store
+listing." **There is no App Store listing.** 508This is a web service that
+deploys to Vercel; that sentence was imported from another product and should
+not have survived review. The real deadline is in management's note below, and
+it is a better one.
+
+### Two findings that narrowed the brief before anyone had an opinion
+
+**The status palette has already claimed three hues.** `--fail` sits at 356°,
+`--wait` at 36°, `--pass` at 147°. A brand accent near any of them will be
+read as a state — in a product whose entire visual language is "this criterion
+is met / open / waiting", a brand colour that looks like a verdict is a defect,
+not a taste question. Measured: a teal accent at 185° is only 38° from
+pass-green and was dropped for that reason rather than on anyone's preference.
+**The available band is roughly 195°–270°: blue through indigo.**
+
+**Every candidate must clear the token test before it is a candidate.** Four
+accents were run through `contrast.ts` against all three surfaces in both
+schemes, plus the button label on both the accent and its hover. All four pass;
+the worst pair across the set is 5.78:1 against a 4.5:1 bar. Colour choice here
+is not constrained by contrast — which means contrast cannot be used as the
+tie-breaker, and the argument has to be made on meaning.
+
+### Around the table
+
+**Product.** The mark must not assert the verdict. This product's one
+differentiator is that it refuses to claim what it cannot prove — it is why
+four criteria still say "a reviewer decides", why the draft banner survived
+design's request to drop it, and why `promiseFor(tier)` lives in code rather
+than in copy. A checkmark logo asserts "passed" before the document has been
+opened. **Any mark that says *approved* is off the table; a mark that says
+*measured* is the brief.**
+
+**Design.** There is no mark. There is no `public/` directory at all, so the
+browser tab currently shows a blank page icon, and has since founding. Three
+constraints on whatever is chosen: it has to read at 16px (favicon), at 32px
+(the header chip), and **in one colour**, because it will be printed
+monochrome on a document nobody controls. That eliminates gradients, fine
+detail and anything relying on two tones to be legible.
+
+**Engineering.** A palette swap is a dozen hex values and a test run; the token
+layer was built so this decision would be cheap. A *mark* is not free in the
+same way: it needs a real asset pipeline, which this repo has never had, and
+the image has to be embeddable in the .docx statement. Neither is hard. Both
+are new.
+
+**Marketing.** The name is the largest open question and nobody has asked it.
+"508This" is imperative and faintly jokey — it reads like a consumer utility
+rather than a service a contracting officer buys. Against that: it contains
+the standard's number, it is memorable, and it is already the repository, the
+docs and the deployed origin. **Marketing's position is keep the name and fix
+its setting.** A name reads serious or unserious mostly by typography, and the
+serif already does most of that work. Renaming is the most expensive thing on
+this page and the least necessary.
+
+**Sales.** The conformance statement .docx is the only artefact that reaches
+the buyer's desk, and it currently goes out unbranded. A contracting officer
+files it beside vendors who all have letterhead. This is the concrete ask and
+it is worth more than the website.
+
+**Vendor relations.** Both faces are SIL OFL 1.1, which permits embedding in a
+distributed document and redistribution with the licence. That is not
+incidental: **this product ships documents**, so any future commercial face
+must be licensed for document embedding specifically, which is the clause that
+is usually missing and exactly the one that would bite here.
+
+**Security.** A logo would be the first static asset this product has ever
+served. It stays first-party — no CDN, no third-party favicon service, nothing
+that turns a brand asset into a request to somewhere else. It must be vector or
+a stripped PNG: no EXIF, no embedded colour profile carrying a serial number.
+
+**Management.** The deadline is not a launch date, it is **the first paid
+conformance statement.** A palette can change afterwards at no cost. A mark
+embedded in delivered .docx files cannot: those files are in customers' hands
+and in federal filing systems, and a later mark makes the earlier ones look
+like they came from a different company. Decide the mark before the first
+statement is sold; everything else can follow.
+
+### Where the table disagreed
+
+**Sales wants the mark on the statement. Product does not.** Product's
+objection: a conformance report is an evidence document, and a vendor logo
+inside it is a small act of self-promotion in a place that is supposed to be
+neutral.
+
+**Proposed resolution, for the Chairman to overturn.** The mark goes in the
+statement as the **evaluator's identification**, not as letterhead. An ACR is
+required to name who performed the evaluation; 508This is already named there
+in text. Setting that existing, required line with the mark beside it is
+identification, which the document owes anyway. A logo at the top of page one
+is letterhead, which it does not. Sales gets the recognition, product keeps the
+document neutral, and the difference is a real one rather than a compromise.
+
+### Three directions
+
+Each one passes the token test; each was rendered on the running product
+rather than described.
+
+**A — Federal navy (`#14457e`), the number as the mark.** The `508` set in
+mono inside a rounded square, like a case stamp. Evolution, not replacement.
+Reads institutional and calm. Puts the standard's number in the logo, which is
+the product's whole promise. Weakest claim to distinctiveness: it is a blue
+square, and there are many.
+
+**B — Indigo (`#4338ca`), a measurement mark.** Two marks and a gap, the
+detail off a caliper or a rule. The most distinctive of the three and the most
+ownable. **Rendered, it pulls the product toward "SaaS app" and away from
+"standards body"** — it is a good identity for a different company.
+
+**C — Wordmark only, no glyph.** 508This set in the serif over a rule, the way
+a standards body sets its own name. Cheapest, most durable, hardest to get
+wrong, and the least work. It has no answer at 16px: a favicon has to be
+*something*, and the fallback is a bare "5" or the number alone — at which
+point it is direction A with extra steps.
+
+### What the table recommends
+
+**A, with the mark held to design's three constraints.** The reasoning that
+carried: this product sells restraint, and its identity should be the visual
+form of the same argument. Indigo is more memorable and says the wrong thing;
+a wordmark alone dodges the favicon rather than answering it. Navy at 212° is
+66° clear of the nearest claimed status hue, reaches 8.34:1 at worst against a
+4.5:1 bar, and is the only direction where the mark is also the product's
+subject matter.
+
+Marketing's caveat stands and is not a small one: **the strongest single
+improvement available is not the colour, it is putting any mark at all on the
+statement .docx.** That is true under all three directions.
+
+### Decisions needed from the Chairman
+
+1. **The direction.** A, B or C. A palette swap is one commit and a test run;
+   the mark is a little more. Nothing is implemented yet — this pass produced
+   options, not a change.
+2. **The name.** Marketing says keep it. It is worth one explicit answer rather
+   than another six months of nobody asking, because the cost of changing it
+   rises with every statement filed.
+3. **Mark on the statement, and in what role** — evaluator identification as
+   proposed above, letterhead as sales would prefer, or not at all.
+
+### Still with the Chairman, unchanged
+
+- The four prices.
+- The first live drafted description; no `ANTHROPIC_API_KEY` has ever existed
+  in any of these environments.
+- The deployment: bucket, IAM user, `npm run check:store`, deploy.
+- Whether "no clock while a reviewer works on it" is what he meant by 72 hours.
+
+---
+
 ## 2026-09-25 — the interface
 
 ### What the Chairman said
