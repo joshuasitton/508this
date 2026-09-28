@@ -40,6 +40,8 @@ import {
   getJobFile,
   propose as proposeInStore,
   markDelivered,
+  jobPdf,
+  jobPackage,
   remediateJob,
   setReviewer as setReviewerInStore,
   unconfirm as unconfirmInStore,
@@ -169,6 +171,38 @@ export async function openJobFile(id: string, which: JobFile) {
     await record('job.downloaded', who.kind === 'account' ? who.account : null, id);
   }
   return file;
+}
+
+/**
+ * The delivered document as a tagged PDF, and the whole package.
+ *
+ * Both are the delivered file in another wrapper, so both start the retention
+ * clock and scrub the record, exactly as taking the .docx does. The order
+ * matters and is the reason this is not two lines: the package *contains* the
+ * conformance statement, which is built from the record, so it is assembled
+ * before the record is scrubbed. Marking delivery first would put a statement
+ * reading "[removed]" into the archive the customer files.
+ */
+export async function openJobPdf(id: string) {
+  if (!(await openJobToChange(id))) return null;
+  const pdf = await jobPdf(id);
+  if (pdf?.ok) {
+    await markDelivered(id);
+    const who = await viewer();
+    await record('job.downloaded', who.kind === 'account' ? who.account : null, id);
+  }
+  return pdf;
+}
+
+export async function openJobPackage(id: string) {
+  if (!(await openJobToChange(id))) return null;
+  const packaged = await jobPackage(id);
+  if (packaged) {
+    await markDelivered(id);
+    const who = await viewer();
+    await record('job.downloaded', who.kind === 'account' ? who.account : null, id);
+  }
+  return packaged;
 }
 
 /** Figures for the review screen. Reading, so a visitor may. */

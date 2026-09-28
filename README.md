@@ -945,6 +945,143 @@ has read yet.
 
 ---
 
+## The package, and the PDF this service writes
+
+A delivered job is three files — the remediated document, a tagged PDF of it,
+and the conformance statement — and `/jobs/<id>/package` is all three in one
+archive. That route exists because the three were three separate downloads and
+a customer who took two of them and missed the statement has not been delivered
+to. The archive is assembled per request rather than stored, for the same
+reason the statement is built per request: it is a function of the job, and the
+job changes every time a reviewer decides something.
+
+The order inside `openJobPackage` is load-bearing. Taking a delivered file
+starts the retention clock **and scrubs the customer's quotations out of the
+record**, and the statement is generated *from* that record — so the archive is
+built first and delivery marked second. The other way round puts a statement
+full of "[removed]" into the file a contracting officer keeps.
+
+### Why 508This writes the PDF rather than converting one
+
+The obvious route is LibreOffice headless, and it was the first one tried. The
+copy installed in this project's container cannot open **any** .docx, including
+files Word itself wrote, so an export built on it could not be run or verified
+here at all — and a conversion nobody can test is not a feature, it is a
+promise. Word's own "Save as PDF" is the other route, and it needs a person
+with a Mac in the loop for every job.
+
+So `src/domain/pdfBuild.ts` writes the file: a page tree, four fonts, one
+content stream per page, and a structure tree whose elements point back at
+marked content in those streams. `src/domain/docxFlow.ts` reads the remediated
+.docx into the blocks it sets, and `src/server/pdfExport.ts` supplies the two
+things neither may have — the archive, and a picture's bytes. It is arithmetic
+over the standard-14 font metrics and the object grammar `pdfWrite.ts` already
+serialises, which means it runs wherever the tests run: with nothing installed.
+
+### It is a reading copy, and the page says so before you download it
+
+The export carries the document's **structure**: headings at their levels,
+lists with their markers counted out of `numbering.xml`, tables with their
+header cells, links with the words that describe them, figures with their
+descriptions, the document's language and title, and a reading order. It does
+not carry the **layout**. Type is set in Helvetica at sizes this service
+chooses, lines break where it breaks them, and colour is not carried across.
+
+Two reasons, and neither is laziness. Reproducing the original's typography
+means embedding its fonts, which means both having them and having a licence to
+redistribute them inside a document — where the standard fourteen need neither,
+so the file is small and sets identically on a machine with nothing installed.
+And black on white is 21:1: text that was set apart by colour alone in the
+original is set apart by weight here, so the export cannot import the two
+findings this product exists to remove.
+
+A customer who expects a photograph of their Word file and gets a reading copy
+has been misled by silence, so the sentence saying which it is sits beside the
+link, before the download, and names Word's own export as the better tool when
+the look matters more than the tags.
+
+### It refuses rather than substitutes
+
+Two things can stop an export, and both stop it completely:
+
+- **A character the encoding cannot set.** The standard fonts speak WinAnsi,
+  which covers Latin-1 plus the punctuation a real document uses — curly
+  quotes, dashes, the euro. A handful of characters have exact equivalents and
+  are folded to them (a no-break space is a space, a non-breaking hyphen is a
+  hyphen, a ligature is the letters it joins). Anything else — Greek, Cyrillic,
+  CJK, an arrow — refuses the document and names the characters. Replacing one
+  with a near-enough character would be an undetectable change to what a
+  federal document says.
+- **A picture nothing here can decode.** Word embeds EMF and WMF metafiles that
+  need Word to draw them. Rather than deliver a document with a figure silently
+  missing, the export refuses and says which picture did it. The one exception
+  is a picture the customer marked **decorative**: by their own declaration it
+  carries no information, so dropping it loses nothing they claimed mattered.
+
+The same principle put footnotes in. A note's text lives in
+`word/footnotes.xml` and the body holds only a reference to it, so an export
+that read `document.xml` and stopped would drop the customer's own words with
+nothing in the file to show it. They are set as `[1]` in the text and written
+out under a **Notes** heading at the end — a relocation, visible, rather than a
+loss. Headers and footers are the deliberate exception: the detector has never
+examined them either, so they are outside what the service measures and claims,
+and the export replaces them with its own page number as an artifact.
+
+### The check is the same one a customer's PDF gets
+
+Every export is put through the whole PDF pipeline — `detectPdf` over the tag
+tree, and the pass that renders each page for contrast, language and reading
+order. The job record keeps the answer as criterion numbers and nothing else,
+because the findings quote the document and a second copy of a customer's words
+in the record is a second thing to scrub at delivery. The page then states what
+was checked and what it found: `3 pages, checked with the same detector this
+service checks a customer's PDF with: nothing is open in the exported PDF.`
+
+Three things make that statement worth making:
+
+- **Negative controls.** `__tests__/pdfBuild.test.ts` strips the alternative
+  text off a figure and expects exactly one finding, marks a table's header
+  cells as data and expects exactly one, gives a link the words "click here"
+  and expects exactly one. Without those, a clean report could mean the
+  detector never saw the figure, the table or the link.
+- **Nothing is lost.** `__tests__/export.test.ts` reads every string the pages
+  paint back out of the content streams and asserts the document's own
+  sentences are in them. No criterion names that failure; a customer finding a
+  missing paragraph in a delivered file is how it would otherwise surface.
+- **The metrics are derived, not remembered.** A PDF has no layout engine, so
+  the writer breaks every line itself and needs the advance width of every
+  character. `npm run widths` reads those out of the standard-14 tables pdf.js
+  already carries and writes `src/domain/pdfFontWidths.ts`; a test checks the
+  result against Adobe's published values. Four hundred numbers typed from
+  memory would be wrong somewhere, and a wrong width is not a crash — it is a
+  line overrunning the margin on page nine of somebody's submission.
+
+The file is also **byte-for-byte reproducible**: the only clock it reads is the
+job's own timestamp, and its file identifier is derived from its contents
+rather than the random number every other generator uses. "The delivered file
+is a pure function of the original and the record" stops being checkable the
+moment one random byte is in it.
+
+### What the export found in our own checker
+
+Running the checker over a document this service had written itself — where
+every tag was known to be right — produced a 1.3.2 Meaningful Sequence finding
+on every table with a multi-line row. The check compares the tag tree's order
+against where the page puts each block, and a table cell is *meant* to be read
+after the cell above and to the left of it, which on the page is a jump
+upwards. Geometry cannot tell that from the error the check exists to find.
+
+So `readingOrder` now marks which pieces of content are inside a `Table` and
+`pdfSequence.ts` leaves those to the table checks that understand them —
+`detectPdf` already asserts header cells and a row structure against the tag
+tree, which is where a table's reading order actually is. It is the one
+exclusion in that file, and it fixes every customer document with a table, not
+only the ones 508This wrote. A checker that cries wolf on correct documents is
+the failure that file was written to avoid; this was an instance of it, found
+by building something known-good and pointing the checker at it.
+
+---
+
 ## What it costs, and why a price is a claim about capability
 
 `src/domain/pricing.ts` decides what 508This charges. It is here in the
@@ -1877,6 +2014,9 @@ intake form asks which it is.
   the conformance statement, above. Run end to end in a browser against the production build
   before merging, and the downloaded file checked with an independent reader;
   `docs/build-state.md` says what was checked.
+- The delivered package: the remediated document, a tagged PDF written by this
+  service, and the statement, in one archive — with the PDF put through the
+  same detector a customer's own PDF goes through before it is offered.
 - A landing page that renders the catalogue from the domain – partly so the
   list a customer reads is the list the report is built from, and partly to
   prove on the first page that `src/domain/` has no idea React exists.
@@ -1893,11 +2033,11 @@ scripts/         ts-resolve.mjs, the loader hook that makes npm test work bare.
 docs/            build-state.md, the sprint, and the standup log.
 ```
 
-The order to build the rest is in `docs/sprint-2026-09-17.md`: remediation
-of the deterministic findings, proposed alternative text, the review queue,
-then delivery as a fixed .docx, a tagged PDF and the ACR. PDF intake comes
-after all of that; an untagged PDF has no structure to fix, only to rebuild,
-and it is the hardest version of the product.
+The order to build the rest is in `docs/sprint-2026-09-17.md`. Delivery — the
+fixed .docx, the tagged PDF and the ACR, in one package — is now built; what
+remains there is a customer, and the prices, the vision key and the deployment,
+all of which wait on the Chairman. PDF intake landed early, on 18 September,
+when the first real documents to arrive turned out to be PDFs.
 
 ---
 

@@ -4,6 +4,85 @@ The running project-level record. Sections are dated and kept in order rather
 than rewritten, so the reasoning stays readable. Decisions live in
 `docs/leadership-standup.md`; this file says where the code stands.
 
+## 2026-09-28 — the tagged PDF, written rather than converted
+
+The package is complete: `/jobs/<id>/package` hands back the remediated .docx,
+a tagged PDF of it, and the conformance statement in one archive. That closes
+items 7 and 8 of the sprint, and item 7 by neither of the two routes it named.
+
+**LibreOffice was tried first and cannot be used here.** `soffice --convert-to
+pdf` was run today against the export's own input and against both .docx files
+in a delivered package: *"Error: source file could not be loaded"* each time,
+which is the same answer the 26 September entry records for a Word-authored
+file. An export built on it could be written here and never once verified. Word on a Mac was the
+other option in the sprint and needs a person in the loop for every job. So
+508This writes the PDF: `domain/pdfBuild.ts` is a tagged-PDF writer,
+`domain/docxFlow.ts` reads the remediated document into the blocks it sets, and
+`server/pdfExport.ts` supplies the archive and the pictures. It is arithmetic
+over the standard-14 metrics and the object grammar `pdfWrite.ts` already
+serialises, so it runs where the tests run — 418 of them, still green with
+`node_modules` moved aside.
+
+**What it is is stated where the customer can read it.** A conformant reading
+copy: structure, tags, reading order, figure descriptions, language, title. Not
+a copy of Word's layout — no embedded fonts, no colour, lines broken here. The
+rail says so above the link, before the download, and names Word's own export
+for documents where the look matters more than the tags.
+
+**It refuses rather than substitutes.** A character WinAnsi cannot set, or a
+picture nothing here can decode (Word embeds EMF and WMF), stops the export
+with a reason the reviewer sees. The one exception is a picture the customer
+marked decorative, which by their own declaration carries nothing. Footnotes
+were the same argument in a different shape: their text is in another part of
+the archive, so an export reading only `document.xml` would have dropped them
+without a trace. They are marked `[1]` in the text and set out under a **Notes**
+heading at the end.
+
+**Every export is checked by the pipeline that checks a customer's PDF** —
+`detectPdf` plus the rendered pass — and the job record keeps the answer as
+criterion numbers only, because findings quote the document and a second copy
+of the customer's words is a second thing to scrub at delivery.
+
+### The export found a false positive in our own checker
+
+Pointing the checker at a document this service had written itself, where every
+tag was known to be right, produced a 1.3.2 finding on every table with a
+multi-line row. A cell is *meant* to be read after the cell above and to the
+left of it, which on the page is a jump upwards — indistinguishable by geometry
+from the inversion the check exists to find. `readingOrder` now marks content
+inside a `Table` and `pdfSequence.ts` leaves those cells to `detectPdf`, which
+checks a table against the tag tree where its reading order actually is. That
+fixes every customer document with a table, not only the ones 508This writes.
+
+### What was checked, and how
+
+- 418 tests, green with `node_modules` moved aside; typecheck, lint and build
+  clean. The export's own tests include the negative controls — strip a
+  figure's description, un-mark a header row, make a link say "click here" —
+  each expecting exactly one finding, so a clean report is not a detector
+  looking at nothing.
+- **Nothing is lost**: a test reads every string the pages paint back out of the
+  content streams and asserts the document's sentences are in them. No
+  criterion names that failure, and it is the one a customer would find.
+- **Looked at, not only measured.** A Word document with headings, a numbered
+  list with a nested level, a three-column table, a figure, two links, a French
+  paragraph and a page break was exported and its three pages rendered and
+  read. The page breaks are right, the links are underlined and wrap correctly
+  across a line, the table's header row repeats its tint, and the mark's
+  transparency comes through.
+- **Run live.** Signed in, uploaded, remediated, downloaded: the archive is
+  three files and opens, the PDF is 52 KB with a structure tree and
+  `DisplayDocTitle`, the rail reads "3 pages, checked … nothing is open in the
+  exported PDF", the retention clock starts and the record is scrubbed. No
+  horizontal overflow at 390px.
+
+**Not verified: that Adobe Acrobat's own accessibility checker passes it.**
+This is the same gap the conformance statement has with Word — nothing here is
+the software a federal reviewer will actually open the file in. The file is
+valid by our reader, by pdf.js, and by the criteria we sell; running one export
+through Acrobat's Accessibility Check on a machine that has it would close the
+last of it.
+
 ## 2026-09-26 — the brand, built
 
 Direction A adopted, the name kept, the mark on the statement as the

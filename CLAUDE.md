@@ -28,6 +28,7 @@ npm run check:store   # prove a bucket and its credentials before deploying into
 npm run triage -- DIR # classify a folder of PDFs; prints no document content
 npm run sweep         # delete the documents whose retention window has run out
 npm run mark          # redraw the favicon and the statement's mark from src/domain/mark.ts
+npm run widths        # regenerate the standard-14 font metrics the PDF export measures with
 ```
 
 ## Where things are
@@ -36,7 +37,7 @@ npm run mark          # redraw the favicon and the statement's mark from src/dom
 |---|---|
 | `src/app/` | App Router pages and layouts, one folder per route; `jobs/[id]/review` is the queue |
 | `src/domain/` | pure functions: the criteria catalogue and coverage, findings, the Word and PDF detectors, the Word remediator, the PDF reader, the job model, the conformance report, the triage, the prices, and the identity, session and audit policy |
-| `src/server/` | Node-only code: the zip reader and writer, the .docx part reader, the PDF reader's inflate, the job store, the report packer, and the account, session, password and audit stores |
+| `src/server/` | Node-only code: the zip reader and writer, the .docx part reader, the PDF reader's inflate, the PDF export's picture decoding, the job store, the report packer, and the account, session, password and audit stores |
 | `__tests__/` | tests, against the domain layer and the server layer's pure parts |
 | `scripts/ts-resolve.mjs` | lets Node run the TypeScript domain with no bundler |
 | `docs/` | project-level state and the leadership standup log |
@@ -57,6 +58,21 @@ npm run mark          # redraw the favicon and the statement's mark from src/dom
   reader say it twice. A test strips the flag and expects the detector to
   complain, which is what keeps that from being an accident.
 
+- **The PDF export writes a PDF; it does not convert one.** `domain/docxFlow.ts`
+  reads the remediated .docx into blocks and `domain/pdfBuild.ts` sets them as a
+  tagged PDF; `server/pdfExport.ts` supplies the two things neither may — the
+  archive and the pictures — and then runs the whole PDF pipeline over its own
+  output. LibreOffice was the obvious route and cannot open any .docx in this
+  project's container, so a converter could not have been verified here at all.
+  What the export is and is not is argued in the README: a conformant reading
+  copy, not a copy of Word's layout.
+- **The export refuses rather than substitutes.** A character WinAnsi cannot
+  set, or a picture in a format nothing here can decode, stops the export with
+  a reason the reviewer is shown. Replacing a character with a near-enough one,
+  or dropping a figure, would be an undetectable change to a customer's
+  document — the one failure a remediation service cannot come back from. The
+  single exception is a picture the customer themselves marked decorative,
+  which by their own declaration carries nothing.
 - **`npm test` runs with zero dependencies installed.** Nothing under
   `src/domain/` may import React, Next or a Node API, and **no file any test
   imports may take an npm dependency.** `src/server/` is Node's own modules

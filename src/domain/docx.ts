@@ -26,6 +26,21 @@ import { attr, child, children, elements, find, findAll, parseXml, textOf, type 
 export interface DocxParts {
   /** word/document.xml – required. */
   document: string;
+  /**
+   * word/numbering.xml – which list a numbered paragraph belongs to and what
+   * its marker looks like. Only the PDF export needs it: a .docx carries the
+   * numbering as a reference and Word draws the actual "1." or bullet, so an
+   * export that writes its own text has to work out what Word would have drawn.
+   */
+  numbering?: string;
+  /**
+   * word/footnotes.xml and word/endnotes.xml — the text of the notes a
+   * paragraph refers to. Only the PDF export needs them, and it needs them for
+   * one reason: a note referenced in the body and stored in another part is
+   * content an export that reads only the body would drop without a trace.
+   */
+  footnotes?: string;
+  endnotes?: string;
   /** word/styles.xml */
   styles?: string;
   /** word/settings.xml */
@@ -111,7 +126,16 @@ function where(p: Paragraph): string {
   return s ? `paragraph ${p.number} (“${s}”)` : `paragraph ${p.number}`;
 }
 
-interface StyleInfo {
+/**
+ * What the styles say about the document as a whole.
+ *
+ * Exported because the PDF export has to agree with the detector about what a
+ * heading *is*: if `docxFlow.ts` read heading levels its own way, a document
+ * could be reported as having sound heading levels and exported with different
+ * ones. One definition, two readers — the same rule `markGeometry` follows in
+ * the other product and `packing.ts` follows in this one's ancestor.
+ */
+export interface StyleInfo {
   /** styleId → heading level (1–9), for paragraph styles that are headings. */
   headingLevel: Map<string, number>;
   /** Document default font size in points, if declared. */
@@ -120,10 +144,23 @@ interface StyleInfo {
   hasLanguage: boolean;
   /** The declared default language's primary subtag, e.g. "en". */
   language: string;
+  /**
+   * The tag as declared, e.g. "en-US". The detector compares languages by
+   * primary subtag — "en-GB" and "en" are one language for 3.1.2 — but a PDF's
+   * `/Lang` should carry what the document actually said, so both are kept and
+   * neither is re-derived somewhere else.
+   */
+  languageTag: string;
 }
 
-function readStyles(styles: string | undefined, settings: string | undefined): StyleInfo {
-  const info: StyleInfo = { headingLevel: new Map(), defaultPoints: DEFAULT_POINTS, hasLanguage: false, language: 'en' };
+export function readStyles(styles: string | undefined, settings: string | undefined): StyleInfo {
+  const info: StyleInfo = {
+    headingLevel: new Map(),
+    defaultPoints: DEFAULT_POINTS,
+    hasLanguage: false,
+    language: 'en',
+    languageTag: 'en',
+  };
   if (styles) {
     const root = parseXml(styles);
     for (const style of children(root, 'style')) {
@@ -151,7 +188,8 @@ function readStyles(styles: string | undefined, settings: string | undefined): S
       const lang = child(rPr, 'lang');
       if (lang && (attr(lang, 'val') || attr(lang, 'eastAsia') || attr(lang, 'bidi'))) {
         info.hasLanguage = true;
-        info.language = primarySubtag(attr(lang, 'val') ?? attr(lang, 'eastAsia') ?? attr(lang, 'bidi') ?? 'en');
+        info.languageTag = attr(lang, 'val') ?? attr(lang, 'eastAsia') ?? attr(lang, 'bidi') ?? 'en';
+        info.language = primarySubtag(info.languageTag);
       }
     }
   }
@@ -160,13 +198,14 @@ function readStyles(styles: string | undefined, settings: string | undefined): S
     const theme = child(root, 'themeFontLang');
     if (theme && (attr(theme, 'val') || attr(theme, 'eastAsia') || attr(theme, 'bidi'))) {
       info.hasLanguage = true;
-      info.language = primarySubtag(attr(theme, 'val') ?? attr(theme, 'eastAsia') ?? attr(theme, 'bidi') ?? 'en');
+      info.languageTag = attr(theme, 'val') ?? attr(theme, 'eastAsia') ?? attr(theme, 'bidi') ?? 'en';
+      info.language = primarySubtag(info.languageTag);
     }
   }
   return info;
 }
 
-function headingLevelOf(p: XmlElement, styles: StyleInfo): number | undefined {
+export function headingLevelOf(p: XmlElement, styles: StyleInfo): number | undefined {
   const pPr = child(p, 'pPr');
   if (!pPr) return undefined;
   const styleId = attr(child(pPr, 'pStyle') ?? pPr, 'val');

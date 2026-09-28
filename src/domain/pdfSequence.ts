@@ -71,6 +71,8 @@ export interface PlacedBlock {
   bottom: number;
   left: number;
   right: number;
+  /** Inside a `Table`. See below: geometry has nothing to say about a cell. */
+  table?: boolean;
 }
 
 export interface PageSequence {
@@ -105,6 +107,8 @@ export function sequenceFindings(pages: readonly PageSequence[], tagged: boolean
   // way this check could quietly claim something it never tested. Some
   // producers tag in ways nothing here can join; that is a fact about the
   // file and a reviewer's job, not a pass.
+  // Table cells count as evidence here: they are text the tag tree was
+  // successfully joined to, even though the geometry tests below skip them.
   if (!pages.some((page) => page.blocks.some((block) => readable(block.text)))) {
     return [
       finding(
@@ -119,7 +123,19 @@ export function sequenceFindings(pages: readonly PageSequence[], tagged: boolean
 
   const out: Finding[] = [];
   for (const page of pages) {
-    const blocks = page.blocks.filter((b) => readable(b.text));
+    // A table's cells are excluded from both tests below, and this is the
+    // one exclusion in this file. A cell is *meant* to be read after the
+    // cell above and to the left of it, which on the page is a jump upward
+    // and to the right — indistinguishable, by geometry alone, from the
+    // inversion this check exists to find. Two columns of cells are not two
+    // columns of prose either. What a table owes is header cells and a row
+    // structure, and `detectPdf` checks both against the tag tree, where the
+    // answer actually is. Reporting cells here would have meant every
+    // multi-line table row in every document arriving as a reading-order
+    // failure, which is the "cries wolf" failure this file was written to
+    // avoid — found by running the checker over a document the exporter
+    // built, where every tag was known to be right.
+    const blocks = page.blocks.filter((b) => readable(b.text) && !b.table);
     if (blocks.length < 2) continue;
 
     const columns = countColumns(blocks, page.width);

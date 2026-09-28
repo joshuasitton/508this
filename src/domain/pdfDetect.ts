@@ -85,6 +85,19 @@ export interface MarkedRef {
   page: number;
   /** The marked-content id the page's content stream uses. */
   mcid: number;
+  /**
+   * Whether this piece is inside a `Table`.
+   *
+   * 1.3.2 compares the tag order against where the page puts each block, and
+   * that comparison is only meaningful for running text. A table's reading
+   * order is defined by its own rows and cells — `Table` → `TR` → `TD` — and
+   * a cell is *supposed* to be read after the cell above and to its left,
+   * which on the page means jumping back up. Geometry cannot tell that from
+   * an error, so `pdfSequence.ts` leaves table cells to the table checks that
+   * actually understand them. Without this flag, every multi-line table row
+   * in the world reads as a reading-order failure.
+   */
+  table?: boolean;
 }
 
 /**
@@ -107,17 +120,18 @@ export function readingOrder(doc: PdfDocument): MarkedRef[] {
 
   const out: MarkedRef[] = [];
   const seen = new Set<PdfDict>();
+  const roleOf = roleResolver(doc);
 
-  const walk = (node: PdfValue, page: number | undefined, depth: number) => {
+  const walk = (node: PdfValue, page: number | undefined, depth: number, table = false) => {
     if (depth > 64) return;
     const value = doc.resolve(node);
 
     if (typeof value === 'number') {
-      if (page) out.push({ page, mcid: value });
+      if (page) out.push(table ? { page, mcid: value, table } : { page, mcid: value });
       return;
     }
     if (Array.isArray(value)) {
-      for (const kid of value) walk(kid, page, depth);
+      for (const kid of value) walk(kid, page, depth, table);
       return;
     }
     if (!(value instanceof Map)) return;
@@ -133,7 +147,7 @@ export function readingOrder(doc: PdfDocument): MarkedRef[] {
 
     if (typeName === 'MCR') {
       const mcid = doc.resolve(value.get('MCID'));
-      if (typeof mcid === 'number' && here) out.push({ page: here, mcid });
+      if (typeof mcid === 'number' && here) out.push(table ? { page: here, mcid, table } : { page: here, mcid });
       return;
     }
 
@@ -141,11 +155,30 @@ export function readingOrder(doc: PdfDocument): MarkedRef[] {
     // that points back at itself, which a malformed file can.
     if (seen.has(value)) return;
     seen.add(value);
-    if (value.has('K')) walk(value.get('K')!, here, depth + 1);
+    const inTable = table || roleOf(name(doc.resolve(value.get('S')))) === 'Table';
+    if (value.has('K')) walk(value.get('K')!, here, depth + 1, inTable);
   };
 
   walk(doc.at(cat, 'StructTreeRoot', 'K'), undefined, 0);
   return out;
+}
+
+/**
+ * A tag through the document's role map: a producer may call a table
+ * "DataGrid" and map it, and a check that matched only the standard name
+ * would miss it.
+ */
+function roleResolver(doc: PdfDocument): (tag: string) => string {
+  const roleMap = doc.at(doc.catalog, 'StructTreeRoot', 'RoleMap');
+  return (tag: string): string => {
+    let out = tag;
+    for (let i = 0; i < 8 && roleMap instanceof Map; i++) {
+      const mapped = name(doc.resolve(roleMap.get(out)));
+      if (!mapped || mapped === out) break;
+      out = mapped;
+    }
+    return out;
+  };
 }
 
 /** Reads the facts once, so the checks below agree with each other. */
@@ -156,16 +189,7 @@ export function readPdfFacts(doc: PdfDocument): PdfFacts {
   const structRoot = doc.at(cat, 'StructTreeRoot');
   const tagged = marked && structRoot instanceof Map;
 
-  const roleMap = doc.at(cat, 'StructTreeRoot', 'RoleMap');
-  const roleOf = (tag: string): string => {
-    let out = tag;
-    for (let i = 0; i < 8 && roleMap instanceof Map; i++) {
-      const mapped = name(doc.resolve(roleMap.get(out)));
-      if (!mapped || mapped === out) break;
-      out = mapped;
-    }
-    return out;
-  };
+  const roleOf = roleResolver(doc);
 
   const pageIndex = new Map<PdfDict, number>();
   doc.pages.forEach((p, i) => pageIndex.set(p, i + 1));

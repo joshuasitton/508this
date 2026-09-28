@@ -88,6 +88,14 @@ export function scrubJob(job: Job, at: string): Job {
     }),
   };
 
+  // The export's refusal names characters or figures out of the document, which
+  // is a quotation in a different shape. The outcome stays; the detail goes.
+  if (job.exported?.detail) {
+    const { detail: _detail, ...rest } = job.exported;
+    void _detail;
+    scrubbed.exported = rest;
+  }
+
   if (job.applied) {
     scrubbed.applied = job.applied.map((a) => ({
       ...a,
