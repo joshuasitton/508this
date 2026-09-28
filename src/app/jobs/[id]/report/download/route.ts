@@ -2,8 +2,7 @@ import { buildAcr } from '@/domain/acr';
 import { acrFilename } from '@/domain/acrDocx';
 import { acrDocx } from '@/server/acr';
 import { openJobToChange } from '@/server/access';
-
-const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+import { DOCX_TYPE, attachment } from '@/server/download';
 
 /**
  * The conformance statement as a Word file. Built on demand rather than
@@ -23,16 +22,5 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
   const acr = buildAcr(job);
   const bytes = acrDocx(acr, job.remediatedAt ?? job.createdAt);
-  const filename = acrFilename(job.filename);
-  const ascii = filename.replace(/[^\x20-\x7e]/g, '_').replace(/["\\]/g, '_');
-  const utf8 = encodeURIComponent(filename);
-
-  return new Response(Buffer.from(bytes), {
-    headers: {
-      'Content-Type': DOCX,
-      'Content-Disposition': `attachment; filename="${ascii}"; filename*=UTF-8''${utf8}`,
-      'Content-Length': String(bytes.byteLength),
-      'Cache-Control': 'private, no-store',
-    },
-  });
+  return attachment(bytes, acrFilename(job.filename), DOCX_TYPE);
 }

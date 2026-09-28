@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 
 import { DOCUMENT_EXEMPT, labelFor } from '@/domain/criteria';
 import { assessAll, describeRemarks, describeSummary, isOpen, stateOf, summarise } from '@/domain/findings';
-import { describeStatus } from '@/domain/job';
+import { PDF_EXPORT_IS, describeExport, describeStatus } from '@/domain/job';
 import { groupByKind } from '@/domain/kinds';
 import { describeSignInNeeded, mayReview } from '@/domain/viewer';
 import { describeRetention } from '@/domain/retention';
@@ -71,6 +71,7 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
   const signedIn = mayReview(who);
   const retention = describeRetention(job);
   const scrubbed = describeScrub(job);
+  const exported = describeExport(job.exported);
   const work = workFor(job);
   const quotes = quoteAll(work);
   const best = bestOffer(work);
@@ -360,11 +361,37 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
             )}
             {signedIn && job.remediatedAt && (
               <ul className={styles.downloads}>
+                {/*
+                  The package first, because the three files are one
+                  deliverable. A customer who took the document and missed the
+                  statement has not been delivered to, and the order of a list
+                  is the only instruction most people read.
+                */}
                 <li>
-                  <a href={`/jobs/${job.id}/download`} className="btn btn-primary">
-                    Download the remediated document
+                  <a href={`/jobs/${job.id}/package`} className="btn btn-primary">
+                    Download the package
                   </a>
+                  <span className={styles.muted}>
+                    The remediated document, a tagged PDF of it, and the conformance statement, in one archive.
+                  </span>
                 </li>
+                <li>
+                  <a href={`/jobs/${job.id}/download`}>Remediated document on its own</a>
+                </li>
+                {job.format === 'docx' && (
+                  <li>
+                    <a href={`/jobs/${job.id}/download?which=pdf`}>Tagged PDF on its own</a>
+                    {/*
+                      Both sentences, and in this order. What the export *is*
+                      has to be said before a customer downloads it, or someone
+                      expecting a picture of their Word file finds out by
+                      opening it. What the check found is said after, because it
+                      is only true once the PDF has been built.
+                    */}
+                    <span className={styles.muted}>{PDF_EXPORT_IS}</span>
+                    {exported && <span className={styles.muted}>{exported}</span>}
+                  </li>
+                )}
                 <li>
                   <Link href={`/jobs/${job.id}/review`} className="btn btn-quiet">
                     {summary.conforms ? 'Review record' : 'Review what is left'}

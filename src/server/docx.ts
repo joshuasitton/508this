@@ -12,6 +12,9 @@ export class NotADocxError extends Error {}
 const DOCUMENT = 'word/document.xml';
 const OPTIONAL: Array<[keyof Omit<DocxParts, 'document'>, string]> = [
   ['styles', 'word/styles.xml'],
+  ['numbering', 'word/numbering.xml'],
+  ['footnotes', 'word/footnotes.xml'],
+  ['endnotes', 'word/endnotes.xml'],
   ['settings', 'word/settings.xml'],
   ['core', 'docProps/core.xml'],
   ['contentTypes', '[Content_Types].xml'],
@@ -21,6 +24,9 @@ const OPTIONAL: Array<[keyof Omit<DocxParts, 'document'>, string]> = [
 const PATHS: Record<keyof DocxParts, string> = {
   document: DOCUMENT,
   styles: 'word/styles.xml',
+  numbering: 'word/numbering.xml',
+  footnotes: 'word/footnotes.xml',
+  endnotes: 'word/endnotes.xml',
   settings: 'word/settings.xml',
   core: 'docProps/core.xml',
   contentTypes: '[Content_Types].xml',

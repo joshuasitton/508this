@@ -125,3 +125,47 @@ test('a tagged document with nothing to compare is escalated, not passed', () =>
     assert.match(found!.description, /by a person/);
   }
 });
+
+/**
+ * A table's cells are read after the cell above and to the left of them, which
+ * on the page is a jump upward. That is what a correct table looks like, and
+ * before cells were excluded this check called every multi-line row a failure —
+ * found by running it over a document 508This had written itself, where every
+ * tag was known to be right.
+ */
+test('a multi-line table row is not a reading-order failure', () => {
+  const cell = (order: number, top: number, left: number, right: number): PlacedBlock => ({
+    order,
+    text: `Cell text ${order}`,
+    top,
+    bottom: top + 20,
+    left,
+    right,
+    table: true,
+  });
+  // Two columns, two lines each, read column by column: block 2 sits level
+  // with block 0 and a clear line above block 1, which is read before it.
+  const cells = [cell(0, 100, 100, 480), cell(1, 160, 100, 480), cell(2, 100, 520, 900), cell(3, 160, 520, 900)];
+  assert.deepEqual(sequenceFindings([page(cells)], true), []);
+
+  // The control: the same geometry outside a table is exactly the inversion
+  // this check exists to report.
+  const prose = cells.map((block) => {
+    const copy = { ...block };
+    delete copy.table;
+    return copy;
+  });
+  const [found] = sequenceFindings([page(prose)], true);
+  assert.ok(found, 'the same order in running text is still a finding');
+  assert.equal(found?.criterion, '1.3.2');
+});
+
+test('a table is not a two-column page', () => {
+  const columns: PlacedBlock[] = [];
+  for (let i = 0; i < COLUMN_BLOCKS; i += 1) {
+    columns.push({ order: i * 2, text: `Left ${i}`, top: 100 + i * 40, bottom: 120 + i * 40, left: 100, right: 400, table: true });
+    columns.push({ order: i * 2 + 1, text: `Right ${i}`, top: 100 + i * 40, bottom: 120 + i * 40, left: 600, right: 900, table: true });
+  }
+  assert.equal(countColumns(columns, WIDTH), 2, 'the geometry really is two columns');
+  assert.deepEqual(sequenceFindings([page(columns)], true), [], 'but a table is not a page in columns');
+});

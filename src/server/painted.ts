@@ -96,9 +96,11 @@ async function read(pdf: Uint8Array, about: Inspecting): Promise<Painted> {
   const blocks: TextBlock[] = [];
   const sequences: PageSequence[] = [];
 
-  // Where each marked-content id sits in the tag tree's reading order.
-  const order = new Map<string, number>();
-  about.reading.forEach((ref, at) => order.set(`${ref.page}:${ref.mcid}`, at));
+  // Where each marked-content id sits in the tag tree's reading order, and
+  // whether it is inside a table — which `pdfSequence.ts` needs, because
+  // geometry cannot judge a cell.
+  const order = new Map<string, { at: number; table: boolean }>();
+  about.reading.forEach((ref, at) => order.set(`${ref.page}:${ref.mcid}`, { at, table: ref.table === true }));
 
   try {
     const pages = Math.min(doc.numPages, MAX_PAGES);
@@ -149,9 +151,9 @@ async function read(pdf: Uint8Array, about: Inspecting): Promise<Painted> {
         // inside a P is tagged by the Span.
         const mcid = [...open].reverse().find((id) => id !== null) ?? null;
         if (mcid === null) continue;
-        const at = order.get(`${number}:${mcid}`);
-        if (at === undefined) continue;
-        place(boxes, mcid, at, item, viewport, width, height);
+        const found = order.get(`${number}:${mcid}`);
+        if (found === undefined) continue;
+        place(boxes, mcid, found, item, viewport, width, height);
       }
 
       if (words.length) blocks.push({ page: number, text: words.join(' ') });
@@ -189,7 +191,7 @@ function mcidOf(id: string | null | undefined): number | null {
 function place(
   boxes: Map<number, PlacedBlock>,
   mcid: number,
-  at: number,
+  found: { at: number; table: boolean },
   item: TextItem,
   viewport: { convertToViewportPoint(x: number, y: number): number[] },
   width: number,
@@ -199,7 +201,7 @@ function place(
   if (!box) return;
   const existing = boxes.get(mcid);
   if (!existing) {
-    boxes.set(mcid, { order: at, text: item.str, ...box });
+    boxes.set(mcid, { order: found.at, text: item.str, table: found.table, ...box });
     return;
   }
   existing.text = `${existing.text} ${item.str}`;

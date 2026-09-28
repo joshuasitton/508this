@@ -64,6 +64,42 @@ export interface Job {
    * every description in it is written by a person.
    */
   cui?: boolean;
+  /**
+   * What the tagged PDF export came to, last time it was built.
+   *
+   * It is a record of a *check*, not a second copy of the findings: only the
+   * criterion numbers the exported PDF still has anything open on, because the
+   * findings themselves quote the document and a second copy of the customer's
+   * words in this record is a second thing to scrub at delivery. Empty
+   * `criteria` is the answer the service hopes for and can state — the export
+   * was run through the same detector a customer's own PDF goes through, and it
+   * came back clean.
+   *
+   * `refused` is the other outcome. Some documents cannot be exported at all,
+   * and saying which and why is better than an empty download.
+   */
+  exported?: PdfExportRecord;
+}
+
+export interface PdfExportRecord {
+  at: string;
+  pages?: number;
+  /** Criteria still open in the exported PDF. Absent when it was refused. */
+  criteria?: string[];
+  /**
+   * Whether the pass that draws each page ran. It answers 1.4.3, 3.1.2 and
+   * 1.3.2, it times out rather than throwing, and an empty finding list from a
+   * pass that never ran looks exactly like a clean one — so which it was is
+   * recorded, and the page says so rather than claiming the wider check.
+   */
+  rendered?: boolean;
+  refused?: 'unsupported-characters' | 'unsupported-figure' | 'not-a-document';
+  /**
+   * The characters, or the figures, that refused it — so a reviewer can act
+   * rather than guess. It comes from the document, so `scrubJob` takes it out
+   * at delivery along with every other quotation.
+   */
+  detail?: string[];
 }
 
 /** One change remediation made, in the customer's words. */
@@ -184,4 +220,50 @@ export function describeStatus(status: JobStatus): string {
     case 'delivered':
       return 'Delivered. The remediated document and its conformance report are ready.';
   }
+}
+
+/**
+ * What the PDF export is, in the customer's words.
+ *
+ * Two sentences the page has to be able to say and cannot fudge. The first is
+ * what the export *is*: a conformant reading copy, not a photograph of the Word
+ * file, because the fonts are the standard fourteen and the lines are broken by
+ * this service rather than by Word. A customer who expects a replica and gets a
+ * reading copy has been misled by silence.
+ *
+ * The second is what the check came back with. "We checked it" is worth nothing
+ * unless it says with what and what it found, so the criteria are named when
+ * any are open — and when none are, that is stated plainly, because it is the
+ * strongest true thing the service can say about a file it wrote itself.
+ */
+export const PDF_EXPORT_IS =
+  'A reading copy, not a copy of the layout: the headings, lists, tables, links and figure descriptions with a reading order, set in standard fonts, so pages break where this service breaks them and not where Word did. Where the look matters more, use Word’s own “Save as PDF” on the remediated file.';
+
+export function describeExport(record: PdfExportRecord | undefined): string | null {
+  if (!record) return null;
+  switch (record.refused) {
+    case 'unsupported-characters':
+      return `This document cannot be exported as a PDF here: it uses characters the export’s fonts cannot set${
+        record.detail?.length ? ` (${record.detail.slice(0, 8).join(' ')})` : ''
+      }. The export refuses rather than replacing them with something the document does not say. Word’s own “Save as PDF” on the remediated document handles it.`;
+    case 'unsupported-figure':
+      return `This document cannot be exported as a PDF here: one of its pictures is in a format the export cannot read${
+        record.detail?.length ? ` (${record.detail.slice(0, 4).join(', ')})` : ''
+      }. Rather than deliver a document with a figure silently missing, the export refuses. Word’s own “Save as PDF” handles it.`;
+    case 'not-a-document':
+      return 'The remediated document could not be reopened to export it. Nothing is wrong with the document you downloaded; the export is what failed.';
+    default:
+      break;
+  }
+  const pages = record.pages ? `${record.pages} ${record.pages === 1 ? 'page' : 'pages'}, checked` : 'Checked';
+  const how = record.rendered
+    ? 'with the same detector this service checks a customer’s PDF with'
+    : 'against its tag tree — the pass that draws each page to measure contrast and reading order could not run, so those stay a reviewer’s';
+  if (!record.criteria || record.criteria.length === 0) {
+    return `${pages} ${how}: nothing is open in the exported PDF.`;
+  }
+  const list = record.criteria.join(', ');
+  return `${pages} ${how}. ${
+    record.criteria.length === 1 ? 'One criterion is' : `${record.criteria.length} criteria are`
+  } still open in the exported PDF: ${list} — the same ${record.criteria.length === 1 ? 'one' : 'ones'} the document itself still owes.`;
 }

@@ -7,6 +7,7 @@ import {
   checkUpload,
   describeStatus,
   describeUploadProblem,
+  describeExport,
   formatFor,
   reviewerName,
 } from '../src/domain/job';
@@ -70,4 +71,42 @@ test('every status and problem has a sentence', () => {
   for (const p of ['no-file', 'unsupported-format', 'too-large', 'not-a-document'] as const) {
     assert.ok(describeUploadProblem(p).length > 10);
   }
+});
+
+/* ── What the PDF export came to ─────────────────────────────────────── */
+
+/**
+ * The sentence beside the download is the whole of what a customer is told
+ * about the export, so it has to distinguish three things that look alike from
+ * the outside: checked and clean, checked and still owing something, and *not
+ * fully checked*. The third is the one worth a test — an empty finding list
+ * from a pass that never ran looks exactly like a clean one, and reporting it
+ * as clean would be the service claiming a check it did not make.
+ */
+test('the export is described by what was actually checked', () => {
+  assert.equal(describeExport(undefined), null);
+
+  const clean = describeExport({ at: '2026-09-28T00:00:00Z', pages: 3, criteria: [], rendered: true }) ?? '';
+  assert.match(clean, /3 pages/);
+  assert.match(clean, /nothing is open/);
+
+  const partial = describeExport({ at: '2026-09-28T00:00:00Z', pages: 3, criteria: ['1.1.1'], rendered: true }) ?? '';
+  assert.match(partial, /One criterion is still open/);
+  assert.match(partial, /1\.1\.1/);
+
+  const unrendered = describeExport({ at: '2026-09-28T00:00:00Z', pages: 2, criteria: [], rendered: false }) ?? '';
+  assert.match(unrendered, /could not run/);
+  assert.doesNotMatch(unrendered, /same detector this service checks/);
+});
+
+test('a refused export says which document feature refused it, and what to do', () => {
+  const characters = describeExport({ at: 'now', refused: 'unsupported-characters', detail: ['提', '→'] }) ?? '';
+  assert.match(characters, /提/);
+  assert.match(characters, /Save as PDF/);
+  // Not "we replaced them": the point of the refusal is that nothing was.
+  assert.match(characters, /refuses rather than replacing/);
+
+  const figure = describeExport({ at: 'now', refused: 'unsupported-figure', detail: ['Chart 1 (.emf)'] }) ?? '';
+  assert.match(figure, /Chart 1 \(\.emf\)/);
+  assert.match(figure, /silently missing/);
 });

@@ -35,6 +35,10 @@ import type { Owner } from '@/domain/viewer';
 import { applyDecisions, remediateDocx } from '@/domain/remediate';
 import { readDocxParts, writeDocx } from './docx';
 import { readPdf, writePdf } from './pdf';
+import { buildAcr } from '@/domain/acr';
+import { acrFilename } from '@/domain/acrDocx';
+import { acrDocx } from './acr';
+import { zip } from './zip';
 
 // Where the bytes live is `blobs.ts`'s business now, not this file's.
 const ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -262,6 +266,111 @@ export function deliveredName(filename: string, which: JobFile): string {
   return dot > 0 ? `${filename.slice(0, dot)} (remediated)${filename.slice(dot)}` : `${filename} (remediated)`;
 }
 
+export type JobPdf =
+  | { ok: true; bytes: Uint8Array; filename: string }
+  | { ok: false; reason: 'unsupported-characters' | 'unsupported-figure' | 'not-a-document'; detail: string[] };
+
+/** "report.docx" comes back as "report (remediated).pdf". */
+export function exportedName(filename: string): string {
+  const dot = filename.lastIndexOf('.');
+  return `${dot > 0 ? filename.slice(0, dot) : filename} (remediated).pdf`;
+}
+
+/**
+ * The delivered document as a tagged PDF, built once and kept.
+ *
+ * Built on demand rather than at remediation, because most of a figure-heavy
+ * document's export cost is decoding its pictures and not every job is
+ * downloaded. Kept rather than rebuilt per request, because the *check* that
+ * goes with it — the whole PDF pipeline, rendered pages included — is the
+ * expensive half and its answer is written onto the record for the page to
+ * state. `rebuild` throws both away, so an export can never describe a
+ * document older than the one it came from.
+ *
+ * A refusal is recorded too. "There is no PDF for this document, because two of
+ * its figures are Windows metafiles" is an answer a reviewer can act on; a
+ * download that fails is not.
+ */
+export async function jobPdf(id: string): Promise<JobPdf | null> {
+  const job = await getJob(id);
+  if (!job || !job.remediatedAt) return null;
+
+  const stored = await readBlob(id, 'export.pdf');
+  if (stored) return { ok: true, bytes: stored, filename: exportedName(job.filename) };
+  if (job.exported?.refused) {
+    return { ok: false, reason: job.exported.refused, detail: job.exported.detail ?? [] };
+  }
+
+  const remediated = await readBlob(id, `remediated.${job.format}`);
+  if (!remediated) return null;
+  // The PDF path has a PDF already; exporting one from itself would be a
+  // second rendering of the customer's own file, which is not a service.
+  if (job.format !== 'docx') return null;
+
+  // `await import` for the same reason `render.ts` is: it reaches a canvas,
+  // this store is in the test suite's import graph, and `npm test` runs with
+  // nothing installed.
+  const { exportPdf } = await import('./pdfExport');
+  const result = await exportPdf(remediated, {
+    fallbackTitle: stem(job.filename),
+    now: job.remediatedAt ?? job.createdAt,
+  });
+
+  if (!result.ok) {
+    const detail = result.reason === 'unsupported-characters' ? result.characters : result.reason === 'unsupported-figure' ? result.figures : [];
+    await writeRecord({ ...job, exported: { at: new Date().toISOString(), refused: result.reason, detail } });
+    return { ok: false, reason: result.reason, detail };
+  }
+
+  await writeBlob(id, 'export.pdf', result.bytes);
+  await writeRecord({
+    ...job,
+    exported: {
+      at: new Date().toISOString(),
+      pages: result.pages,
+      criteria: result.criteria,
+      rendered: result.rendered,
+    },
+  });
+  return { ok: true, bytes: result.bytes, filename: exportedName(job.filename) };
+}
+
+/**
+ * The package the customer came for: the remediated document, the tagged PDF,
+ * and the conformance statement, in one archive.
+ *
+ * Assembled rather than stored, for the same reason the statement is: it is a
+ * function of the job, and the job changes every time a reviewer decides
+ * something. A package on disk would be a second record of the same assessment
+ * and a way for the two to disagree.
+ *
+ * A document whose PDF was refused still gets a package — the other two files
+ * are what the customer paid for, and a missing PDF is explained on the page
+ * rather than by an archive that will not build.
+ */
+export async function jobPackage(id: string): Promise<{ bytes: Uint8Array; filename: string } | null> {
+  const job = await getJob(id);
+  if (!job?.remediatedAt) return null;
+  const document = await getJobFile(id, 'remediated');
+  if (!document) return null;
+
+  const entries = new Map<string, Uint8Array>();
+  entries.set(document.filename, document.bytes);
+
+  const acr = buildAcr(job);
+  entries.set(acrFilename(job.filename), acrDocx(acr, job.remediatedAt ?? job.createdAt));
+
+  const pdf = await jobPdf(id);
+  if (pdf?.ok) entries.set(pdf.filename, pdf.bytes);
+
+  return { bytes: zip(entries), filename: packageName(job.filename) };
+}
+
+export function packageName(filename: string): string {
+  const dot = filename.lastIndexOf('.');
+  return `${dot > 0 ? filename.slice(0, dot) : filename} (508This).zip`;
+}
+
 /**
  * Runs automatic remediation on the original, stores the result, and
  * re-detects it. A finding is marked remediated when it is absent from the
@@ -303,8 +412,13 @@ async function rebuild(job: Job): Promise<Job> {
     applied: [...auto.applied, ...reviewed.applied],
     remediatedAt: new Date().toISOString(),
   };
+  // The export describes the file this just replaced, so it goes. Keeping it
+  // would mean a PDF that says "checked, nothing open" about a document that
+  // has since changed — the one lie this whole pipeline is arranged to prevent.
+  delete updated.exported;
   updated.status = statusOf(updated);
   await writeBlob(job.id, `remediated.${job.format}`, remediated);
+  await removeBlob(keyFor(job.id, 'export.pdf'));
   await writeRecord(updated);
   return updated;
 }
@@ -581,7 +695,7 @@ export async function sweepExpired(now = Date.now()): Promise<string[]> {
     const job = await readRecord(id);
     if (!job || job.deletedAt || !expired(job, now)) continue;
 
-    for (const name of [`original.${job.format}`, `remediated.${job.format}`]) {
+    for (const name of [`original.${job.format}`, `remediated.${job.format}`, 'export.pdf']) {
       await removeBlob(keyFor(id, name));
     }
     await writeRecord({ ...job, deletedAt: new Date(now).toISOString() });
